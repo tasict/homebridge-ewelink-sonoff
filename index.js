@@ -252,6 +252,12 @@ function eWeLink(log, config, api) {
 
                                 if (json.hasOwnProperty("params") && json.params.hasOwnProperty("switch")) {
                                     platform.updatePowerStateCharacteristic(json.deviceid, json.params.switch);
+                                } else if (json.hasOwnProperty("params") && json.params.hasOwnProperty("switches") && Array.isArray(json.params.switches)) {
+                                    json.params.switches.forEach(function (entry) {
+                                        if (entry.hasOwnProperty('outlet') && entry.hasOwnProperty('switch')) {
+                                            platform.updatePowerStateCharacteristic(json.deviceid + 'CH' + (entry.outlet+1), entry.switch);
+                                        }
+                                    });
                                 }
 
                             }
