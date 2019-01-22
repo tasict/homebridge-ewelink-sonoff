@@ -160,13 +160,13 @@ function eWeLink(log, config, api) {
                             accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, deviceInformationFromWebApi.params.fwVersion);
 
                             if(switchesAmount > 1) {
-                                platform.log(switchesAmount + " channels device has been set: " + deviceInformationFromWebApi.extra.extra.model);
+                                platform.log(switchesAmount + " channels device has been set: " + deviceInformationFromWebApi.extra.extra.model + ' uiid: ' + deviceInformationFromWebApi.uiid);
                                 for(let i=0; i!==switchesAmount; i++) {
                                     accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Name, deviceInformationFromWebApi.name + ' CH ' + (i+1));
                                     platform.updatePowerStateCharacteristic(deviceId + 'CH' + (i+1), deviceInformationFromWebApi.params.switches[i].switch, platform.devicesFromApi.get(deviceId));
                                 }
                             } else  {
-                                platform.log("Single channel device has been set: " + deviceInformationFromWebApi.extra.extra.model);
+                                platform.log("Single channel device has been set: " + deviceInformationFromWebApi.extra.extra.model + ' uiid: ' + deviceInformationFromWebApi.uiid);
                                 accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Name, deviceInformationFromWebApi.name);
                                 platform.updatePowerStateCharacteristic(deviceId, deviceInformationFromWebApi.params.switch);
                             }
@@ -231,7 +231,7 @@ function eWeLink(log, config, api) {
                                 } else if (json.hasOwnProperty("params") && json.params.hasOwnProperty("switches") && Array.isArray(json.params.switches)) {
                                     json.params.switches.forEach(function (entry) {
                                         if (entry.hasOwnProperty('outlet') && entry.hasOwnProperty('switch')) {
-                                            platform.updatePowerStateCharacteristic(json.deviceid + 'CH' + (entry.outlet+1), entry.switch);
+                                            platform.updatePowerStateCharacteristic(json.deviceid + 'CH' + (entry.outlet+1), entry.switch, platform.devicesFromApi.get(json.deviceid));
                                         }
                                     });
                                 }
@@ -410,8 +410,14 @@ eWeLink.prototype.updatePowerStateCharacteristic = function(deviceId, state, dev
     let accessory = platform.accessories.get(deviceId);
 
     if(typeof accessory === 'undefined' && device) {
+        platform.log("Adding accessory for deviceId [%s].", deviceId);
         platform.addAccessory(device, deviceId);
         accessory = platform.accessories.get(deviceId);
+    }
+
+    if (!accessory) {
+        platform.log("Error updating non-exist accessory with deviceId [%s].", deviceId);
+        return;
     }
 
     if (state === 'on') {
