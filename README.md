@@ -90,6 +90,15 @@ You can only have one authentication token per user account.
 
 Therefore if you use the HomeKit app and eWeLink app at the same time, they will fight each other for the login session. They should both work individually. You can leave homebridge running when using the eWeLink app.
 
+### To avoid being logged off from the eWeLink app
+
+1. Create another account
+2. Then log in with the new account on another mobile device (you have to keep both accounts connected and with eWeLink on the screen).
+3. Go to your eWeLink, select your Sonoff device and share it with the other account.
+4. A popup should appear on the other mobile device, accept it.
+5. Use the second account as your plugin login (and never use this account on eWeLink anymore to avoid being logged off)
+6. Be happy and never get a "session expired" message again.
+
 ## Troubleshooting
 
 I've attempted to make the logging as useful as possible. If you have any suggestions, please open an issue on GitHub.
