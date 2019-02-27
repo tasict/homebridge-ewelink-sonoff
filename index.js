@@ -435,6 +435,12 @@ eWeLink.prototype.updatePowerStateCharacteristic = function(deviceId, state, dev
 eWeLink.prototype.getPowerState = function(accessory, callback) {
     let platform = this;
 
+    if (!this.webClient) {
+        callback('this.webClient not yet ready while obtaining power status for your device');
+        accessory.reachable = false;
+        return;
+    }
+
     platform.log("Requesting power state for [%s]", accessory.displayName);
 
     this.webClient.get('/api/user/device', function(err, res, body) {
