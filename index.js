@@ -420,17 +420,17 @@ eWeLink.prototype.addAccessory = function(device, deviceId = null, services = { 
     accessory.context.channel = channel;
 
     accessory.reachable = device.online === 'true';
-
-	if(services.switch) {
+    
+    if(services.switch) {
         accessory.addService(Service.Switch, device.name + (channel ? ' CH ' + channel : ''))
-            .getCharacteristic(Characteristic.On)
-            .on('set', function(value, callback) {
-                platform.setPowerState(accessory, value, callback);
-            })
-            .on('get', function(callback) {
-                platform.getPowerState(accessory, callback);
-            });
-	}
+        .getCharacteristic(Characteristic.On)
+        .on('set', function(value, callback) {
+            platform.setPowerState(accessory, value, callback);
+        })
+        .on('get', function(callback) {
+            platform.getPowerState(accessory, callback);
+        });
+    }
     if(services.thermostat) {
         var service = accessory.addService(Service.Thermostat, device.name + (channel ? ' CH ' + channel : ''));
 
@@ -470,7 +470,6 @@ eWeLink.prototype.addAccessory = function(device, deviceId = null, services = { 
             platform.getCurrentHumidity(accessory, callback);
         });
     }
-
 
     accessory.on('identify', function(paired, callback) {
         platform.log(accessory.displayName, "Identify not supported");
@@ -686,40 +685,33 @@ eWeLink.prototype.getPowerState = function(accessory, callback) {
 
     });
 
-
 };
 
 eWeLink.prototype.getCurrentTemperature = function(accessory, callback) {
     let platform = this;
 
-    platform.log("Requesting power state for [%s]", accessory.displayName);
+    platform.log("Requesting current temperature for [%s]", accessory.displayName);
 
     this.webClient.get('/api/user/device', function(err, res, body) {
 
         if (err){
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. Verify your configuration options. Error was [%s]", err);
+            platform.log("An error was encountered while requesting a list of devices while interrogating current temperature. Verify your configuration options. Error was [%s]", err);
             return;
         } else if (!body || body.hasOwnProperty('error')) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. Verify your configuration options. Response was [%s]", JSON.stringify(body));
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
+            platform.log("An error was encountered while requesting a list of devices while interrogating current temperature. Verify your configuration options. Response was [%s]", JSON.stringify(body));
+            callback('An error was encountered while requesting a list of devices to interrogate current temperature for your device');
             return;
         }
 
         let size = Object.keys(body).length;
 
         if (body.length < 1) {
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
+            callback('An error was encountered while requesting a list of devices to interrogate current temperature for your device');
             accessory.reachable = false;
             return;
         }
 
         let deviceId = accessory.context.deviceId;
-
-        // platform.log("getCurrentTemperature, context", JSON.stringify(accessory.context,null,2));
-
-        //if(accessory.context.switches > 1) {
-        //    deviceId = deviceId.replace("CH" + accessory.context.channel, "");
-        //}
 
         let filteredResponse = body.filter(device => (device.deviceid === deviceId));
 
@@ -736,10 +728,8 @@ eWeLink.prototype.getCurrentTemperature = function(accessory, callback) {
                     return;
                 }
 
-                
                 let currentTemperature = device.params.currentTemperature;
                 platform.log("getCurrentTemperature:", currentTemperature);
-
 
                 if(accessory.getService(Service.Thermostat)) {
                     accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.CurrentTemperature, currentTemperature);
@@ -749,25 +739,6 @@ eWeLink.prototype.getCurrentTemperature = function(accessory, callback) {
                 }
                 accessory.reachable = true;
                 callback(null,currentTemperature);
-                /*
-                if (device.params.currentTemperature !== undefined) {
-                    accessory.reachable = true;
-                    accessory.setCharacteristic(Characteristic.)
-                    platform.log('API reported that [%s] is On', device.name);
-                    callback(null, 1);
-                    return;
-                } else if (device.params.switch === 'off') {
-                    accessory.reachable = true;
-                    platform.log('API reported that [%s] is Off', device.name);
-                    callback(null, 0);
-                    return;
-                } else {
-                    accessory.reachable = false;
-                    platform.log('API reported an unknown status for device [%s]', accessory.displayName);
-                    callback('API returned an unknown status for device ' + accessory.displayName);
-                    return;
-                }
-                */
 
             }
 
@@ -788,40 +759,33 @@ eWeLink.prototype.getCurrentTemperature = function(accessory, callback) {
 
     });
 
-
 };
 
 eWeLink.prototype.getCurrentHumidity = function(accessory, callback) {
     let platform = this;
 
-    platform.log("Requesting power state for [%s]", accessory.displayName);
+    platform.log("Requesting current humidity for [%s]", accessory.displayName);
 
     this.webClient.get('/api/user/device', function(err, res, body) {
 
         if (err){
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. Verify your configuration options. Error was [%s]", err);
+            platform.log("An error was encountered while requesting a list of devices while interrogating current humidity. Verify your configuration options. Error was [%s]", err);
             return;
         } else if (!body || body.hasOwnProperty('error')) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. Verify your configuration options. Response was [%s]", JSON.stringify(body));
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
+            platform.log("An error was encountered while requesting a list of devices while interrogating current humidity. Verify your configuration options. Response was [%s]", JSON.stringify(body));
+            callback('An error was encountered while requesting a list of devices to interrogate current humidity for your device');
             return;
         }
 
         let size = Object.keys(body).length;
 
         if (body.length < 1) {
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
+            callback('An error was encountered while requesting a list of devices to interrogate current humidity for your device');
             accessory.reachable = false;
             return;
         }
 
         let deviceId = accessory.context.deviceId;
-
-        // platform.log("getCurrentTemperature, context", JSON.stringify(accessory.context,null,2));
-
-        //if(accessory.context.switches > 1) {
-        //    deviceId = deviceId.replace("CH" + accessory.context.channel, "");
-        //}
 
         let filteredResponse = body.filter(device => (device.deviceid === deviceId));
 
@@ -838,7 +802,6 @@ eWeLink.prototype.getCurrentHumidity = function(accessory, callback) {
                     return;
                 }
 
-                
                 let currentHumidity = device.params.currentHumidity;
                 platform.log("getCurrentHumidity:", currentHumidity);
 
@@ -850,25 +813,6 @@ eWeLink.prototype.getCurrentHumidity = function(accessory, callback) {
                 }
                 accessory.reachable = true;
                 callback(null,currentHumidity);
-                /*
-                if (device.params.currentTemperature !== undefined) {
-                    accessory.reachable = true;
-                    accessory.setCharacteristic(Characteristic.)
-                    platform.log('API reported that [%s] is On', device.name);
-                    callback(null, 1);
-                    return;
-                } else if (device.params.switch === 'off') {
-                    accessory.reachable = true;
-                    platform.log('API reported that [%s] is Off', device.name);
-                    callback(null, 0);
-                    return;
-                } else {
-                    accessory.reachable = false;
-                    platform.log('API reported an unknown status for device [%s]', accessory.displayName);
-                    callback('API returned an unknown status for device ' + accessory.displayName);
-                    return;
-                }
-                */
 
             }
 
@@ -888,7 +832,6 @@ eWeLink.prototype.getCurrentHumidity = function(accessory, callback) {
         }
 
     });
-
 
 };
 
