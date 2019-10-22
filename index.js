@@ -84,21 +84,21 @@ function eWeLink(log, config, api) {
                 this.webClient = request.createClient(url);
 
                 this.webClient.headers['Authorization'] = 'Bearer ' + this.authenticationToken;
-                this.webClient.get('/api/user/device?'+ this.getArguments() , function(err, res, body) {
-                    
-                    if (err ){
+                this.webClient.get('/api/user/device?' + this.getArguments() , function(err, res, body) {
+
+                    if (err) {
                         platform.log("An error was encountered while requesting a list of devices. Error was [%s]", err);
                         return;
                     } else if (!body) {
                         platform.log("An error was encountered while requesting a list of devices. No data in response.");
                         return;
-                    }else if(body.hasOwnProperty('error') && body.error != 0){
+                    } else if(body.hasOwnProperty('error') && body.error != 0) {
                         let response = JSON.stringify(body);
                         platform.log("An error was encountered while requesting a list of devices. Response was [%s]", response);
                         if (body.error === '401') {
                             platform.log("Verify that you have the correct authenticationToken specified in your configuration. The currently-configured token is [%s]", platform.authenticationToken);
                         }
-                        return
+                        return;
                     }
 
                     body = body.devicelist;
@@ -163,7 +163,7 @@ function eWeLink(log, config, api) {
                             accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Model, deviceInformationFromWebApi.extra.extra.model + ' (' + deviceInformationFromWebApi.uiid + ')');
                             accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, deviceInformationFromWebApi.params.fwVersion);
 
-                            if(switchesAmount > 1) {
+                            if (switchesAmount > 1) {
                                 platform.log(switchesAmount + " channels device has been set: " + deviceInformationFromWebApi.extra.extra.model + ' uiid: ' + deviceInformationFromWebApi.uiid);
                                 for(let i=0; i!==switchesAmount; i++) {
                                     accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Name, deviceInformationFromWebApi.name + ' CH ' + (i+1));
@@ -212,8 +212,6 @@ function eWeLink(log, config, api) {
                     }
 
                     platform.log("API key retrieved from web service is [%s]", platform.apiKey);
-
-                    apiKey = platform.apiKey
 
                     // We have our devices, now open a connection to the WebSocket API
 
@@ -593,15 +591,15 @@ eWeLink.prototype.getPowerState = function(accessory, callback) {
 
     platform.log("Requesting power state for [%s]", accessory.displayName);
 
-    this.webClient.get('/api/user/device?'+ this.getArguments(), function(err, res, body) {
+    this.webClient.get('/api/user/device?' + this.getArguments(), function(err, res, body) {
 
-        if (err){
+        if (err) {
             platform.log("An error was encountered while requesting a list of devices while interrogating power status. Error was [%s]", err);
             return;
         } else if (!body) {
             platform.log("An error was encountered while requesting a list of devices while interrogating power status. No data in response.", err);
             return;
-        }else if(body.hasOwnProperty('error') && body.error != 0){
+        } else if(body.hasOwnProperty('error') && body.error != 0) {
             platform.log("An error was encountered while requesting a list of devices while interrogating power status. Verify your configuration options. Response was [%s]", JSON.stringify(body));
             if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
                 platform.relogin();
@@ -707,15 +705,15 @@ eWeLink.prototype.getCurrentTemperature = function(accessory, callback) {
 
     platform.log("Requesting current temperature for [%s]", accessory.displayName);
 
-    this.webClient.get('/api/user/device?'+ this.getArguments(), function(err, res, body) {
+    this.webClient.get('/api/user/device?' + this.getArguments(), function(err, res, body) {
 
-        if (err){
+        if (err) {
             platform.log("An error was encountered while requesting a list of devices while interrogating current temperature. Verify your configuration options. Error was [%s]", err);
             return;
         } else if (!body) {
             platform.log("An error was encountered while requesting a list of devices while interrogating current temperature. Verify your configuration options. No data in response.", err);
             return;
-        }else if(body.hasOwnProperty('error') && body.error != 0){
+        } else if(body.hasOwnProperty('error') && body.error != 0) {
             platform.log("An error was encountered while requesting a list of devices while interrogating current temperature. Verify your configuration options. Response was [%s]", JSON.stringify(body));
             callback('An error was encountered while requesting a list of devices to interrogate current temperature for your device');
             return;
@@ -786,22 +784,21 @@ eWeLink.prototype.getCurrentHumidity = function(accessory, callback) {
 
     platform.log("Requesting current humidity for [%s]", accessory.displayName);
 
-    this.webClient.get('/api/user/device?'+this.getArguments(), function(err, res, body) {
+    this.webClient.get('/api/user/device?' + this.getArguments(), function(err, res, body) {
 
-        if (err){
+        if (err) {
             platform.log("An error was encountered while requesting a list of devices while interrogating current humidity. Verify your configuration options. Error was [%s]", err);
             return;
         } else if (!body) {
             platform.log("An error was encountered while requesting a list of devices while interrogating current humidity. Verify your configuration options. No data in response.", err);
             return;
-        }else if(body.hasOwnProperty('error') && body.error != 0){
+        } else if(body.hasOwnProperty('error') && body.error != 0) {
             platform.log("An error was encountered while requesting a list of devices while interrogating current humidity. Verify your configuration options. Response was [%s]", JSON.stringify(body));
             callback('An error was encountered while requesting a list of devices to interrogate current humidity for your device');
             return;
         }
 
         body = body.devicelist;
-
 
         let size = Object.keys(body).length;
 
@@ -893,9 +890,6 @@ eWeLink.prototype.setHumidityState = function(accessory, value, callback) {
     callback();
 };
 
-
-
-
 eWeLink.prototype.setPowerState = function(accessory, isOn, callback) {
     let platform = this;
     let options = {};
@@ -982,9 +976,6 @@ eWeLink.prototype.login = function(callback) {
     data.model = 'iPhone10,6';
     data.romVersion = '11.1.2';
     data.appVersion = '3.5.3';
-
-
-
     
     let json = JSON.stringify(data);
     this.log('Sending login request with user credentials: %s', json);
@@ -1186,21 +1177,21 @@ eWeLink.prototype.getDeviceChannelCount = function (device) {
     
 //create arguments for later get request
 eWeLink.prototype.getArguments = function(){
-    let args = {}
-    args.lang = 'en'
-    args.apiKey = apiKey
-    args.getTag = '1'
-    args.version = '6'
+    let args = {};
+    args.lang = 'en';
+    args.apiKey = this.apiKey;
+    args.getTag = '1';
+    args.version = '6';
     args.ts = '' + Math.floor(new Date().getTime() / 1000);
     args.nounce = '' + nonce();
-    args.appid = 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq'
+    args.appid = 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq';
     args.imei = this.config.imei;
     args.os = 'iOS';
     args.model = 'iPhone10,6';
     args.romVersion = '11.1.2';
     args.appVersion = '3.5.3';
     return querystring.stringify(args);
-}
+};
 
 /* WEB SOCKET STUFF */
 
