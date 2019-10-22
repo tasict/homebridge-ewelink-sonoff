@@ -117,7 +117,10 @@ function eWeLink(log, config, api) {
 
                     body.forEach((device) => {
                         platform.apiKey = device.apikey;
-                        platform.devicesFromApi.set(device.deviceid, device);
+                        // Skip Sonoff Bridge as it is not supported by this plugin
+                        if (['RF_BRIDGE'].indexOf(platform.getDeviceTypeByUiid(device.uiid)) == -1) {
+                            platform.devicesFromApi.set(device.deviceid, device);
+                        }
                     });
 
                     // Now we compare the cached devices against the web list
