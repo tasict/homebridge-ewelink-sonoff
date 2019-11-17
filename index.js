@@ -1027,7 +1027,15 @@ eWeLink.prototype.getPowerState = function (accessory, callback) {
     this.webClient.get('/api/user/device?' + this.getArguments(), function (err, res, body) {
 
         if (err) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. Error was [%s]", err);
+            if ([503].indexOf(parseInt(res.statusCode)) !== -1) {
+                // callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
+                platform.log('Sonoff API 503 error');
+                setTimeout(function() {
+                    platform.getPowerState(accessory, callback);
+                }, 1000);
+            } else {
+                platform.log("An error was encountered while requesting a list of devices while interrogating power status. Verify your configuration options. Error was [%s]", err);
+            }
             return;
         } else if (!body) {
             platform.log("An error was encountered while requesting a list of devices while interrogating power status. No data in response.", err);
@@ -1059,7 +1067,7 @@ eWeLink.prototype.getPowerState = function (accessory, callback) {
 
         let filteredResponse = body.filter(device => (device.deviceid === deviceId));
         console.log(deviceId);
-        console.log(device.deviceid);
+        // console.log(device.deviceid);
 
         if (filteredResponse.length === 1) {
 
