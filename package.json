@@ -1,9 +1,8 @@
 {
   "name": "homebridge-ewelink-krasnov",
-  "version": "0.1.15-1",
+  "version": "0.1.17-1",
   "author": "gbro115",
   "contributors": [
-    "Viktor Krasnov",
     "krasnovvy@gmail.com"
   ],
   "description": "homebridge-eWeLink is a Homebrige plugin to control Sonoff relays and T1 switches running OEM firmware",
