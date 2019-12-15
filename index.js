@@ -13,8 +13,6 @@ let webClient = '';
 let apiKey = 'UNCONFIGURED';
 let authenticationToken = 'UNCONFIGURED';
 let Accessory, Service, Characteristic, UUIDGen;
-let delaySend = 0;
-const delayOffset = 280;
 
 module.exports = function (homebridge) {
     console.log("homebridge API version: " + homebridge.version);
@@ -122,7 +120,7 @@ function eWeLink(log, config, api) {
                     platform.log("eWeLink HTTPS API reports that there are a total of [%s] devices registered", size);
 
                     if (size === 0) {
-                        platform.log("As there were no devices were found, all devices have been removed from the platorm's cache. Please regiester your devices using the eWeLink app and restart HomeBridge");
+                        platform.log("As there were no devices were found, all devices have been removed from the platform's cache. Please regiester your devices using the eWeLink app and restart HomeBridge");
                         platform.accessories.clear();
                         platform.api.unregisterPlatformAccessories("homebridge-eWeLink", "eWeLink", platform.accessories);
                         return;
@@ -435,8 +433,9 @@ eWeLink.prototype.configureAccessory = function (accessory) {
 
     platform.log(accessory.displayName, "Configure Accessory");
 
+    let service;
     if (accessory.getService(Service.WindowCovering)) {
-        var service = accessory.getService(Service.WindowCovering);
+        service = accessory.getService(Service.WindowCovering);
         service.getCharacteristic(Characteristic.CurrentPosition)
             .on('get', function (callback) {
                 platform.getCurrentPosition(accessory, callback);
@@ -493,7 +492,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
 
     }
     if (accessory.getService(Service.Thermostat)) {
-        var service = accessory.getService(Service.Thermostat);
+        service = accessory.getService(Service.Thermostat);
 
         service.getCharacteristic(Characteristic.CurrentTemperature)
             .on('set', function (value, callback) {
@@ -654,7 +653,6 @@ eWeLink.prototype.addAccessory = function (device, deviceId = null, services = {
             });
     }
 
-
     if (services.blind) {
         // platform.log("Services:", services);
         accessory.context.switchUp = services.group.relay_up - 1;
@@ -674,7 +672,7 @@ eWeLink.prototype.addAccessory = function (device, deviceId = null, services = {
         // Ensuring switches device config
         platform.initSwitchesConfig(accessory);
 
-        var service = accessory.addService(Service.WindowCovering, deviceName);
+        let service = accessory.addService(Service.WindowCovering, deviceName);
         service.getCharacteristic(Characteristic.CurrentPosition)
             .on('get', function (callback) {
                 platform.getCurrentPosition(accessory, callback);
@@ -702,7 +700,7 @@ eWeLink.prototype.addAccessory = function (device, deviceId = null, services = {
             });
     }
     if (services.thermostat) {
-        var service = accessory.addService(Service.Thermostat, deviceName);
+        let service = accessory.addService(Service.Thermostat, deviceName);
 
         service.getCharacteristic(Characteristic.CurrentTemperature)
             .on('set', function (value, callback) {
@@ -803,9 +801,12 @@ eWeLink.prototype.updatePowerStateCharacteristic = function (deviceId, state, de
 
     platform.log("Updating recorded Characteristic.On for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, isOn);
 
-    accessory.getService(Service.Switch)
+    let currentState = accessory.getService(Service.Switch).getCharacteristic(Characteristic.On).value;
+    if (currentState !== isOn) {
+        platform.log("Updating recorded Characteristic.On for [%s] from [%s] to [%s]. No request will be sent to the device.", accessory.displayName, currentState, isOn);
+        accessory.getService(Service.Switch)
         .setCharacteristic(Characteristic.On, isOn);
-
+    }
 };
 
 eWeLink.prototype.updateCurrentTemperatureCharacteristic = function (deviceId, state, device = null, channel = null) {
@@ -820,6 +821,11 @@ eWeLink.prototype.updateCurrentTemperatureCharacteristic = function (deviceId, s
     if (typeof accessory === 'undefined' && device) {
         platform.addAccessory(device, deviceId);
         accessory = platform.accessories.get(deviceId);
+    }
+
+    if (!accessory) {
+        platform.log("Error updating non-exist accessory with deviceId [%s].", deviceId);
+        return;
     }
 
     // platform.log(JSON.stringify(device,null,2));
@@ -986,13 +992,13 @@ eWeLink.prototype.updateFanSpeedCharacteristic = function (deviceId, state1, sta
 
     if (state1 === 'on' && state2 === 'off' && state3 === 'off') {
         isOn = true;
-        speed = 33.0
+        speed = 33.0;
     } else if (state1 === 'on' && state2 === 'on' && state3 === 'off') {
         isOn = true;
-        speed = 66.0
+        speed = 66.0;
     } else if (state1 === 'on' && state2 === 'off' && state3 === 'on') {
         isOn = true;
-        speed = 100.0
+        speed = 100.0;
     }
 
     platform.log("Updating recorded Characteristic.On for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, isOn);
@@ -1590,6 +1596,55 @@ eWeLink.prototype.setHumidityState = function (accessory, value, callback) {
     callback();
 };
 
+eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
+    let platform = this;
+
+    if (!platform.hasOwnProperty('delaySend')) {
+        platform.delaySend = 0;
+    }
+    const delayOffset = 280;
+
+    let sendOperation = function (string) {
+        if (!platform.isSocketOpen) {
+            // socket not open, retry later
+            setTimeout(function () {
+                sendOperation(string);
+            }, delayOffset);
+            return;
+        }
+
+        if (platform.wsc) {
+            platform.wsc.send(string);
+            //platform.log("WS message sent");
+            callback();
+        }
+
+        if (platform.delaySend <= 0) {
+            platform.delaySend = 0;
+        } else {
+            platform.delaySend -= delayOffset;
+        }
+    };
+
+    if (!platform.isSocketOpen) {
+        platform.log('Socket was closed. It will reconnect automatically');
+
+        let interval;
+        let waitToSend = function (string) {
+            if (platform.isSocketOpen) {
+                clearInterval(interval);
+                sendOperation(string);
+            } else {
+                //platform.log('Connection not ready.....');
+            }
+        };
+        interval = setInterval(waitToSend, 750, string);
+    } else {
+        setTimeout(sendOperation, platform.delaySend, string);
+        platform.delaySend += delayOffset;
+    }
+};
+
 eWeLink.prototype.setPowerState = function (accessory, isOn, callback) {
     let platform = this;
     let options = {};
@@ -1622,39 +1677,9 @@ eWeLink.prototype.setPowerState = function (accessory, isOn, callback) {
     payload.sequence = platform.getSequence();
 
     let string = JSON.stringify(payload);
-    platform.log(string);
+    // platform.log( string );
 
-
-    const sendOperation = async function (string) {
-        if (platform.wsc) {
-            platform.wsc.send(string,callback);
-            platform.log("WS message sent");
-        }
-
-        if (delaySend <= 0)
-            delaySend = 0;
-        else
-            delaySend -= delayOffset;
-    }
-
-    if (!platform.isSocketOpen) {
-        platform.log('Socket was closed. It will reconnect automatically');
-
-        const waitToSend = function (string){
-            if (platform.isSocketOpen) {
-                clearInterval(interval);
-                sendOperation(string);
-            } else {
-                platform.log('Connection not ready.....')
-            }
-        }
-        const interval = setInterval(waitToSend, 750,string)
-    }
-    else{
-        setTimeout(sendOperation, delaySend, string)
-        delaySend += delayOffset;
-    }
-
+    platform.sendWebSocketMessage(string, callback);
 };
 
 
@@ -1688,19 +1713,7 @@ eWeLink.prototype.setFanLightState = function (accessory, isOn, callback) {
     let string = JSON.stringify(payload);
     // platform.log( string );
 
-    if (platform.isSocketOpen) {
-
-        setTimeout(function () {
-            platform.wsc.send(string);
-
-            // TODO Here we need to wait for the response to the socket
-
-            callback();
-        }, 1);
-
-    } else {
-        callback('Socket was closed. It will reconnect automatically; please retry your command');
-    }
+    platform.sendWebSocketMessage(string, callback);
 
 };
 
@@ -1733,19 +1746,7 @@ eWeLink.prototype.setFanState = function (accessory, isOn, callback) {
     let string = JSON.stringify(payload);
     // platform.log( string );
 
-    if (platform.isSocketOpen) {
-
-        setTimeout(function () {
-            platform.wsc.send(string);
-
-            // TODO Here we need to wait for the response to the socket
-
-            callback();
-        }, 1);
-
-    } else {
-        callback('Socket was closed. It will reconnect automatically; please retry your command');
-    }
+    platform.sendWebSocketMessage(string, callback);
 
 };
 
@@ -1791,19 +1792,7 @@ eWeLink.prototype.setFanSpeed = function (accessory, value, callback) {
     let string = JSON.stringify(payload);
     // platform.log( string );
 
-    if (platform.isSocketOpen) {
-
-        setTimeout(function () {
-            platform.wsc.send(string);
-
-            // TODO Here we need to wait for the response to the socket
-
-            callback();
-        }, 1);
-
-    } else {
-        callback('Socket was closed. It will reconnect automatically; please retry your command');
-    }
+    platform.sendWebSocketMessage(string, callback);
 };
 
 // Sample function to show how developer can remove accessory dynamically from outside event
@@ -2430,7 +2419,7 @@ eWeLink.prototype.setFinalBlindsState = function (accessory) {
 
     } else {
         platform.log('Socket was closed. It will reconnect automatically; please retry your command');
-        return false
+        return false;
     }
 };
 
