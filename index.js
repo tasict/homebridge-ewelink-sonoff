@@ -592,8 +592,9 @@ eWeLink.prototype.addAccessory = function (device, deviceId = null, services = {
 
     let deviceName = device.name + (channel ? ' CH ' + channel : '');
     try {
-        if (device.tags.ck_channel_name[channel-1])
+        if (channel && device.tags && device.tags.ck_channel_name && device.tags.ck_channel_name[channel-1]) {
             deviceName = device.tags.ck_channel_name[channel-1];
+        }
     } catch (e) {
         this.log("Problem device name : [%s]", e);
     }
