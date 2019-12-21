@@ -5,6 +5,7 @@ let url = require('url');
 const querystring = require('querystring');
 let request = require('request-json');
 let nonce = require('nonce')();
+let crypto = require('crypto');
 
 let wsc;
 let isSocketOpen = false;
@@ -36,6 +37,10 @@ function eWeLink(log, config, api) {
 
     let platform = this;
     this.log = log;
+    this.config = config;
+    this.accessories = new Map();
+    this.authenticationToken = config['authenticationToken'];
+    this.devicesFromApi = new Map();
 
     // platform.log(JSON.stringify(config, null, " "));
 
@@ -45,18 +50,13 @@ function eWeLink(log, config, api) {
     }
 
     if (!config['apiHost']) {
-        config['apiHost'] = 'us-api.coolkit.cc:8080';
+        config['apiHost'] = 'eu-api.coolkit.cc:8080';
     }
     if (!config['webSocketApi']) {
         config['webSocketApi'] = 'us-pconnect3.coolkit.cc';
     }
 
     platform.log("Intialising eWeLink");
-
-    this.config = config;
-    this.accessories = new Map();
-    this.authenticationToken = config['authenticationToken'];
-    this.devicesFromApi = new Map();
 
     // Groups configuration
     this.groups = new Map();
@@ -84,7 +84,7 @@ function eWeLink(log, config, api) {
 
             platform.log("A total of [%s] accessories were loaded from the local cache", platform.accessories.size);
 
-            this.login(function () {
+            let afterLogin = function () {
 
                 // Get a list of all devices from the API, and compare it to the list of cached devices.
                 // New devices will be added, and devices that exist in the cache but not in the web list
@@ -414,7 +414,16 @@ function eWeLink(log, config, api) {
 
                 }); // End WebSocket
 
-            }.bind(this)); // End login
+            }; // End afterLogin
+
+            // Resolve region if countryCode is provided
+            if (this.config['countryCode']) {
+                this.getRegion(this.config['countryCode'], function () {
+                    this.login(afterLogin.bind(this));
+                }.bind(this));
+            } else {
+                this.login(afterLogin.bind(this));
+            }
 
         }.bind(this));
     }
@@ -1807,6 +1816,14 @@ eWeLink.prototype.removeAccessory = function (accessory) {
         'eWeLink', [accessory]);
 };
 
+eWeLink.prototype.getSignature = function (string) {
+    //let appSecret = "248,208,180,108,132,92,172,184,256,152,256,144,48,172,220,56,100,124,144,160,148,88,28,100,120,152,244,244,120,236,164,204";
+    //let f = "ab!@#$ijklmcdefghBCWXYZ01234DEFGHnopqrstuvwxyzAIJKLMNOPQRSTUV56789%^&*()";
+    //let decrypt = function(r){var n="";return r.split(',').forEach(function(r){var t=parseInt(r)>>2,e=f.charAt(t);n+=e}),n.trim()};
+    let decryptedAppSecret = '6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'; //decrypt(appSecret);
+    return crypto.createHmac('sha256', decryptedAppSecret).update(string).digest('base64');
+};
+
 eWeLink.prototype.login = function (callback) {
     if (!this.config.phoneNumber && !this.config.email || !this.config.password || !this.config.imei) {
         this.log('phoneNumber / email / password / imei not found in config, skipping login');
@@ -1834,11 +1851,7 @@ eWeLink.prototype.login = function (callback) {
     let json = JSON.stringify(data);
     this.log('Sending login request with user credentials: %s', json);
 
-    //let appSecret = "248,208,180,108,132,92,172,184,256,152,256,144,48,172,220,56,100,124,144,160,148,88,28,100,120,152,244,244,120,236,164,204";
-    //let f = "ab!@#$ijklmcdefghBCWXYZ01234DEFGHnopqrstuvwxyzAIJKLMNOPQRSTUV56789%^&*()";
-    //let decrypt = function(r){var n="";return r.split(',').forEach(function(r){var t=parseInt(r)>>2,e=f.charAt(t);n+=e}),n.trim()};
-    let decryptedAppSecret = '6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'; //decrypt(appSecret);
-    let sign = require('crypto').createHmac('sha256', decryptedAppSecret).update(json).digest('base64');
+    let sign = this.getSignature(json);
     this.log('Login signature: %s', sign);
 
     let webClient = request.createClient('https://' + this.config.apiHost);
@@ -1884,6 +1897,68 @@ eWeLink.prototype.login = function (callback) {
         this.getWebSocketHost(function () {
             callback(body.at);
         }.bind(this));
+    }.bind(this));
+};
+
+eWeLink.prototype.getRegion = function (countryCode, callback) {
+    var data = {};
+    data.country_code = countryCode;
+    data.version = '6';
+    data.ts = '' + Math.floor(new Date().getTime() / 1000);
+    data.nonce = '' + nonce();
+    data.appid = 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq';
+    data.imei = this.config.imei;
+    data.os = 'iOS';
+    data.model = 'iPhone10,6';
+    data.romVersion = '11.1.2';
+    data.appVersion = '3.5.3';
+    
+    let query = querystring.stringify(data);
+    this.log('getRegion query: %s', query);
+
+    let dataToSign = [];
+    Object.keys(data).forEach(function (key) {
+        dataToSign.push({key: key, value: data[key]});
+    });
+    dataToSign.sort(function (a, b) {
+        return a.key < b.key ? -1 : 1;
+    });
+    dataToSign = dataToSign.map(function (kv) {
+        return kv.key + "=" + kv.value;
+    }).join('&');
+
+    let sign = this.getSignature(dataToSign);
+    this.log('getRegion signature: %s', sign);
+
+    let webClient = request.createClient('https://api.coolkit.cc:8080');
+    webClient.headers['Authorization'] = 'Sign ' + sign;
+    webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
+    webClient.get('/api/user/region?' + query, function (err, res, body) {
+        if (err) {
+            this.log("An error was encountered while getting region. Error was [%s]", err);
+            callback();
+            return;
+        }
+
+        if (!body.region) {
+            let response = JSON.stringify(body);
+            this.log("Server did not response with a region. Response was [%s]", response);
+            callback();
+            return;
+        }
+
+        let idx = this.config.apiHost.indexOf('-');
+        if (idx == -1) {
+            this.log("Received region [%s]. However we cannot construct the new API host url.", body.region);
+            callback();
+            return;
+        }
+        let newApiHost = body.region + this.config.apiHost.substring(idx);
+        if (this.config.apiHost != newApiHost) {
+            this.log("Received region [%s], updating API host to [%s].", body.region, newApiHost);
+            this.config.apiHost = newApiHost;
+        }
+        callback(body.region);
     }.bind(this));
 };
 
