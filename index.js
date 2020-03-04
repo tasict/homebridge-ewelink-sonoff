@@ -327,7 +327,7 @@ function eWeLink(log, config, api) {
                                 } else if (json.hasOwnProperty("params") && json.params.hasOwnProperty("switches") && Array.isArray(json.params.switches)) {
                                     if (platform.groups.has(json.deviceid)) {
                                         let group = platform.groups.get(json.deviceid);
-                                        console.log('---------------' + group);
+                                        platform.log('---------------' + group);
 
                                         switch (group.type) {
                                             case 'blind':
@@ -1074,14 +1074,10 @@ eWeLink.prototype.getPowerState = function (accessory, callback) {
         }
 
         let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-        console.log(deviceId);
-        // console.log(device.deviceid);
 
         if (filteredResponse.length === 1) {
 
             let device = filteredResponse[0];
-
-            console.log(device);
 
             if (device.deviceid === deviceId) {
 
