@@ -753,7 +753,9 @@ eWeLink.prototype.addAccessory = function (device, deviceId = null, services = {
 
     accessory.on('identify', function (paired, callback) {
         platform.log(accessory.displayName, "Identify not supported");
-        callback();
+	try {
+            callback();
+	} catch (e) { }
     });
 
     accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.SerialNumber, device.extra.extra.mac);
@@ -773,7 +775,7 @@ eWeLink.prototype.addAccessory = function (device, deviceId = null, services = {
         accessory.context.switches = switchesAmount;
     }
 
-    this.accessories.set(device.deviceid, accessory);
+    this.accessories.set(deviceId ? deviceId : device.deviceid, accessory);
 
     this.api.registerPlatformAccessories("homebridge-eWeLink",
         "eWeLink", [accessory]);
