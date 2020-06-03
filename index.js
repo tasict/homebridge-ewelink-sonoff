@@ -121,8 +121,8 @@ function eWeLink(log, config, api) {
 
                     if (size === 0) {
                         platform.log("As there were no devices were found, all devices have been removed from the platform's cache. Please regiester your devices using the eWeLink app and restart HomeBridge");
+                        platform.api.unregisterPlatformAccessories("homebridge-eWeLink", "eWeLink", Array.from(platform.accessories.values()));
                         platform.accessories.clear();
-                        platform.api.unregisterPlatformAccessories("homebridge-eWeLink", "eWeLink", platform.accessories);
                         return;
                     }
 
