@@ -962,7 +962,7 @@ eWeLink.prototype.updateFanLightCharacteristic = function (deviceId, state, devi
 
     if (typeof accessory === 'undefined' && device) {
         platform.log("Adding accessory for deviceId [%s].", deviceId);
-        platform.addAccessory(device, deviceId);
+        platform.addAccessory(device, deviceId, {'fan': true});
         accessory = platform.accessories.get(deviceId);
     }
 
@@ -995,7 +995,7 @@ eWeLink.prototype.updateFanSpeedCharacteristic = function (deviceId, state1, sta
 
     if (typeof accessory === 'undefined' && device) {
         platform.log("Adding accessory for deviceId [%s].", deviceId);
-        platform.addAccessory(device, deviceId);
+        platform.addAccessory(device, deviceId, {'fan': true});
         accessory = platform.accessories.get(deviceId);
     }
 
