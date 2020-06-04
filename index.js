@@ -1039,7 +1039,7 @@ eWeLink.prototype.getPowerState = function (accessory, callback) {
     this.webClient.get('/api/user/device?' + this.getArguments(), function (err, res, body) {
 
         if (err) {
-            if ([503].indexOf(parseInt(res.statusCode)) !== -1) {
+            if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
                 // callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
                 platform.log('Sonoff API 503 error');
                 setTimeout(function() {
