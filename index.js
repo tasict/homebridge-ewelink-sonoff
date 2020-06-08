@@ -264,7 +264,7 @@ function eWeLink(log, config, api) {
                                             platform.log('Group type error ! Device [%s], ID : [%s] will not be added', deviceToAdd.name, deviceToAdd.deviceid);
                                             break;
                                     }
-                                } else if (deviceToAdd.extra.extra.model === "PSF-BFB-GL" || deviceToAdd.extra.extra.model === "PSF-B04-GL") {
+                                } else if (deviceToAdd.extra.extra.model === "PSF-BFB-GL") {
                                     services.fan = true;
                                     services.switch = false;
                                     platform.log('Device [%s], ID : [%s] will be added as a fan', deviceToAdd.name, deviceToAdd.deviceid);
@@ -960,11 +960,11 @@ eWeLink.prototype.updateFanLightCharacteristic = function (deviceId, state, devi
 
     let accessory = platform.accessories.get(deviceId);
 
-    if (typeof accessory === 'undefined' && device) {
-        platform.log("Adding accessory for deviceId [%s].", deviceId);
-        platform.addAccessory(device, deviceId, {'fan': true});
-        accessory = platform.accessories.get(deviceId);
-    }
+    // if (typeof accessory === 'undefined' && device) {
+    //     platform.log("Adding accessory for deviceId [%s].", deviceId);
+    //     platform.addAccessory(device, deviceId);
+    //     accessory = platform.accessories.get(deviceId);
+    // }
 
     if (!accessory) {
         platform.log("Error updating non-exist accessory with deviceId [%s].", deviceId);
@@ -993,11 +993,11 @@ eWeLink.prototype.updateFanSpeedCharacteristic = function (deviceId, state1, sta
 
     let accessory = platform.accessories.get(deviceId);
 
-    if (typeof accessory === 'undefined' && device) {
-        platform.log("Adding accessory for deviceId [%s].", deviceId);
-        platform.addAccessory(device, deviceId, {'fan': true});
-        accessory = platform.accessories.get(deviceId);
-    }
+    // if (typeof accessory === 'undefined' && device) {
+    //     platform.log("Adding accessory for deviceId [%s].", deviceId);
+    //     platform.addAccessory(device, deviceId);
+    //     accessory = platform.accessories.get(deviceId);
+    // }
 
     if (!accessory) {
         platform.log("Error updating non-exist accessory with deviceId [%s].", deviceId);
