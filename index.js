@@ -58,6 +58,8 @@ function eWeLink(log, config, api) {
       
       platform.api.on('didFinishLaunching', function() {
          
+         platform.log("[%s] devices were loaded from the Homebridge cache.", platform.accessories.size);
+         
          let afterLogin = function() {
             
             if (platform.debug) platform.log("Auth token received [%s].", platform.authenticationToken);
