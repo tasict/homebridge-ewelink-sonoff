@@ -47,14 +47,6 @@ function eWeLink(log, config, api) {
    this.devicesFromApi = new Map();
    this.deviceGroups = new Map();
    
-   if (this.config['groups'] && Object.keys(this.config['groups']).length > 0) {
-      this.config.groups.forEach((group) => {
-         if (typeof group.deviceId !== 'undefined') {
-            this.deviceGroups.set(group.deviceId, group);
-         }
-      });
-   }
-   
    let platform = this;
    
    if (api) {
@@ -66,10 +58,6 @@ function eWeLink(log, config, api) {
       
       platform.api.on('didFinishLaunching', function() {
          
-         platform.log("[%s] accessories were loaded from the Homebridge cache.", platform.accessories.size);
-         if (platform.deviceGroups.size > 0) {
-            platform.log("[%s] groups were loaded from the Homebridge config.", platform.deviceGroups.size);
-         }
          let afterLogin = function() {
             
             if (platform.debug) platform.log("Auth token received [%s].", platform.authenticationToken);
@@ -108,13 +96,13 @@ function eWeLink(log, config, api) {
                let size = Object.keys(apiDevices).length;
                
                if (size === 0) {
-                  platform.log("API reports no devices in your eWeLink account. Homebridge cache will be cleared.");
+                  platform.log("[0] devices were loaded from your eWeLink account. Homebridge cache will be cleared.");
                   platform.api.unregisterPlatformAccessories("homebridge-eWeLink", "eWeLink", Array.from(platform.accessories.values()));
                   platform.accessories.clear();
                   return;
                }
                
-               platform.log("API reports [%s] devices registered to your eWeLink account.", size);
+               platform.log("[%s] devices were loaded from your eWeLink account.", size);
                
                apiDevices.forEach((device) => {
                   // Skip Sonoff Bridge as it is not supported by this plugin
@@ -122,6 +110,17 @@ function eWeLink(log, config, api) {
                      platform.devicesFromApi.set(device.deviceid, device);
                   }
                });
+               
+               if (platform.config['groups'] && Object.keys(platform.config['groups']).length > 0) {
+                  platform.config.groups.forEach((group) => {
+                     if (typeof group.deviceId !== 'undefined' && platform.devicesFromApi.has(group.deviceId)) {
+                        platform.deviceGroups.set(group.deviceId, group);
+                     }
+                  });
+               }
+               if (platform.deviceGroups.size > 0) {
+                  platform.log("[%s] groups were loaded from the Homebridge config.", platform.deviceGroups.size);
+               }
                
                // Function to check each Homebridge cached device exists in the API response.
                function checkIfDeviceIsStillRegistered(value, deviceId, map) {
@@ -381,7 +380,6 @@ function eWeLink(log, config, api) {
                   let string = JSON.stringify(payload);
                   if (platform.debug) platform.log('Sending web socket login request [%s].', string);
                   platform.wsc.send(string);
-                  
                };
                
                platform.wsc.onclose = function(e) {
@@ -406,7 +404,6 @@ function eWeLink(log, config, api) {
 eWeLink.prototype.addAccessory = function(device, deviceId = null, services) {
    
    let platform = this;
-   
    
    if (!platform.log) {
       return;
