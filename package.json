@@ -3,9 +3,24 @@
   "version": "0.2.0",
   "author": "gbro115",
   "contributors": [
+    "gbro115",
     "MrTomAsh",
     "howanghk",
     "LeJeko",
+    "aremishevsky-chegg",
+    "samkni",
+    "robsonfj",
+    "ramsesz",
+    "metarutaiga",
+    "janbuecker",
+    "jacopofranza",
+    "donavanbecker",
+    "dhutchison",
+    "danielk117",
+    "bassrock",
+    "VictorKrasnov",
+    "JuniorGenius",
+    "BobbySlope",
     "thepotterfamily"
   ],
   "description": "homebridge-eWeLink is a Homebrige plugin to control Sonoff relays running OEM firmware",
@@ -25,7 +40,7 @@
   },
   "dependencies": {
     "nonce": "^1.0.4",
-    "request-json": "^0.6.4",
+    "request-json": "^0.6.5",
     "ws": "^7.3.0"
   }
 }
