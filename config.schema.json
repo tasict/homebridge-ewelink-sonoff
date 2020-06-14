@@ -1,33 +1,23 @@
 {
    "pluginAlias":"eWeLink",
    "pluginType":"platform",
+   "singular": true,
    "headerDisplay":"Homebridge plugin to control Sonoff relays with OEM firmware. It uses the same API as the iOS app to communicate with your devices.",
    "footerDisplay":"If you have any suggestions, please open an issue on [GitHub](https://github.com/howanghk/homebridge-ewelink/issues).",
    "schema":{
       "type":"object",
       "properties":{
-         "name":{
-            "type":"string",
-            "title":"Name",
-            "default":"eWeLink"
-         },
          "countryCode":{
             "type":"integer",
             "title":"Country Code",
-            "description":"The telephone country code from where you are (based on your public IP).",
+            "description":"The telephone country code linked to your eWeLink account (without the +).",
             "placeholder":"1",
             "maximum":999
          },
-         "phoneNumber":{
+         "username":{
             "type":"string",
-            "title":"Phone Number",
-            "description":"The phone number linked to your eWeLink account. Leave blank if you use your email instead.",
-            "placeholder":""
-         },
-         "email":{
-            "type":"string",
-            "title":"Email Address",
-            "description":"The email address linked to your eWeLink account. Leave blank if you use your phone number instead.",
+            "title":"Username",
+            "description":"The phone number or email address linked to your eWeLink account.",
             "placeholder":""
          },
          "password":{
@@ -36,16 +26,10 @@
             "placeholder":"",
             "description":"The password for your eWeLink account."
          },
-         "imei":{
-            "type":"string",
-            "title":"IMEI",
-            "default":"01234567-89AB-CDEF-0123-456789ABCDEF",
-            "description":"Only change this if you need to."
-         },
          "groups":{
             "type":"array",
             "title":"Groups",
-            "description":"You can group channels of multi-switch devices to simulate another accessory instead of having each switch separately. Currently, only 'blind' (WindowCovering) is supported.",
+            "description":"You can group channels of multi-switch devices to simulate another accessory instead of having each switch separately. Currently only 'blind' (WindowCovering) is supported.",
             "items":{
                "type":"object",
                "properties":{
@@ -58,7 +42,7 @@
                   "deviceId":{
                      "type":"string",
                      "title":"Device ID",
-                     "description":"Device ID from your eWelink app."
+                     "description":"Device ID from your eWeLink app."
                   },
                   "relay_up":{
                      "type":"number",
@@ -100,23 +84,10 @@
             }
          }
       },
-      "oneOf":[
-         {
-            "required":[
-               "email"
-            ]
-         },
-         {
-            "required":[
-               "phoneNumber"
-            ]
-         }
-      ],
       "required":[
-         "name",
          "countryCode",
-         "password",
-         "imei"
+         "username",
+         "password"
       ]
    }
 }

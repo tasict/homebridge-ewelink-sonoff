@@ -1,65 +1,73 @@
-/* jshint -W030, -W069, esversion: 6 */
 let WebSocket = require('ws');
 let http = require('http');
 let url = require('url');
-const querystring = require('querystring');
 let request = require('request-json');
 let nonce = require('nonce')();
+const querystring = require('querystring');
 let crypto = require('crypto');
 
 let wsc;
 let isSocketOpen = false;
-let sequence = 0;
-let webClient = '';
-let apiKey = 'UNCONFIGURED';
-let authenticationToken = 'UNCONFIGURED';
+let sequence;
+let webClient;
 let Accessory, Service, Characteristic, UUIDGen;
 
-module.exports = function (homebridge) {
-    console.log("homebridge API version: " + homebridge.version);
-
+module.exports = function(homebridge) {
+    
     // Accessory must be created from PlatformAccessory Constructor
     Accessory = homebridge.platformAccessory;
-
+    
     // Service and Characteristic are from hap-nodejs
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
     UUIDGen = homebridge.hap.uuid;
-
+    
     // For platform plugin to be considered as dynamic platform plugin,
     // registerPlatform(pluginName, platformName, constructor, dynamic), dynamic must be true
     homebridge.registerPlatform("homebridge-eWeLink", "eWeLink", eWeLink, true);
-
+    
 };
 
 // Platform constructor
 function eWeLink(log, config, api) {
 
+    if (!config || (!config['username'] || !config['password'])) {
+        log("Unable to load plugin - please check you have set your username and password in the Homebridge config.");
+        return;
+    }
+    
     let platform = this;
     this.log = log;
     this.config = config;
+    
+    this.config['apiHost'] = 'eu-api.coolkit.cc:8080';
+    this.config['webSocketApi'] = 'eu-pconnect3.coolkit.cc';
+
+    this.apiKey = 'UNCONFIGURED';
+    this.authenticationToken = 'UNCONFIGURED';
+    
+    if (this.config['username'].includes("@")) {
+        this.config['emailLogin'] = true;
+        this.config['email'] = this.config['username'];
+    } else {
+        this.config['emailLogin'] = false;
+        this.config['phoneNumber'] = this.config['username'];
+    }
+    if (!this.config['imei']) {
+        this.config['imei'] = '01234567-89AB-CDEF-0123-456789ABCDEF';
+    }
+    if (!this.config['countryCode']) {
+        this.config['countryCode'] = '1';
+    }
+
+	this.debug = platform.config['debug'] == true ? true : false;
+    //this.debug = true;
+    
     this.accessories = new Map();
-    this.authenticationToken = config['authenticationToken'];
     this.devicesFromApi = new Map();
-
-    // platform.log(JSON.stringify(config, null, " "));
-
-    if (!config || (!config['authenticationToken'] && ((!config['phoneNumber'] && !config['email']) || !config['password'] || !config['imei']))) {
-        log("Initialization skipped. Missing configuration data.");
-        return;
-    }
-
-    if (!config['apiHost']) {
-        config['apiHost'] = 'eu-api.coolkit.cc:8080';
-    }
-    if (!config['webSocketApi']) {
-        config['webSocketApi'] = 'us-pconnect3.coolkit.cc';
-    }
-
-    platform.log("Initialising eWeLink");
+    this.groups = new Map();
 
     // Groups configuration
-    this.groups = new Map();
     let configGroups = config['groups'] || null;
     if (configGroups) {
         if (Object.keys(configGroups).length > 0) {
@@ -69,87 +77,86 @@ function eWeLink(log, config, api) {
         }
     }
 
-    platform.log("Found %s group(s)", this.groups.size);
+    if (this.groups.size > 0) {
+        platform.log("Found [%s] group(s) from the Homebridge config.", this.groups.size);
+    }
 
     if (api) {
-        // Save the API object as plugin needs to register new accessory via this object
+        // Save the API object as plugin needs to register new accessories via this object.
         this.api = api;
 
-        // Listen to event "didFinishLaunching", this means homebridge already finished loading cached accessories.
-        // Platform Plugin should only register new accessory that doesn't exist in homebridge after this event.
-        // Or start discover new accessories.
-
+        // Listen to event "didFinishLaunching", this means Homebridge has already finished loading cached accessories.
+        // Platform plugin will register new accessories that don't already exist in Homebridge.
 
         this.api.on('didFinishLaunching', function () {
 
-            platform.log("A total of [%s] accessories were loaded from the local cache", platform.accessories.size);
+            platform.log("[%s] accessories were loaded from the Homebridge cache.", platform.accessories.size);
 
             let afterLogin = function () {
-
+                
+                if (platform.debug) platform.log("Auth token received: [%s].", this.authenticationToken);
+                if (platform.debug) platform.log("API key received: [%s].", this.apiKey);
+                
                 // Get a list of all devices from the API, and compare it to the list of cached devices.
                 // New devices will be added, and devices that exist in the cache but not in the web list
                 // will be removed from Homebridge.
 
-                let url = 'https://' + this.config['apiHost'];
+                platform.log("Requesting a list of devices through the eWeLink HTTP API.");
 
-                platform.log("Requesting a list of devices from eWeLink HTTPS API at [%s]", url);
-
-                this.webClient = request.createClient(url);
-
+                this.webClient = request.createClient('https://' + this.config['apiHost']);
                 this.webClient.headers['Authorization'] = 'Bearer ' + this.authenticationToken;
                 this.webClient.get('/api/user/device?' + this.getArguments(), function (err, res, body) {
 
                     if (err) {
-                        platform.log("An error was encountered while requesting a list of devices. Error was [%s]", err);
+                        platform.log("An error occurred requesting devices through the API...");
+                        platform.log("[%s].", err);
                         return;
                     } else if (!body) {
-                        platform.log("An error was encountered while requesting a list of devices. No data in response.");
+                        platform.log("An error occurred requesting devices through the API...");
+                        platform.log("[No data in response].");
                         return;
                     } else if (body.hasOwnProperty('error') && body.error != 0) {
                         let response = JSON.stringify(body);
-                        platform.log("An error was encountered while requesting a list of devices. Response was [%s]", response);
+                        platform.log("An error occurred requesting devices through the API...");
                         if (body.error === '401') {
-                            platform.log("Verify that you have the correct authenticationToken specified in your configuration. The currently-configured token is [%s]", platform.authenticationToken);
+                            platform.log("[Authorisation token error].");
+                        } else {
+                            platform.log("[%s].", response);
                         }
                         return;
                     }
 
-                    body = body.devicelist;
-
-                    let size = Object.keys(body).length;
-                    platform.log("eWeLink HTTPS API reports that there are a total of [%s] devices registered", size);
+                    apiDevices = body.devicelist;
+                    let size = Object.keys(apiDevices).length;
 
                     if (size === 0) {
-                        platform.log("As there were no devices were found, all devices have been removed from the platform's cache. Please regiester your devices using the eWeLink app and restart HomeBridge");
+                        platform.log("API reports no devices in your eWeLink account. Homebridge cache will be cleared.");
                         platform.api.unregisterPlatformAccessories("homebridge-eWeLink", "eWeLink", Array.from(platform.accessories.values()));
                         platform.accessories.clear();
                         return;
                     }
+                    
+                    platform.log("API reports [%s] devices registered to your eWeLink account.", size);
 
-                    let newDevicesToAdd = new Map();
-
-                    body.forEach((device) => {
-                        platform.apiKey = device.apikey;
+                    apiDevices.forEach((device) => {
                         // Skip Sonoff Bridge as it is not supported by this plugin
                         if (['RF_BRIDGE'].indexOf(platform.getDeviceTypeByUiid(device.uiid)) == -1) {
                             platform.devicesFromApi.set(device.deviceid, device);
                         }
                     });
 
-                    // Now we compare the cached devices against the web list
-                    platform.log("Evaluating if devices need to be removed...");
-
+                    // Function to check each Homebridge cached device exists in the API response.
                     function checkIfDeviceIsStillRegistered(value, deviceId, map) {
 
                         let accessory = platform.accessories.get(deviceId);
 
-                        // To handle grouped accessories
-                        var realDeviceId = deviceId;
-
+                        // To handle multi-channel devices
+                        let realDeviceId = deviceId;
                         if (accessory.context.switches > 1) {
                             realDeviceId = deviceId.replace('CH' + accessory.context.channel, "");
                         }
 
+                        // **TODO** sort out this code from here //
                         if (platform.devicesFromApi.has(realDeviceId) && (accessory.context.switches <= 1 || accessory.context.channel <= accessory.context.switches)) {
                             if ((deviceId != realDeviceId) && platform.groups.has(realDeviceId)) {
                                 platform.log('Device [%s], ID : [%s] is now grouped. It will be removed.', accessory.displayName, accessory.UUID);
@@ -169,17 +176,17 @@ function eWeLink(log, config, api) {
                             platform.log('Device [%s], ID : [%s] was not present in the response from the API. It will be removed.', accessory.displayName, accessory.UUID);
                             platform.removeAccessory(accessory);
                         }
+                        // **TODO** sort out this code to here //
                     }
 
-                    // If we have devices in our cache, check that they exist in the web response
+                    // Using above function -> if we have devices in our cache, check that they exist in the web response.
                     if (platform.accessories.size > 0) {
-                        platform.log("Verifying that all cached devices are still registered with the API. Devices that are no longer registered with the API will be removed.");
+                        if (platform.debug) platform.log("Checking if devices need to be removed from the Homebridge cache...");
                         platform.accessories.forEach(checkIfDeviceIsStillRegistered);
                     }
 
-                    platform.log("Evaluating if new devices need to be added...");
-
-                    // Now we compare the cached devices against the web list
+                    // Now the reverse.
+                    // Function to update the existing devices received from API and add new devices to Homebridge.
                     function checkIfDeviceIsAlreadyConfigured(value, deviceId, map) {
 
                         if (platform.accessories.has(deviceId)) {
@@ -204,7 +211,7 @@ function eWeLink(log, config, api) {
                                         case 'blind':
                                             platform.log("Blind device has been set: " + deviceInformationFromWebApi.extra.extra.model + ' uiid: ' + deviceInformationFromWebApi.uiid);
                                             accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Name, deviceInformationFromWebApi.name);
-                                            platform.updateBlindStateCharacteristic(deviceId, deviceInformationFromWebApi.params.switches);
+                                            platform.updateBlindState(deviceId, deviceInformationFromWebApi.params.switches);
                                             // Ensuring switches device config
                                             platform.initSwitchesConfig(accessory);
                                             break;
@@ -213,24 +220,24 @@ function eWeLink(log, config, api) {
                                             break;
                                     }
                                 } else if (deviceType === 'FAN_LIGHT') {
-                                    platform.updateFanLightCharacteristic(deviceId, deviceInformationFromWebApi.params.switches[0].switch, platform.devicesFromApi.get(deviceId));
-                                    platform.updateFanSpeedCharacteristic(deviceId, deviceInformationFromWebApi.params.switches[1].switch, deviceInformationFromWebApi.params.switches[2].switch, deviceInformationFromWebApi.params.switches[3].switch, platform.devicesFromApi.get(deviceId));
+                                    platform.updateFanLight(deviceId, deviceInformationFromWebApi.params.switches[0].switch, platform.devicesFromApi.get(deviceId));
+                                    platform.updateFanSpeed(deviceId, deviceInformationFromWebApi.params.switches[1].switch, deviceInformationFromWebApi.params.switches[2].switch, deviceInformationFromWebApi.params.switches[3].switch, platform.devicesFromApi.get(deviceId));
                                 } else {
                                     platform.log(switchesAmount + " channels device has been set: " + deviceInformationFromWebApi.extra.extra.model + ' uiid: ' + deviceInformationFromWebApi.uiid);
                                     for (let i = 0; i !== switchesAmount; i++) {
                                         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Name, deviceInformationFromWebApi.name + ' CH ' + (i + 1));
-                                        platform.updatePowerStateCharacteristic(deviceId + 'CH' + (i + 1), deviceInformationFromWebApi.params.switches[i].switch, platform.devicesFromApi.get(deviceId));
+                                        platform.updatePowerState(deviceId + 'CH' + (i + 1), deviceInformationFromWebApi.params.switches[i].switch, platform.devicesFromApi.get(deviceId));
                                     }
                                 }
                             } else {
                                 platform.log("Single channel device has been set: " + deviceInformationFromWebApi.extra.extra.model + ' uiid: ' + deviceInformationFromWebApi.uiid);
                                 accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Name, deviceInformationFromWebApi.name);
-                                platform.updatePowerStateCharacteristic(deviceId, deviceInformationFromWebApi.params.switch);
+                                platform.updatePowerState(deviceId, deviceInformationFromWebApi.params.switch);
                             }
 
                             if (deviceInformationFromWebApi.extra.extra.model === "PSA-BHA-GL") {
                                 platform.log("Thermostat device has been set: " + deviceInformationFromWebApi.extra.extra.model);
-                                platform.updateCurrentTemperatureCharacteristic(deviceId, deviceInformationFromWebApi.params);
+                                platform.updateCurrentTemperature(deviceId, deviceInformationFromWebApi.params);
                             }
 
                         } else {
@@ -282,198 +289,473 @@ function eWeLink(log, config, api) {
                         }
                     }
 
-                    // Go through the web response to make sure that all the devices that are in the response do exist in the accessories map
+                    // Using above function -> update existing and add new devices
                     if (platform.devicesFromApi.size > 0) {
+                        if (platform.debug) platform.log("Checking if devices need to be added/updated in the Homebridge cache...");
                         platform.devicesFromApi.forEach(checkIfDeviceIsAlreadyConfigured);
                     }
-
-                    platform.log("API key retrieved from web service is [%s]", platform.apiKey);
-
-                    // We have our devices, now open a connection to the WebSocket API
-
-                    let url = 'wss://' + platform.config['webSocketApi'] + ':8080/api/ws';
-
-                    platform.log("Connecting to the WebSocket API at [%s]", url);
-
+                    
+                    
+                    // Let's open a connection to the WebSocket API.
+                    platform.log("Opening web socket for real time updates.");
                     platform.wsc = new WebSocketClient();
-
-                    platform.wsc.open(url);
-
+                    platform.wsc.open('wss://' + platform.config['webSocketApi'] +':8080/api/ws');
+                    
                     platform.wsc.onmessage = function (message) {
 
-                        // Heartbeat response can be safely ignored
+                        if (platform.debug) platform.log("Web socket message received [%s].", message);
                         if (message == 'pong') {
                             return;
                         }
-
-                        platform.log("WebSocket messge received: ", message);
-
+                        platform.log(message);
                         let json;
                         try {
                             json = JSON.parse(message);
                         } catch (e) {
                             return;
                         }
-
                         if (json.hasOwnProperty("action")) {
-
+                            
                             if (json.action === 'update') {
-
-                                platform.log("Update message received for device [%s]", json.deviceid);
-                                platform.log(json);
-
+                                
+                                platform.log("External update received via web socket.");
+                                
+                                // **TODO** sort out this code from here //
                                 if (json.hasOwnProperty("params") && json.params.hasOwnProperty("switch")) {
-                                    platform.updatePowerStateCharacteristic(json.deviceid, json.params.switch);
+                                    
+                                    platform.updatePowerState(json.deviceid, json.params.switch);
+                                    
                                 } else if (json.hasOwnProperty("params") && json.params.hasOwnProperty("switches") && Array.isArray(json.params.switches)) {
+                                    
                                     if (platform.groups.has(json.deviceid)) {
                                         let group = platform.groups.get(json.deviceid);
                                         platform.log('---------------' + group);
-
+                                        
                                         switch (group.type) {
                                             case 'blind':
-                                                if (group.handle_api_changes) {
-                                                    platform.updateBlindStateCharacteristic(json.deviceid, json.params.switches);
-                                                } else {
-                                                    platform.log('Setup to not respond to API. Device ID : [%s] will not be updated.', json.deviceid);
-                                                }
-                                                break;
+                                            if (group.handle_api_changes) {
+                                                platform.updateBlindState(json.deviceid, json.params.switches);
+                                            } else {
+                                                platform.log('Setup to not respond to API. Device ID : [%s] will not be updated.', json.deviceid);
+                                            }
+                                            break;
                                             default:
-                                                platform.log('Group type error ! Device ID : [%s] will not be updated.', json.deviceid);
-                                                break;
+                                            platform.log('Group type error ! Device ID : [%s] will not be updated.', json.deviceid);
+                                            break;
                                         }
                                     } else if (platform.devicesFromApi.has(json.deviceid) && platform.getDeviceTypeByUiid(platform.devicesFromApi.get(json.deviceid).uiid) === 'FAN_LIGHT') {
-                                        platform.updateFanLightCharacteristic(json.deviceid, json.params.switches[0].switch, platform.devicesFromApi.get(json.deviceid));
+                                        platform.updateFanLight(json.deviceid, json.params.switches[0].switch, platform.devicesFromApi.get(json.deviceid));
                                         platform.devicesFromApi.get(json.deviceid).params.switches = json.params.switches;
-                                        platform.updateFanSpeedCharacteristic(json.deviceid, json.params.switches[1].switch, json.params.switches[2].switch, json.params.switches[3].switch, platform.devicesFromApi.get(json.deviceid));
+                                        platform.updateFanSpeed(json.deviceid, json.params.switches[1].switch, json.params.switches[2].switch, json.params.switches[3].switch, platform.devicesFromApi.get(json.deviceid));
                                     } else {
-                                        json.params.switches.forEach(function (entry) {
-                                            if (entry.hasOwnProperty('outlet') && entry.hasOwnProperty('switch')) {
-                                                platform.updatePowerStateCharacteristic(json.deviceid + 'CH' + (entry.outlet + 1), entry.switch, platform.devicesFromApi.get(json.deviceid));
-                                            }
-                                        });
+                                        
+                                        
+json.params.switches.forEach(function (entry) {
+    if (entry.hasOwnProperty('outlet') && entry.hasOwnProperty('switch')) {
+        platform.updatePowerState(json.deviceid + 'CH' + (entry.outlet + 1), entry.switch, platform.devicesFromApi.get(json.deviceid), entry.outlet + 1);
+        
+        
+    }
+});
                                     }
                                 }
-
+                                
                                 if (json.hasOwnProperty("params") && (json.params.hasOwnProperty("currentTemperature") || json.params.hasOwnProperty("currentHumidity"))) {
-                                    platform.updateCurrentTemperatureCharacteristic(json.deviceid, json.params);
-                                }
-
-
+                                    platform.updateCurrentTemperature(json.deviceid, json.params);
+                                } 
+                                
+                                // **TODO** sort out this code to here //
+                                
+                                
+                            } else {
+                                if (platform.debug) platform.log("Unknown action property received via web socket.");
+                                if (platform.debug) platform.log(json);
                             }
-
-                        } else if (json.hasOwnProperty('config') && json.config.hb && json.config.hbInterval) {
+                            
+                        } else if (json.hasOwnProperty("config") && json.config.hb && json.config.hbInterval) {
                             if (!platform.hbInterval) {
                                 platform.hbInterval = setInterval(function () {
-                                    platform.wsc.send('ping');
+                                    platform.wsc.send("ping");
                                 }, json.config.hbInterval * 1000);
                             }
+                        } else {
+                            if (platform.debug) platform.log("Unknown message received via web socket.");
+                            if (platform.debug) platform.log(json);
                         }
-
+                        
                     };
-
+                    
                     platform.wsc.onopen = function (e) {
-
+                        
                         platform.isSocketOpen = true;
-
-                        // We need to authenticate upon opening the connection
-
-                        let time_stamp = new Date() / 1000;
-                        let ts = Math.floor(time_stamp);
-
-                        // Here's the eWeLink payload as discovered via Charles
+                        
+                        // We need to authenticate upon opening the connection using the eWeLink payload as discovered via Charles.
                         let payload = {};
                         payload.action = "userOnline";
-                        payload.userAgent = 'app';
-                        payload.version = 6;
-                        payload.nonce = '' + nonce();
-                        payload.apkVesrion = "1.8";
-                        payload.os = 'ios';
-                        payload.at = config.authenticationToken;
+                        payload.at = platform.authenticationToken;
                         payload.apikey = platform.apiKey;
-                        payload.ts = '' + ts;
-                        payload.model = 'iPhone10,6';
-                        payload.romVersion = '11.1.2';
+                        payload.appid = 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq';
+                        payload.nonce = '' + nonce();
+                        payload.ts = '' + Math.floor(new Date() / 1000);
+                        payload.userAgent = 'app';
                         payload.sequence = platform.getSequence();
-
+                        payload.version = 8;
                         let string = JSON.stringify(payload);
-
-                        platform.log('Sending login request [%s]', string);
-
+                        if (platform.debug) platform.log('Sending web socket login request [%s].', string);
                         platform.wsc.send(string);
-
+                        
                     };
-
+                    
                     platform.wsc.onclose = function (e) {
-                        platform.log("WebSocket was closed. Reason [%s]", e);
+                        platform.log("Web socket was closed [%s].", e);
                         platform.isSocketOpen = false;
                         if (platform.hbInterval) {
                             clearInterval(platform.hbInterval);
                             platform.hbInterval = null;
                         }
                     };
-
-                }); // End WebSocket
-
-            }; // End afterLogin
-
-            // Resolve region if countryCode is provided
-            if (this.config['countryCode']) {
-                this.getRegion(this.config['countryCode'], function () {
-                    this.login(afterLogin.bind(this));
-                }.bind(this));
-            } else {
+                });
+            };
+            // Country code "cannot not exist" as if it's not in the config then it's been set to "1" [USA] already.
+            this.getRegion(this.config['countryCode'], function () {
                 this.login(afterLogin.bind(this));
-            }
-
+            }.bind(this));
         }.bind(this));
     }
 }
 
-// Function invoked when homebridge tries to restore cached accessory.
-// We update the existing devices as part of didFinishLaunching(), as to avoid an additional call to the the HTTPS API.
-eWeLink.prototype.configureAccessory = function (accessory) {
-
+// Sample function to show how developer can add accessory dynamically from outside event
+eWeLink.prototype.addAccessory = function(device, deviceId = null, services) {
+    
     let platform = this;
-
-    // To avoid crash if platform config change
+    
+    
     if (!platform.log) {
         return;
     }
+    
+    let channel = 0;
+    let realDeviceId = deviceId ? deviceId : device.deviceid;
+    
+    if (this.accessories.get(realDeviceId)) {
+        platform.log("Not adding [%s] as it already exists in the Homebridge cache.", realDeviceId);
+        return;
+    }
+    
+    if (device.type != 10) {
+        platform.log("A device with an unknown type [%s] was returned and cannot be added to Homebridge.", device.type);
+        return;
+    }
+    
+    if (deviceId) {
+        let id = deviceId.split("CH");
+        channel = id[1];
+    }
+    
+    let deviceName = device.name + (channel ? ' CH ' + channel : '');
+    try {
+        if (channel && device.tags && device.tags.ck_channel_name && device.tags.ck_channel_name[channel - 1]) {
+            deviceName = device.tags.ck_channel_name[channel - 1];
+        }
+    } catch (e) {
+        platform.log("Problem device [%s].", e);
+    }
+    
+    try {
+        const status = channel && device.params.switches && device.params.switches[channel - 1] ? device.params.switches[channel - 1].switch : device.params.switch || "off";
+        platform.log("Adding [%s], model [%s], status [%s], online [%s].", deviceName, device.productModel, status, device.online);
+    } catch (e) {
+        platform.log("Not adding [%s], model [%s], online [%s]. Error [%s].", deviceName, device.productModel, device.online, e);
+    }
+    
+    let switchesCount = this.getDeviceChannelCount(device);
+    if (channel > switchesCount) {
+        platform.log("[%s] has not been added [Model [%s] only has [%s] switches].", deviceName, device.productModel, switchesCount);
+        return;
+    }
+    
+    const accessory = new Accessory(deviceName, UUIDGen.generate(realDeviceId).toString());
+    
+    accessory.context.deviceId = realDeviceId;
+    accessory.context.apiKey = device.apikey;
+    accessory.context.switches = 1;
+    accessory.context.channel = channel;
+    
+    accessory.reachable = device.online === 'true';
+    
+    if (services.fan) {
+        var fan = accessory.addService(Service.Fanv2, device.name);
+        var light = accessory.addService(Service.Lightbulb, device.name + ' Light');
+        
+        fan.getCharacteristic(Characteristic.On)
+        .on("get", function(callback) {
+            platform.getFanState(accessory, callback);
+        })
+        .on("set", function(value, callback) {
+            platform.setFanState(accessory, value, callback);
+        });
+        
+        // This is actually the fan speed instead of rotation speed but HomeKit fan does not support this
+        fan.getCharacteristic(Characteristic.RotationSpeed)
+        .setProps({
+            minStep: 3
+        })
+        .on("get", function(callback) {
+            platform.getFanSpeed(accessory, callback);
+        })
+        .on("set", function(value, callback) {
+            platform.setFanSpeed(accessory, value, callback);
+        });
+        
+        light.getCharacteristic(Characteristic.On)
+        .on("get", function(callback) {
+            platform.getFanLightState(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setFanLightState(accessory, value, callback);
+        });
+    }
+    
+    if (services.blind) {
+        
+        accessory.context.switchUp = services.group.relay_up - 1;
+        accessory.context.switchDown = services.group.relay_down - 1;
+        accessory.context.durationUp = services.group.time_up;
+        accessory.context.durationDown = services.group.time_down;
+        accessory.context.durationBMU = services.group.time_botton_margin_up || 0;
+        accessory.context.durationBMD = services.group.time_botton_margin_down || 0;
+        accessory.context.fullOverdrive = services.group.full_overdrive || 0;
+        accessory.context.percentDurationDown = (accessory.context.durationDown / 100) * 1000;
+        accessory.context.percentDurationUp = (accessory.context.durationUp / 100) * 1000;
+        accessory.context.handleApiChanges = services.group.handle_api_changes || true;
+        
+        accessory.context.lastPosition = 100; // Last known position (0-100%).
+        accessory.context.currentPositionState = 2; // 0 = Moving up, 1 = Moving down, 2 = Not moving.
+        accessory.context.currentTargetPosition = 100; // Target position (0-100%).
+        
+        // Ensuring switches device config
+        platform.initSwitchesConfig(accessory);
+        
+        var blind = accessory.addService(Service.WindowCovering, deviceName);
+        blind.getCharacteristic(Characteristic.CurrentPosition)
+        .on('get', function(callback) {
+            platform.getCurrentPosition(accessory, callback);
+        });
+        
+        blind.getCharacteristic(Characteristic.PositionState)
+        .on('get', function(callback) {
+            platform.getPositionState(accessory, callback);
+        });
+        
+        blind.getCharacteristic(Characteristic.TargetPosition)
+        .on('get', function(callback) {
+            platform.getTargetPosition(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setBlindTargetPosition(accessory, value, callback);
+        });
+    }
+    if (services.switch) {
+        let switchDevice = accessory.addService(Service.Switch, deviceName);
+        switchDevice.getCharacteristic(Characteristic.On)
+        .on('get', function(callback) {
+            platform.getPowerState(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setPowerState(accessory, value, callback);
+        });
+    }
+    if (services.thermostat) {
+        let thermostat = accessory.addService(Service.Thermostat, deviceName);
+        
+        thermostat.getCharacteristic(Characteristic.CurrentTemperature)
+        .on('get', function(callback) {
+            platform.getCurrentTemperature(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setTemperatureState(accessory, value, callback);
+        });
+        
+        thermostat.getCharacteristic(Characteristic.CurrentRelativeHumidity)
+        .on('get', function(callback) {
+            platform.getCurrentHumidity(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setHumidityState(accessory, value, callback);
+        });
+    }
+    if (services.temperature) {
+        let tempSensor = accessory.addService(Service.TemperatureSensor, deviceName);
+        tempSensor.getCharacteristic(Characteristic.CurrentTemperature)
+        .on('get', function(callback) {
+            platform.getCurrentTemperature(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setTemperatureState(accessory, value, callback);
+        });
+    }
+    
+    if (services.humidity) {
+        let humiditySensor = accessory.addService(Service.HumiditySensor, deviceName);
+        humiditySensor.getCharacteristic(Characteristic.CurrentRelativeHumidity)
+        .on('get', function(callback) {
+            platform.getCurrentHumidity(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setHumidityState(accessory, value, callback);
+        });
+    }
+    
+    accessory.on('identify', function(paired, callback) {
+        platform.log("[%s] identified. Identification on device not supported.", accessory.displayName);
+        try {
+            callback();
+        } catch (e) {}
+    });
+    
+    // Exception when a device is not ready to register
+    try {
+        accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.SerialNumber, device.extra.extra.mac);
+        accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Manufacturer, device.productModel);
+        accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Model, device.extra.extra.model);
+        accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Identify, false);
+        accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+    } catch (e) {
+        platform.log("[%s] has not been added [%s].", accessory.displayName, e);
+    }
+    
+    let switchesAmount = platform.getDeviceChannelCount(device);
+    if (switchesAmount > 1) {
+        accessory.context.switches = switchesAmount;
+    }
+    this.accessories.set(realDeviceId, accessory);
+    this.api.registerPlatformAccessories("homebridge-eWeLink", "eWeLink", [accessory]);
+};
 
-    platform.log(accessory.displayName, "Configure Accessory");
-
+// Function invoked when Homebridge tries to restore cached accessory.
+// We update the existing devices as part of didFinishLaunching(), as to avoid an additional call to the the HTTPS API.
+eWeLink.prototype.configureAccessory = function(accessory) {
+    
+    let platform = this;
+    if (!platform.log) {
+        return;
+    }
+    
+    platform.log("Configuring cached accessory [%s].", accessory.displayName);
+    
     let service;
+    if (accessory.getService(Service.Switch)) {
+        service = accessory.getService(Service.Switch);
+        service.getCharacteristic(Characteristic.On)
+        .on('get', function(callback) {
+            platform.getPowerState(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setPowerState(accessory, value, callback);
+        });
+        
+    }
+    if (accessory.getService(Service.Thermostat)) {
+        service = accessory.getService(Service.Thermostat);
+        service.getCharacteristic(Characteristic.CurrentTemperature)
+        .on('get', function(callback) {
+            platform.getCurrentTemperature(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setTemperatureState(accessory, value, callback);
+        });
+        service.getCharacteristic(Characteristic.CurrentRelativeHumidity)
+        .on('get', function(callback) {
+            platform.getCurrentHumidity(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setHumidityState(accessory, value, callback);
+        });
+    }
+    if (accessory.getService(Service.TemperatureSensor)) {
+        service = accessory.getService(Service.TemperatureSensor);
+        service.getCharacteristic(Characteristic.CurrentTemperature)
+        .on('get', function(callback) {
+            platform.getCurrentTemperature(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setTemperatureState(accessory, value, callback);
+        });
+    }
+    if (accessory.getService(Service.HumiditySensor)) {
+        service = accessory.getService(Service.HumiditySensor);
+        service.getCharacteristic(Characteristic.CurrentRelativeHumidity)
+        .on('get', function(callback) {
+            platform.getCurrentHumidity(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setHumidityState(accessory, value, callback);
+        });
+    }
+    
+    if (accessory.getService(Service.Fanv2)) {
+        service = accessory.getService(Service.Fanv2);
+        service.getCharacteristic(Characteristic.On)
+        .on("get", function(callback) {
+            platform.getFanState(accessory, callback);
+        })
+        .on("set", function(value, callback) {
+            platform.setFanState(accessory, value, callback);
+        });
+        
+        // This is actually the fan speed instead of rotation speed but HomeKit fan does not support this
+        service.getCharacteristic(Characteristic.RotationSpeed)
+        .setProps({
+            minStep: 3
+        })
+        .on("get", function(callback) {
+            platform.getFanSpeed(accessory, callback);
+        })
+        .on("set", function(value, callback) {
+            platform.setFanSpeed(accessory, value, callback);
+        });
+    }
+    
+    if (accessory.getService(Service.Lightbulb)) {
+        service = accessory.getService(Service.Lightbulb);
+        service.getCharacteristic(Characteristic.On)
+        .on("get", function(callback) {
+            platform.getFanLightState(accessory, callback);
+        })
+        .on("set", function(value, callback) {
+            platform.setFanLightState(accessory, value, callback);
+        });
+    }
+
     if (accessory.getService(Service.WindowCovering)) {
         service = accessory.getService(Service.WindowCovering);
         service.getCharacteristic(Characteristic.CurrentPosition)
-            .on('get', function (callback) {
-                platform.getCurrentPosition(accessory, callback);
-            });
+        .on('get', function(callback) {
+            platform.getCurrentPosition(accessory, callback);
+        });
         service.getCharacteristic(Characteristic.PositionState)
-            .on('get', function (callback) {
-                platform.getPositionState(accessory, callback);
-            });
+        .on('get', function(callback) {
+            platform.getPositionState(accessory, callback);
+        });
         service.getCharacteristic(Characteristic.TargetPosition)
-            .on('set', function (value, callback) {
-                platform.setTargetPosition(accessory, value, callback);
-            })
-            .on('get', function (callback) {
-                platform.getTargetPosition(accessory, callback);
-            });
-
-        // Restore previous state
+        .on('get', function(callback) {
+            platform.getTargetPosition(accessory, callback);
+        })
+        .on('set', function(value, callback) {
+            platform.setBlindTargetPosition(accessory, value, callback);
+        });
+        
         let lastPosition = accessory.context.lastPosition;
-        platform.log("[%s] Previous last Position stored: %s", accessory.displayName, lastPosition);
         if ((lastPosition === undefined) || (lastPosition < 0)) {
             lastPosition = 0;
-            platform.log("[%s] No previous saved state. lastPosition set to default: %s", accessory.displayName, lastPosition);
+            if (platform.debug) platform.log("[%s] cached position is [unknown] so lastPosition set to [0].", accessory.displayName);
         } else {
-            platform.log("[%s] Previous saved state found. lastPosition set to: %s", accessory.displayName, lastPosition);
+            if (platform.debug) platform.log("[%s] cached position is [%s] so lastPosition set accordingly.", accessory.displayName, lastPosition);
         }
         accessory.context.lastPosition = lastPosition;
         accessory.context.currentTargetPosition = lastPosition;
         accessory.context.currentPositionState = 2;
-
+        
         // Updating config
         let group = platform.groups.get(accessory.context.deviceId);
         if (group) {
@@ -489,521 +771,271 @@ eWeLink.prototype.configureAccessory = function (accessory) {
             accessory.context.handleApiChanges = group.handle_api_changes || true;
         }
     }
-    if (accessory.getService(Service.Switch)) {
-
-        accessory.getService(Service.Switch)
-            .getCharacteristic(Characteristic.On)
-            .on('set', function (value, callback) {
-                platform.setPowerState(accessory, value, callback);
-            })
-            .on('get', function (callback) {
-                platform.getPowerState(accessory, callback);
-            });
-
-    }
-    if (accessory.getService(Service.Thermostat)) {
-        service = accessory.getService(Service.Thermostat);
-
-        service.getCharacteristic(Characteristic.CurrentTemperature)
-            .on('set', function (value, callback) {
-                platform.setTemperatureState(accessory, value, callback);
-            })
-            .on('get', function (callback) {
-                platform.getCurrentTemperature(accessory, callback);
-            });
-        service.getCharacteristic(Characteristic.CurrentRelativeHumidity)
-            .on('set', function (value, callback) {
-                platform.setHumidityState(accessory, value, callback);
-            })
-            .on('get', function (callback) {
-                platform.getCurrentHumidity(accessory, callback);
-            });
-    }
-    if (accessory.getService(Service.TemperatureSensor)) {
-        accessory.getService(Service.TemperatureSensor)
-            .getCharacteristic(Characteristic.CurrentTemperature)
-            .on('set', function (value, callback) {
-                platform.setTemperatureState(accessory, value, callback);
-            })
-            .on('get', function (callback) {
-                platform.getCurrentTemperature(accessory, callback);
-            });
-    }
-    if (accessory.getService(Service.HumiditySensor)) {
-        accessory.getService(Service.HumiditySensor)
-            .getCharacteristic(Characteristic.CurrentRelativeHumidity)
-            .on('set', function (value, callback) {
-                platform.setHumidityState(accessory, value, callback);
-            })
-            .on('get', function (callback) {
-                platform.getCurrentHumidity(accessory, callback);
-            });
-    }
-
-    if (accessory.getService(Service.Fanv2)) {
-        accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
-            .on("get", function (callback) {
-                platform.getFanState(accessory, callback);
-            })
-            .on("set", function (value, callback) {
-                platform.setFanState(accessory, value, callback);
-            });
-
-        // This is actually the fan speed instead of rotation speed but homekit fan does not support this
-        accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed)
-            .setProps({
-                minStep: 3
-            })
-            .on("get", function (callback) {
-                platform.getFanSpeed(accessory, callback);
-            })
-            .on("set", function (value, callback) {
-                platform.setFanSpeed(accessory, value, callback);
-            });
-    }
-
-    if (accessory.getService(Service.Lightbulb)) {
-        accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("get", function (callback) {
-                platform.getFanLightState(accessory, callback);
-            })
-            .on("set", function (value, callback) {
-                platform.setFanLightState(accessory, value, callback);
-            });
-
-    }
-
-
     this.accessories.set(accessory.context.deviceId, accessory);
-
 };
 
-// Sample function to show how developer can add accessory dynamically from outside event
-eWeLink.prototype.addAccessory = function (device, deviceId = null, services = {"switch": true}) {
-
-    // Here we need to check if it is currently there
-    if (this.accessories.get(deviceId ? deviceId : device.deviceid)) {
-        this.log("Not adding [%s] as it already exists in the cache", deviceId ? deviceId : device.deviceid);
-        return;
-    }
-
+// Sample function to show how developer can remove accessory dynamically from outside event
+eWeLink.prototype.removeAccessory = function(accessory) {
     let platform = this;
-    let channel = 0;
-
-    if (device.type != 10) {
-        this.log("A device with an unknown type was returned. It will be skipped.", device.type);
+    if (!platform.log) {
         return;
     }
-
-    if (deviceId) {
-        let id = deviceId.split("CH");
-        channel = id[1];
-    }
-
-    let deviceName = device.name + (channel ? ' CH ' + channel : '');
-    try {
-        if (channel && device.tags && device.tags.ck_channel_name && device.tags.ck_channel_name[channel-1]) {
-            deviceName = device.tags.ck_channel_name[channel-1];
-        }
-    } catch (e) {
-        this.log("Problem device name : [%s]", e);
-    }
-
-    try {
-        const status = channel && device.params.switches && device.params.switches[channel - 1] ? device.params.switches[channel - 1].switch : device.params.switch || "off";
-        this.log("Found Accessory with Name : [%s], Manufacturer : [%s], Status : [%s], Is Online : [%s], API Key: [%s] ", deviceName, device.productModel, status, device.online, device.apikey);
-    } catch (e) {
-        this.log("Problem accessory Accessory with Name : [%s], Manufacturer : [%s], Error : [%s], Is Online : [%s], API Key: [%s] ", deviceName, device.productModel, e, device.online, device.apikey);
-    }
-
-    let switchesCount = this.getDeviceChannelCount(device);
-    if (channel > switchesCount) {
-        this.log("Can't add [%s], because device [%s] has only [%s] switches.", deviceName, device.productModel, switchesCount);
-        return;
-    }
-
-    const accessory = new Accessory(deviceName, UUIDGen.generate((deviceId ? deviceId : device.deviceid).toString()));
-
-    accessory.context.deviceId = deviceId ? deviceId : device.deviceid;
-    accessory.context.apiKey = device.apikey;
-    accessory.context.switches = 1;
-    accessory.context.channel = channel;
-
-    accessory.reachable = device.online === 'true';
-
-    if (services.fan) {
-        var fan = accessory.addService(Service.Fanv2, device.name);
-        var light = accessory.addService(Service.Lightbulb, device.name + ' Light');
-        light.getCharacteristic(Characteristic.On)
-            .on("get", function (callback) {
-                platform.getFanLightState(accessory, callback);
-            })
-            .on('set', function (value, callback) {
-                platform.setFanLightState(accessory, value, callback);
-            });
-
-
-        fan.getCharacteristic(Characteristic.On)
-            .on("get", function (callback) {
-                platform.getFanState(accessory, callback);
-            })
-            .on("set", function (value, callback) {
-                platform.setFanState(accessory, value, callback);
-            });
-
-        // This is actually the fan speed instead of rotation speed but homekit fan does not support this
-        fan.getCharacteristic(Characteristic.RotationSpeed)
-            .setProps({
-                minStep: 3
-            })
-            .on("get", function (callback) {
-                platform.getFanSpeed(accessory, callback);
-            })
-            .on("set", function (value, callback) {
-                platform.setFanSpeed(accessory, value, callback);
-            });
-    }
-
-    if (services.blind) {
-        // platform.log("Services:", services);
-        accessory.context.switchUp = services.group.relay_up - 1;
-        accessory.context.switchDown = services.group.relay_down - 1;
-        accessory.context.durationUp = services.group.time_up;
-        accessory.context.durationDown = services.group.time_down;
-        accessory.context.durationBMU = services.group.time_botton_margin_up || 0;
-        accessory.context.durationBMD = services.group.time_botton_margin_down || 0;
-        accessory.context.fullOverdrive = services.group.full_overdrive || 0;
-        accessory.context.percentDurationDown = (accessory.context.durationDown / 100) * 1000;
-        accessory.context.percentDurationUp = (accessory.context.durationUp / 100) * 1000;
-        accessory.context.handleApiChanges = services.group.handle_api_changes || true;
-
-        accessory.context.lastPosition = 100;           // Last know position, (0-100%)
-        accessory.context.currentPositionState = 2;     // 2 = Stoped , 0=Moving Up , 1 Moving Down.
-        accessory.context.currentTargetPosition = 100;    //  Target Position, (0-100%)
-
-        // Ensuring switches device config
-        platform.initSwitchesConfig(accessory);
-
-        let service = accessory.addService(Service.WindowCovering, deviceName);
-        service.getCharacteristic(Characteristic.CurrentPosition)
-            .on('get', function (callback) {
-                platform.getCurrentPosition(accessory, callback);
-            });
-        service.getCharacteristic(Characteristic.PositionState)
-            .on('get', function (callback) {
-                platform.getPositionState(accessory, callback);
-            });
-        service.getCharacteristic(Characteristic.TargetPosition)
-            .on('get', function (callback) {
-                platform.getTargetPosition(accessory, callback);
-            })
-            .on('set', function (value, callback) {
-                platform.setTargetPosition(accessory, value, callback);
-            });
-    }
-    if (services.switch) {
-        accessory.addService(Service.Switch, deviceName)
-            .getCharacteristic(Characteristic.On)
-            .on('set', function (value, callback) {
-                platform.setPowerState(accessory, value, callback);
-            })
-            .on('get', function (callback) {
-                platform.getPowerState(accessory, callback);
-            });
-    }
-    if (services.thermostat) {
-        let service = accessory.addService(Service.Thermostat, deviceName);
-
-        service.getCharacteristic(Characteristic.CurrentTemperature)
-            .on('set', function (value, callback) {
-                platform.setTemperatureState(accessory, value, callback);
-            })
-            .on('get', function (callback) {
-                platform.getCurrentTemperature(accessory, callback);
-            });
-        service.getCharacteristic(Characteristic.CurrentRelativeHumidity)
-            .on('set', function (value, callback) {
-                platform.setHumidityState(accessory, value, callback);
-            })
-            .on('get', function (callback) {
-                platform.getCurrentHumidity(accessory, callback);
-            });
-    }
-    if (services.temperature) {
-        accessory.addService(Service.TemperatureSensor, deviceName)
-            .getCharacteristic(Characteristic.CurrentTemperature)
-            .on('set', function (value, callback) {
-                platform.setTemperatureState(accessory, value, callback);
-            })
-            .on('get', function (callback) {
-                platform.getCurrentTemperature(accessory, callback);
-            });
-    }
-
-    if (services.humidity) {
-        accessory.addService(Service.HumiditySensor, deviceName)
-            .getCharacteristic(Characteristic.CurrentRelativeHumidity)
-            .on('set', function (value, callback) {
-                platform.setHumidityState(accessory, value, callback);
-            })
-            .on('get', function (callback) {
-                platform.getCurrentHumidity(accessory, callback);
-            });
-    }
-
-    accessory.on('identify', function (paired, callback) {
-        platform.log(accessory.displayName, "Identify not supported");
-	try {
-            callback();
-	} catch (e) { }
-    });
-
-    accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.SerialNumber, device.extra.extra.mac);
-    accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Manufacturer, device.productModel);
-    accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Model, device.extra.extra.model);
-    accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Identify, false);
-
-    // Exception when some device is not ready to register
-    try {
-        accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-    } catch (e) {
-        this.log("Error : [%s]", e);
-    }
-
-    let switchesAmount = platform.getDeviceChannelCount(device);
-    if (switchesAmount > 1) {
-        accessory.context.switches = switchesAmount;
-    }
-
-    this.accessories.set(deviceId ? deviceId : device.deviceid, accessory);
-
-    this.api.registerPlatformAccessories("homebridge-eWeLink",
-        "eWeLink", [accessory]);
-
+    platform.log("[%s] will be removed from Homebridge.", accessory.displayName);
+    platform.accessories.delete(accessory.context.deviceId);
+    platform.api.unregisterPlatformAccessories('homebridge-eWeLink', 'eWeLink', [accessory]);
 };
 
-eWeLink.prototype.getSequence = function () {
-    let time_stamp = new Date() / 1000;
-    this.sequence = Math.floor(time_stamp * 1000);
-    return this.sequence;
-};
 
-eWeLink.prototype.updatePowerStateCharacteristic = function (deviceId, state, device = null, channel = null) {
-
+eWeLink.prototype.updatePowerState = function(deviceId, newState, device = null, channel = null) {
+    
     // Used when we receive an update from an external source
-
     let platform = this;
-
-    let isOn = false;
-
+    if (!platform.log) {
+        return;
+    }
+    
+    let isOn;
     let accessory = platform.accessories.get(deviceId);
-
+    
     if (typeof accessory === 'undefined' && device) {
-        platform.log("Adding accessory for deviceId [%s].", deviceId);
-        platform.addAccessory(device, deviceId);
+        let switchesCount = platform.getDeviceChannelCount(device);
+        if (channel > switchesCount) {
+            return;
+        }
+        if (platform.debug) platform.log("External update received for device [%s] which is not in Homebridge.", deviceId);
+        let services = {};
+        services.switch = true;
+        platform.addAccessory(device, deviceId, services);
         accessory = platform.accessories.get(deviceId);
     }
-
+    
     if (!accessory) {
-        platform.log("Error updating non-exist accessory with deviceId [%s].", deviceId);
+        platform.log("Error updating device with ID [%s] as it is not in Homebridge.", deviceId);
         return;
     }
+    
+    isOn = newState === 'on' ? true : false;
 
-    if (state === 'on') {
-        isOn = true;
-    }
-
-    platform.log("Updating recorded Characteristic.On for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, isOn);
+    platform.log("[%s] has been turned [%s] by an external source. Updating Homebridge.", accessory.displayName, newState);
+    accessory.getService(Service.Switch).setCharacteristic(Characteristic.On, isOn);
 
     let currentState = accessory.getService(Service.Switch).getCharacteristic(Characteristic.On).value;
     if (currentState !== isOn) {
-        platform.log("Updating recorded Characteristic.On for [%s] from [%s] to [%s]. No request will be sent to the device.", accessory.displayName, currentState, isOn);
-        accessory.getService(Service.Switch)
-        .setCharacteristic(Characteristic.On, isOn);
+        accessory.getService(Service.Switch).setCharacteristic(Characteristic.On, isOn);
     }
+    
 };
 
-eWeLink.prototype.updateCurrentTemperatureCharacteristic = function (deviceId, state, device = null, channel = null) {
-
+eWeLink.prototype.updateCurrentTemperature = function(deviceId, state, device = null, channel = null) {
+    
     // Used when we receive an update from an external source
-
+    
     let platform = this;
-
-    let accessory = platform.accessories.get(deviceId);
-    //platform.log("deviceID:", deviceId);
-
-    if (typeof accessory === 'undefined' && device) {
-        platform.addAccessory(device, deviceId);
-        accessory = platform.accessories.get(deviceId);
-    }
-
-    if (!accessory) {
-        platform.log("Error updating non-exist accessory with deviceId [%s].", deviceId);
+    
+    if (!platform.log) {
         return;
     }
-
-    // platform.log(JSON.stringify(device,null,2));
-
+    
+    let accessory = platform.accessories.get(deviceId);
+    //platform.log("deviceID:", deviceId);
+    
+    if (typeof accessory === 'undefined' && device) {
+        services = {};
+        services.thermostat = true;
+        services.temperature = true;
+        services.humidity = true;
+        services.switch = false;
+        platform.log("Adding accessory for device with ID [%s].", deviceId);
+        platform.addAccessory(device, deviceId, services);
+        accessory = platform.accessories.get(deviceId);
+    }
+    
+    if (!accessory) {
+        platform.log("Error updating device with ID [%s] as it is not in Homebridge.", deviceId);
+        return;
+    }
+    
     let currentTemperature = state.currentTemperature;
     let currentHumidity = state.currentHumidity;
-
-    platform.log("Updating recorded Characteristic.CurrentTemperature for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, currentTemperature);
-    platform.log("Updating recorded Characteristic.CurrentRelativeHuniditgy for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, currentHumidity);
-
+    
+    platform.log("Updating 'Characteristic.CurrentTemperature' for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, currentTemperature);
+    platform.log("Updating 'Characteristic.CurrentRelativeHumiditgy' for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, currentHumidity);
+    
     if (accessory.getService(Service.Thermostat)) {
         accessory.getService(Service.Thermostat)
-            .setCharacteristic(Characteristic.CurrentTemperature, currentTemperature);
+        .setCharacteristic(Characteristic.CurrentTemperature, currentTemperature);
         accessory.getService(Service.Thermostat)
-            .setCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumidity);
+        .setCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumidity);
     }
     if (accessory.getService(Service.TemperatureSensor)) {
         accessory.getService(Service.TemperatureSensor)
-            .setCharacteristic(Characteristic.CurrentTemperature, currentTemperature);
+        .setCharacteristic(Characteristic.CurrentTemperature, currentTemperature);
     }
     if (accessory.getService(Service.HumiditySensor)) {
         accessory.getService(Service.HumiditySensor)
-            .setCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumidity);
+        .setCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumidity);
     }
-
 };
 
-eWeLink.prototype.updateBlindStateCharacteristic = function (deviceId, switches, device = null) {
-
+eWeLink.prototype.updateBlindState = function(deviceId, switches, device = null) {
+    
     // Used when we receive an update from an external source
-
+    
     let platform = this;
-
-    let accessory = platform.accessories.get(deviceId);
-
-    if (typeof accessory === 'undefined' && device) {
-        platform.log("Adding accessory for deviceId [%s].", deviceId);
-        platform.addAccessory(device, deviceId);
-        accessory = platform.accessories.get(deviceId);
-    }
-
-    if (!accessory) {
-        platform.log("Error updating non-exist accessory with deviceId [%s].", deviceId);
+    
+    if (!platform.log) {
         return;
     }
-
+    
+    let isOn = false;
+    let accessory = platform.accessories.get(deviceId);
+    
+    if (typeof accessory === 'undefined' && device) {
+        platform.log("Adding accessory for device with ID [%s].", deviceId);
+        let services = {};
+        services.blind = true;
+        services.switch = false;
+        
+        platform.addAccessory(device, deviceId, services);
+        accessory = platform.accessories.get(deviceId);
+    }
+    
+    if (!accessory) {
+        platform.log("Error updating device with ID [%s] as it is not in Homebridge.", deviceId);
+        return;
+    }
+    
     let state = platform.getBlindState(switches, accessory);
     // platform.log("blindStae_debug:", state)
     // [0,0] = 0 => 2 Stopped
     // [0,1] = 1 => 1 Moving down
     // [1,0] = 2 => 0 Moving up
     // [1,1] = 3 => Error
-
+    
     let stateString = ["Moving up", "Moving down", "Stopped", "Error!"];
     let service = accessory.getService(Service.WindowCovering);
     let actualPosition;
-
+    
     // platform.log("accessory.context.currentPositionState:", accessory.context.currentPositionState);
-
+    
     switch (state) {
         case 3:
-            platform.log("[%s] ERROR : positionState: %s. Force stop!", accessory.displayName, state);
-            actualPosition = platform.actualPosition(accessory);
-            accessory.context.currentTargetPosition = actualPosition;
-            accessory.context.targetTimestamp = Date.now() + 10;
-            service.setCharacteristic(Characteristic.TargetPosition, actualPosition);
-            break;
+        platform.log("Error with [%s] - 'positionState' is %s. Force stop.", accessory.displayName, state);
+        actualPosition = platform.actualPosition(accessory);
+        accessory.context.currentTargetPosition = actualPosition;
+        accessory.context.targetTimestamp = Date.now() + 10;
+        service.setCharacteristic(Characteristic.TargetPosition, actualPosition);
+        break;
         case 2:
-            if (accessory.context.currentPositionState == 2) {
-                platform.log("[%s] received new positionState: %s (%s). Already stopped. Nothing to do.", accessory.displayName, state, stateString[state]);
-                return;
-            }
-            actualPosition = platform.actualPosition(accessory);
-            platform.log("[%s] received new positionState when moving: %s (%s). Targuet pos: %s", accessory.displayName, state, stateString[state], actualPosition);
-            accessory.context.currentTargetPosition = actualPosition;
-            accessory.context.targetTimestamp = Date.now() + 10;
-            service.setCharacteristic(Characteristic.TargetPosition, actualPosition);
-            break;
+        if (accessory.context.currentPositionState == 2) {
+            platform.log("[%s] received new 'positionState' [%s - %s]. Already stopped. Nothing to do.", accessory.displayName, state, stateString[state]);
+            return;
+        }
+        actualPosition = platform.actualPosition(accessory);
+        platform.log("[%s] received new 'positionState' when moving [%s - %s]. Target position is [%s]", accessory.displayName, state, stateString[state], actualPosition);
+        accessory.context.currentTargetPosition = actualPosition;
+        accessory.context.targetTimestamp = Date.now() + 10;
+        service.setCharacteristic(Characteristic.TargetPosition, actualPosition);
+        break;
         case 1:
-            if (accessory.context.currentPositionState == 1) {
-                platform.log("[%s] received same positionState: %s (%s). Nothing to do.", accessory.displayName, state, stateString[state]);
-                return;
-            }
-            if (accessory.context.currentTargetPosition == 0) {
-                platform.log("[%s] received new positionState: %s (%s). Targuet pos is already 0. Stopping!", accessory.displayName, state, stateString[state]);
-                platform.setFinalBlindsState(accessory);
-            } else {
-                platform.log("[%s] received new positionState: %s (%s). Targuet pos: 0", accessory.displayName, state, stateString[state]);
-                service.setCharacteristic(Characteristic.TargetPosition, 0);
-            }
-            break;
+        if (accessory.context.currentPositionState == 1) {
+            platform.log("[%s] received new 'positionState' [%s - %s]. Nothing to do.", accessory.displayName, state, stateString[state]);
+            return;
+        }
+        if (accessory.context.currentTargetPosition == 0) {
+            platform.log("[%s] received new 'positionState' [%s - %s]. Target position is already 0. Stopping.", accessory.displayName, state, stateString[state]);
+            platform.setBlindFinalState(accessory);
+        } else {
+            platform.log("[%s] received new 'positionState' [%s - %s]. Target position is 0.", accessory.displayName, state, stateString[state]);
+            service.setCharacteristic(Characteristic.TargetPosition, 0);
+        }
+        break;
         case 0:
-            if (accessory.context.currentPositionState == 0) {
-                platform.log("[%s] received same positionState: %s (%s). Nothing to do.", accessory.displayName, state, stateString[state]);
-                return;
-            }
-            if (accessory.context.currentTargetPosition == 100) {
-                platform.log("[%s] received new positionState: %s (%s). Targuet pos is already 100. Stopping!", accessory.displayName, state, stateString[state]);
-                platform.setFinalBlindsState(accessory);
-            } else {
-                platform.log("[%s] received new positionState: %s (%s). Targuet pos: 100", accessory.displayName, state, stateString[state]);
-                service.setCharacteristic(Characteristic.TargetPosition, 100);
-            }
-            break;
+        if (accessory.context.currentPositionState == 0) {
+            platform.log("[%s] received new 'positionState' [%s - %s]. Nothing to do.", accessory.displayName, state, stateString[state]);
+            return;
+        }
+        if (accessory.context.currentTargetPosition == 100) {
+            platform.log("[%s] received new 'positionState' [%s - %s]. Target position is already 100. Stopping.", accessory.displayName, state, stateString[state]);
+            platform.setBlindFinalState(accessory);
+        } else {
+            platform.log("[%s] received new 'positionState' [%s - %s]. Target position is 100.", accessory.displayName, state, stateString[state]);
+            service.setCharacteristic(Characteristic.TargetPosition, 100);
+        }
+        break;
         default:
-            platform.log('[%s] PositionState type error !', accessory.displayName);
-            break;
+        platform.log("Error with 'positionState' type for [%s].", accessory.displayName);
+        break;
     }
 };
 
-eWeLink.prototype.updateFanLightCharacteristic = function (deviceId, state, device = null) {
-
+eWeLink.prototype.updateFanLight = function(deviceId, state, device = null) {
+    
     // Used when we receive an update from an external source
-
+    
     let platform = this;
-
-    let isOn = false;
-
-    let accessory = platform.accessories.get(deviceId);
-
-    // if (typeof accessory === 'undefined' && device) {
-    //     platform.log("Adding accessory for deviceId [%s].", deviceId);
-    //     platform.addAccessory(device, deviceId);
-    //     accessory = platform.accessories.get(deviceId);
-    // }
-
-    if (!accessory) {
-        platform.log("Error updating non-exist accessory with deviceId [%s].", deviceId);
+    
+    if (!platform.log) {
         return;
     }
-
+    
+    let isOn = false;
+    let accessory = platform.accessories.get(deviceId);
+    
+    if (typeof accessory === 'undefined' && device) {
+        let services = {};
+        services.fan = true;
+        services.switch = false;
+        platform.log("Adding accessory for device with ID [%s].", deviceId);
+        platform.addAccessory(device, deviceId, services);
+        accessory = platform.accessories.get(deviceId);
+    }
+    
+    if (!accessory) {
+        platform.log("Error updating device with ID [%s] as it is not in Homebridge.", deviceId);
+        return;
+    }
+    
     if (state === 'on') {
         isOn = true;
     }
-
-    platform.log("Updating recorded Characteristic.On for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, isOn);
-
+    
+    platform.log("Updating 'Characteristic.On' for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, isOn);
+    
     accessory.getService(Service.Lightbulb)
-        .setCharacteristic(Characteristic.On, isOn);
-
+    .setCharacteristic(Characteristic.On, isOn);
+    
 };
 
-eWeLink.prototype.updateFanSpeedCharacteristic = function (deviceId, state1, state2, state3, device = null) {
-
+eWeLink.prototype.updateFanSpeed = function(deviceId, state1, state2, state3, device = null) {
+    
     // Used when we receive an update from an external source
-
+    
     let platform = this;
-
-    let isOn = false;
-    let speed = 0;
-
-    let accessory = platform.accessories.get(deviceId);
-
-    // if (typeof accessory === 'undefined' && device) {
-    //     platform.log("Adding accessory for deviceId [%s].", deviceId);
-    //     platform.addAccessory(device, deviceId);
-    //     accessory = platform.accessories.get(deviceId);
-    // }
-
-    if (!accessory) {
-        platform.log("Error updating non-exist accessory with deviceId [%s].", deviceId);
+    
+    if (!platform.log) {
         return;
     }
-
+    
+    let isOn = false;
+    let speed = 0;
+    
+    let accessory = platform.accessories.get(deviceId);
+    
+    if (typeof accessory === 'undefined' && device) {
+        let services = {};
+        services.fan = true;
+        services.switch = false;
+        platform.log("Adding accessory for device with ID [%s].", deviceId);
+        platform.addAccessory(device, deviceId, services);
+        accessory = platform.accessories.get(deviceId);
+    }
+    
+    if (!accessory) {
+        platform.log("Error updating device with ID [%s] as it is not in Homebridge.", deviceId);
+        return;
+    }
+    
     if (state1 === 'on' && state2 === 'off' && state3 === 'off') {
         isOn = true;
         speed = 33.0;
@@ -1014,536 +1046,561 @@ eWeLink.prototype.updateFanSpeedCharacteristic = function (deviceId, state1, sta
         isOn = true;
         speed = 100.0;
     }
-
-    platform.log("Updating recorded Characteristic.On for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, isOn);
-    platform.log("Updating recorded Characteristic.RotationSpeed for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, speed);
-
+    
+    platform.log("Updating 'Characteristic.On' for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, isOn);
+    platform.log("Updating 'Characteristic.RotationSpeed' for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, speed);
+    
     accessory.getService(Service.Fanv2)
-        .setCharacteristic(Characteristic.On, isOn);
-
+    .setCharacteristic(Characteristic.On, isOn);
+    
     accessory.getService(Service.Fanv2)
-        .setCharacteristic(Characteristic.RotationSpeed, speed);
+    .setCharacteristic(Characteristic.RotationSpeed, speed);
 };
 
-eWeLink.prototype.getPowerState = function (accessory, callback) {
-    let platform = this;
 
-    if (!this.webClient) {
-        callback('this.webClient not yet ready while obtaining power status for your device');
-        accessory.reachable = false;
+
+eWeLink.prototype.getPowerState = function(accessory, callback) {
+    let platform = this;
+    if (!platform.log) {
         return;
     }
-
-    platform.log("Requesting power state for [%s]", accessory.displayName);
-
-    this.webClient.get('/api/user/device?' + this.getArguments(), function (err, res, body) {
-
+    let deviceId = accessory.context.deviceId;
+    let realDeviceId = accessory.context.deviceId;
+    if (accessory.context.switches > 1) {
+        realDeviceId = deviceId.replace("CH" + accessory.context.channel, "");
+    }
+    platform.log("[%s] Requesting power status...", accessory.displayName);
+    this.webClient.get('/api/user/device/' + realDeviceId + '?deviceid=' + realDeviceId + '&' + this.getArguments(), function(err, res, body) {
+        
         if (err) {
             if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
-                // callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
-                platform.log('Sonoff API 503 error');
+                platform.log('[%s] Sonoff API 503 error. Will try again.', accessory.displayName);
                 setTimeout(function() {
                     platform.getPowerState(accessory, callback);
                 }, 1000);
             } else {
-                platform.log("An error was encountered while requesting a list of devices while interrogating power status. Verify your configuration options. Error was [%s]", err);
+                platform.log("[%s] An error occurred while requesting power status. See next line.", accessory.displayName);
+                platform.log("[%s] %s.", accessory.displayName, err);
             }
             return;
         } else if (!body) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. No data in response.", err);
+            platform.log("[%s] An error occurred while requesting power status. See next line.", accessory.displayName);
+            platform.log("[%s] No data in response.", accessory.displayName);
             return;
         } else if (body.hasOwnProperty('error') && body.error != 0) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. Verify your configuration options. Response was [%s]", JSON.stringify(body));
+            platform.log("[%s] An error occurred while requesting power status. See next line.", accessory.displayName);
             if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
                 platform.relogin();
+            } else if (body.msg && body.msg == 'fd is null') {
+                platform.log("[%s] Temporary eWeLink API error.", accessory.displayName);
+            } else {
+                platform.log("[%s] %s.", accessory.displayName, JSON.stringify(body));
             }
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
+            callback('An error occurred while requesting power status for ' + accessory.displayName);
             return;
         }
-
-        body = body.devicelist;
-
-        let size = Object.keys(body).length;
-
-        if (body.length < 1) {
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
-            accessory.reachable = false;
-            return;
-        }
-
-        let deviceId = accessory.context.deviceId;
-
-        if (accessory.context.switches > 1) {
-            deviceId = deviceId.replace("CH" + accessory.context.channel, "");
-        }
-
-        let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-
-        if (filteredResponse.length === 1) {
-
-            let device = filteredResponse[0];
-
-            if (device.deviceid === deviceId) {
-
-                if (device.online !== true) {
+        
+        if (body.hasOwnProperty("deviceid") && body.deviceid == realDeviceId) {
+            let device = body;
+            if (device.online !== true) {
+                accessory.reachable = false;
+                platform.log("[%s] API reported device is offline.", accessory.displayName);
+                callback('API reported that [%s] is offline.', device.name);
+                return;
+            }
+            if (accessory.context.switches > 1) {
+                let state = device.params.switches[accessory.context.channel - 1].switch;
+                if (state === 'on' || state === 'off') {
+                    accessory.reachable = true;
+                    platform.log('[%s] API reported device is turned %s.', accessory.displayName, state);
+                    callback(null, state === 'on' ? 1 : 0);
+                    return;
+                } else {
                     accessory.reachable = false;
-                    platform.log("Device [%s] was reported to be offline by the API", accessory.displayName);
-                    callback('API reported that [%s] is not online', device.name);
+                    platform.log('[%s] API reported an unknown status.', accessory.displayName);
+                    callback('API returned an unknown status for ' + accessory.displayName);
                     return;
                 }
-
-                if (accessory.context.switches > 1) {
-                    if (device.params.switches[accessory.context.channel - 1].switch === 'on') {
-                        accessory.reachable = true;
-                        platform.log('API reported that [%s] CH %s is On', device.name, accessory.context.channel);
-                        callback(null, 1);
-                        return;
-                    } else if (device.params.switches[accessory.context.channel - 1].switch === 'off') {
-                        accessory.reachable = true;
-                        platform.log('API reported that [%s] CH %s is Off', device.name, accessory.context.channel);
-                        callback(null, 0);
-                        return;
-                    } else {
-                        accessory.reachable = false;
-                        platform.log('API reported an unknown status for device [%s]', accessory.displayName);
-                        callback('API returned an unknown status for device ' + accessory.displayName);
-                        return;
-                    }
-
+            } else {
+                let state = device.params.switch;
+                if (state === 'on' || state === 'off') {
+                    accessory.reachable = true;
+                    platform.log('[%s] API reported device is turned %s.', accessory.displayName, state);
+                    callback(null, state === 'on' ? 1 : 0);
+                    return;
                 } else {
-                    if (device.params.switch === 'on') {
-                        accessory.reachable = true;
-                        platform.log('API reported that [%s] is On', device.name);
-                        callback(null, 1);
-                        return;
-                    } else if (device.params.switch === 'off') {
-                        accessory.reachable = true;
-                        platform.log('API reported that [%s] is Off', device.name);
-                        callback(null, 0);
-                        return;
-                    } else {
-                        accessory.reachable = false;
-                        platform.log('API reported an unknown status for device [%s]', accessory.displayName);
-                        callback('API returned an unknown status for device ' + accessory.displayName);
-                        return;
-                    }
-
+                    accessory.reachable = false;
+                    platform.log("[%s] API reported an unknown status.", accessory.displayName);
+                    callback("API returned an unknown status for device " + accessory.displayName);
+                    return;
                 }
-
             }
-
-        } else if (filteredResponse.length > 1) {
-            // More than one device matches our Device ID. This should not happen.
-            platform.log("ERROR: The response contained more than one device with Device ID [%s]. Filtered response follows.", device.deviceid);
-            platform.log(filteredResponse);
-            callback("The response contained more than one device with Device ID " + device.deviceid);
-
-        } else if (filteredResponse.length < 1) {
-
-            // The device is no longer registered
-
-            platform.log("Device [%s] did not exist in the response.", accessory.displayName);
-            //platform.removeAccessory(accessory);
-
+        } else {
+            accessory.reachable = false;
+            platform.log("[%s] An error occurred while requesting power status.", accessory.displayName);
+            callback('An error occurred while requesting power status for ' + accessory.displayName);
+            return;
         }
-
     });
-
 };
 
-eWeLink.prototype.getFanLightState = function (accessory, callback) {
+eWeLink.prototype.getFanLightState = function(accessory, callback) {
     let platform = this;
-
+    
+    if (!platform.log) {
+        return;
+    }
+    
     if (!this.webClient) {
-        callback('this.webClient not yet ready while obtaining power status for your device');
+        callback("this.webClient not yet ready while obtaining fan light status for your device.");
         accessory.reachable = false;
         return;
     }
-
-    platform.log("Requesting fan light power state for [%s]", accessory.displayName);
-
-    this.webClient.get('/api/user/device?' + this.getArguments(), function (err, res, body) {
-
+    
+    platform.log("Requesting fan light status for [%s]...", accessory.displayName);
+    
+    this.webClient.get('/api/user/device?' + this.getArguments(), function(err, res, body) {
+        
         if (err) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. Error was [%s]", err);
+            if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
+                platform.log('Sonoff API 503 error. Will try again.');
+                setTimeout(function() {
+                    platform.getFanLightState(accessory, callback);
+                }, 1000);
+            } else {
+                platform.log("An error occurred while requesting fan light status for [%s]. Error [%s].", accessory.displayName, err);
+            }
             return;
         } else if (!body) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. No data in response.", err);
+            platform.log("An error occurred while requesting fan light status for [%s]. Error [No data in response].", accessory.displayName);
             return;
         } else if (body.hasOwnProperty('error') && body.error != 0) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. Verify your configuration options. Response was [%s]", JSON.stringify(body));
+            platform.log("An error occurred while requesting fan light status for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
             if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
                 platform.relogin();
             }
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
+            callback('An error occurred while requesting fan light status for your device');
             return;
         }
-
+        
         body = body.devicelist;
-
+        
         let size = Object.keys(body).length;
-
+        
         if (body.length < 1) {
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
+            callback('An error occurred while requesting fan light status for your device');
             accessory.reachable = false;
             return;
         }
-
+        
         let deviceId = accessory.context.deviceId;
-
+        
         let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-
+        
         if (filteredResponse.length === 1) {
-
+            
             let device = filteredResponse[0];
-
+            
             if (device.deviceid === deviceId) {
                 if (device.online !== true) {
                     accessory.reachable = false;
-                    platform.log("Device [%s] was reported to be offline by the API", accessory.displayName);
-                    callback('API reported that [%s] is not online', device.name);
+                    platform.log("Device [%s] was reported to be offline by the API.", accessory.displayName);
+                    callback("API reported that [%s] is not online", device.name);
                     return;
                 }
-
+                
                 if (device.params.switches[0].switch === 'on') {
                     accessory.reachable = true;
-                    platform.log('API reported that fan light %s is On', device.name);
+                    platform.log("API reported that [%s] is [on].", device.name);
                     callback(null, 1);
                     return;
                 } else if (device.params.switches[0].switch === 'off') {
                     accessory.reachable = true;
-                    platform.log('API reported that fan light %s is Off', device.name);
+                    platform.log("API reported that [%s] is [off].", device.name);
                     callback(null, 0);
                     return;
                 } else {
                     accessory.reachable = false;
-                    platform.log('API reported an unknown status for device [%s]', accessory.displayName);
-                    callback('API returned an unknown status for device ' + accessory.displayName);
+                    platform.log("API reported an unknown status for [%s].", accessory.displayName);
+                    callback("API returned an unknown status for " + accessory.displayName);
                     return;
                 }
             }
-
+            
         } else if (filteredResponse.length > 1) {
             // More than one device matches our Device ID. This should not happen.
-            platform.log("ERROR: The response contained more than one device with Device ID [%s]. Filtered response follows.", device.deviceid);
+            platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
             platform.log(filteredResponse);
-            callback("The response contained more than one device with Device ID " + device.deviceid);
-
+            callback("The response contained more than one device with ID " + device.deviceid);
         } else if (filteredResponse.length < 1) {
             // The device is no longer registered
-            // The device is no longer registered
-            platform.log("Device [%s] did not exist in the response. It will be removed", accessory.displayName);
+            platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
             platform.removeAccessory(accessory);
+        } else {
+            callback('An error occurred while requesting fan light status for your device');
         }
     });
 };
 
-eWeLink.prototype.getFanState = function (accessory, callback) {
-    let platform = this;
 
+
+eWeLink.prototype.getCurrentTemperature = function(accessory, callback) {
+    let platform = this;
+    
+    if (!platform.log) {
+        return;
+    }
+    
     if (!this.webClient) {
-        callback('this.webClient not yet ready while obtaining power status for your device');
+        callback("this.webClient not yet ready while obtaining temperature for your device.");
         accessory.reachable = false;
         return;
     }
-
-    platform.log("Requesting fan state for [%s]", accessory.displayName);
-
-    this.webClient.get('/api/user/device?' + this.getArguments(), function (err, res, body) {
-
+    
+    platform.log("Requesting temperature for [%s]...", accessory.displayName);
+    this.webClient.get('/api/user/device?' + this.getArguments(), function(err, res, body) {
+        
         if (err) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. Error was [%s]", err);
+            if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
+                platform.log('Sonoff API 503 error. Will try again.');
+                setTimeout(function() {
+                    platform.getCurrentTemperature(accessory, callback);
+                }, 1000);
+            } else {
+                platform.log("An error occurred while requesting temperature for [%s]. Error [%s].", accessory.displayName, err);
+            }
             return;
         } else if (!body) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. No data in response.", err);
+            platform.log("An error occurred while requesting temperature for [%s]. Error [No data in response].", accessory.displayName);
             return;
         } else if (body.hasOwnProperty('error') && body.error != 0) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. Verify your configuration options. Response was [%s]", JSON.stringify(body));
+            platform.log("An error occurred while requesting temperature for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
             if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
                 platform.relogin();
             }
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
+            callback('An error occurred while requesting temperature for your device');
             return;
         }
-
+        
         body = body.devicelist;
-
+        
         let size = Object.keys(body).length;
-
+        
         if (body.length < 1) {
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
+            callback('An error occurred while requesting temperature for your device');
             accessory.reachable = false;
             return;
         }
-
+        
         let deviceId = accessory.context.deviceId;
-
         let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-
+        
         if (filteredResponse.length === 1) {
-
+            
             let device = filteredResponse[0];
-
+            
             if (device.deviceid === deviceId) {
+                
                 if (device.online !== true) {
                     accessory.reachable = false;
-                    platform.log("Device [%s] was reported to be offline by the API", accessory.displayName);
-                    callback('API reported that [%s] is not online', device.name);
+                    platform.log("Device [%s] was reported to be offline by the API.", accessory.displayName);
+                    callback("API reported that [%s] is not online", device.name);
                     return;
                 }
-
-                if (device.params.switches[1].switch === 'on') {
-                    accessory.reachable = true;
-                    platform.log('API reported that fan light %s is On', device.name);
-                    callback(null, 1);
-                    return;
-                } else if (device.params.switches[1].switch === 'off') {
-                    accessory.reachable = true;
-                    platform.log('API reported that fan light %s is Off', device.name);
-                    callback(null, 0);
-                    return;
-                } else {
-                    accessory.reachable = false;
-                    platform.log(device.params.switches);
-                    platform.log('API reported an unknown status for device [%s] [%s]', accessory.displayName, device.params.switches[1].switch);
-                    callback('API returned an unknown status for device ' + accessory.displayName);
-                    return;
-                }
-            }
-
-        } else if (filteredResponse.length > 1) {
-            // More than one device matches our Device ID. This should not happen.
-            platform.log("ERROR: The response contained more than one device with Device ID [%s]. Filtered response follows.", device.deviceid);
-            platform.log(filteredResponse);
-            callback("The response contained more than one device with Device ID " + device.deviceid);
-
-        } else if (filteredResponse.length < 1) {
-            // The device is no longer registered
-            platform.log("Device [%s] did not exist in the response. It will be removed", accessory.displayName);
-            platform.removeAccessory(accessory);
-        }
-    });
-};
-
-eWeLink.prototype.getFanSpeed = function (accessory, callback) {
-    let platform = this;
-
-    if (!this.webClient) {
-        callback('this.webClient not yet ready while obtaining power status for your device');
-        accessory.reachable = false;
-        return;
-    }
-
-    platform.log("Requesting fan state for [%s]", accessory.displayName);
-
-    this.webClient.get('/api/user/device?' + this.getArguments(), function (err, res, body) {
-
-        if (err) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. Error was [%s]", err);
-            return;
-        } else if (!body) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. No data in response.", err);
-            return;
-        } else if (body.hasOwnProperty('error') && body.error != 0) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating power status. Verify your configuration options. Response was [%s]", JSON.stringify(body));
-            if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
-                platform.relogin();
-            }
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
-            return;
-        }
-
-        body = body.devicelist;
-
-        let size = Object.keys(body).length;
-
-        if (body.length < 1) {
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
-            accessory.reachable = false;
-            return;
-        }
-
-        let deviceId = accessory.context.deviceId;
-
-        let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-
-        if (filteredResponse.length === 1) {
-
-            let device = filteredResponse[0];
-
-            if (device.deviceid === deviceId) {
-                if (device.online !== true) {
-                    accessory.reachable = false;
-                    platform.log("Device [%s] was reported to be offline by the API", accessory.displayName);
-                    callback('API reported that [%s] is not online', device.name);
-                    return;
-                }
-
-                if (device.params.switches[1].switch === 'on' && device.params.switches[2].switch === 'off' && device.params.switches[3].switch === 'off') {
-                    accessory.reachable = true;
-                    platform.log('API reported that fan speed %s is %d', device.name, 33);
-                    callback(null, 33);
-                    return;
-                } else if (device.params.switches[1].switch === 'on' && device.params.switches[2].switch === 'on' && device.params.switches[3].switch === 'off') {
-                    accessory.reachable = true;
-                    platform.log('API reported that fan speed %s is %d', device.name, 66);
-                    callback(null, 66);
-                    return;
-                } else if (device.params.switches[1].switch === 'on' && device.params.switches[2].switch === 'off' && device.params.switches[3].switch === 'on') {
-                    accessory.reachable = true;
-                    platform.log('API reported that fan speed %s is %d', device.name, 100);
-                    callback(null, 100);
-                    return;
-                } else {
-                    accessory.reachable = false;
-                    platform.log('API reported an unknown status for device [%s]', accessory.displayName);
-                    callback('API returned an unknown status for device ' + accessory.displayName);
-                    return;
-                }
-            }
-
-        } else if (filteredResponse.length > 1) {
-            // More than one device matches our Device ID. This should not happen.
-            platform.log("ERROR: The response contained more than one device with Device ID [%s]. Filtered response follows.", device.deviceid);
-            platform.log(filteredResponse);
-            callback("The response contained more than one device with Device ID " + device.deviceid);
-
-        } else if (filteredResponse.length < 1) {
-            // The device is no longer registered
-            platform.log("Device [%s] did not exist in the response. It will be removed", accessory.displayName);
-            platform.removeAccessory(accessory);
-        }
-    });
-};
-
-eWeLink.prototype.getCurrentTemperature = function (accessory, callback) {
-    let platform = this;
-
-    platform.log("Requesting current temperature for [%s]", accessory.displayName);
-
-    this.webClient.get('/api/user/device?' + this.getArguments(), function (err, res, body) {
-
-        if (err) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating current temperature. Verify your configuration options. Error was [%s]", err);
-            return;
-        } else if (!body) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating current temperature. Verify your configuration options. No data in response.", err);
-            return;
-        } else if (body.hasOwnProperty('error') && body.error != 0) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating current temperature. Verify your configuration options. Response was [%s]", JSON.stringify(body));
-            callback('An error was encountered while requesting a list of devices to interrogate current temperature for your device');
-            return;
-        }
-
-        body = body.devicelist;
-
-        let size = Object.keys(body).length;
-
-        if (body.length < 1) {
-            callback('An error was encountered while requesting a list of devices to interrogate current temperature for your device');
-            accessory.reachable = false;
-            return;
-        }
-
-        let deviceId = accessory.context.deviceId;
-
-        let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-
-        if (filteredResponse.length === 1) {
-
-            let device = filteredResponse[0];
-
-            if (device.deviceid === deviceId) {
-
-                if (device.online !== true) {
-                    accessory.reachable = false;
-                    platform.log("Device [%s] was reported to be offline by the API", accessory.displayName);
-                    callback('API reported that [%s] is not online', device.name);
-                    return;
-                }
-
+                
                 let currentTemperature = device.params.currentTemperature;
-                platform.log("getCurrentTemperature:", currentTemperature);
-
+                
                 if (accessory.getService(Service.Thermostat)) {
                     accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.CurrentTemperature, currentTemperature);
                 }
                 if (accessory.getService(Service.TemperatureSensor)) {
                     accessory.getService(Service.TemperatureSensor).setCharacteristic(Characteristic.CurrentTemperature, currentTemperature);
                 }
+                platform.log("API reported that [%s] temperature is [%s].", device.name, currentTemperature);
                 accessory.reachable = true;
                 callback(null, currentTemperature);
-
+                
             }
-
+            
         } else if (filteredResponse.length > 1) {
             // More than one device matches our Device ID. This should not happen.
-            platform.log("ERROR: The response contained more than one device with Device ID [%s]. Filtered response follows.", device.deviceid);
+            platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
             platform.log(filteredResponse);
-            callback("The response contained more than one device with Device ID " + device.deviceid);
-
+            callback("The response contained more than one device with ID " + device.deviceid);
         } else if (filteredResponse.length < 1) {
-
             // The device is no longer registered
-
-            platform.log("Device [%s] did not exist in the response. It will be removed", accessory.displayName);
+            platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
             platform.removeAccessory(accessory);
-
+        } else {
+            callback('An error occurred while requesting temperature for your device');
         }
-
     });
-
+    
 };
 
-eWeLink.prototype.getCurrentHumidity = function (accessory, callback) {
+eWeLink.prototype.getFanState = function(accessory, callback) {
     let platform = this;
-
-    platform.log("Requesting current humidity for [%s]", accessory.displayName);
-
-    this.webClient.get('/api/user/device?' + this.getArguments(), function (err, res, body) {
-
+    
+    if (!platform.log) {
+        return;
+    }
+    
+    if (!this.webClient) {
+        callback("this.webClient not yet ready while obtaining fan status for your device.");
+        accessory.reachable = false;
+        return;
+    }
+    
+    platform.log("Requesting fan status for [%s]...", accessory.displayName);
+    this.webClient.get('/api/user/device?' + this.getArguments(), function(err, res, body) {
+        
         if (err) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating current humidity. Verify your configuration options. Error was [%s]", err);
+            if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
+                platform.log('Sonoff API 503 error. Will try again.');
+                setTimeout(function() {
+                    platform.getFanState(accessory, callback);
+                }, 1000);
+            } else {
+                platform.log("An error occurred while requesting fan status for [%s]. Error [%s].", accessory.displayName, err);
+            }
             return;
         } else if (!body) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating current humidity. Verify your configuration options. No data in response.", err);
+            platform.log("An error occurred while requesting fan status for [%s]. Error [No data in response].", accessory.displayName);
             return;
         } else if (body.hasOwnProperty('error') && body.error != 0) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating current humidity. Verify your configuration options. Response was [%s]", JSON.stringify(body));
-            callback('An error was encountered while requesting a list of devices to interrogate current humidity for your device');
+            platform.log("An error occurred while requesting fan status for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
+            if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
+                platform.relogin();
+            }
+            callback('An error occurred while requesting fan status for your device');
             return;
         }
-
+        
         body = body.devicelist;
-
+        
         let size = Object.keys(body).length;
-
+        
         if (body.length < 1) {
-            callback('An error was encountered while requesting a list of devices to interrogate current humidity for your device');
+            callback('An error occurred while requesting fan status for your device');
             accessory.reachable = false;
             return;
         }
-
+        
         let deviceId = accessory.context.deviceId;
-
         let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-
+        
         if (filteredResponse.length === 1) {
-
+            
             let device = filteredResponse[0];
-
+            
             if (device.deviceid === deviceId) {
-
                 if (device.online !== true) {
                     accessory.reachable = false;
-                    platform.log("Device [%s] was reported to be offline by the API", accessory.displayName);
-                    callback('API reported that [%s] is not online', device.name);
+                    platform.log("Device [%s] was reported to be offline by the API.", accessory.displayName);
+                    callback("API reported that [%s] is not online", device.name);
                     return;
                 }
+                
+                if (device.params.switches[1].switch === 'on') {
+                    accessory.reachable = true;
+                    platform.log("API reported that [%s] is [on].", device.name);
+                    callback(null, 1);
+                    return;
+                } else if (device.params.switches[1].switch === 'off') {
+                    accessory.reachable = true;
+                    platform.log("API reported that [%s] is [off].", device.name);
+                    callback(null, 0);
+                    return;
+                } else {
+                    accessory.reachable = false;
+                    platform.log("API reported an unknown status for [%s - %s].", accessory.displayName, device.params.switches[1].switch);
+                    callback("API returned an unknown status for device " + accessory.displayName);
+                    return;
+                }
+            }
+            
+        } else if (filteredResponse.length > 1) {
+            // More than one device matches our Device ID. This should not happen.
+            platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
+            platform.log(filteredResponse);
+            callback("The response contained more than one device with ID " + device.deviceid);
+        } else if (filteredResponse.length < 1) {
+            // The device is no longer registered
+            platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
+            platform.removeAccessory(accessory);
+        } else {
+            callback('An error occurred while requesting fan status for your device');
+        }
+    });
+};
 
+eWeLink.prototype.getFanSpeed = function(accessory, callback) {
+    let platform = this;
+    
+    if (!platform.log) {
+        return;
+    }
+    
+    if (!this.webClient) {
+        callback("this.webClient not yet ready while obtaining fan speed for your device.");
+        accessory.reachable = false;
+        return;
+    }
+    
+    platform.log("Requesting fan speed for [%s]...", accessory.displayName);
+    this.webClient.get('/api/user/device?' + this.getArguments(), function(err, res, body) {
+        
+        if (err) {
+            if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
+                platform.log('Sonoff API 503 error. Will try again.');
+                setTimeout(function() {
+                    platform.getFanSpeed(accessory, callback);
+                }, 1000);
+            } else {
+                platform.log("An error occurred while requesting fan speed for [%s]. Error [%s].", accessory.displayName, err);
+            }
+            return;
+        } else if (!body) {
+            platform.log("An error occurred while requesting fan speed for [%s]. Error [No data in response].", accessory.displayName);
+            return;
+        } else if (body.hasOwnProperty('error') && body.error != 0) {
+            platform.log("An error occurred while requesting fan speed for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
+            if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
+                platform.relogin();
+            }
+            callback('An error occurred while requesting fan speed for your device');
+            return;
+        }
+        
+        body = body.devicelist;
+        
+        let size = Object.keys(body).length;
+        
+        if (body.length < 1) {
+            callback('An error occurred while requesting fan speed for your device');
+            accessory.reachable = false;
+            return;
+        }
+        
+        let deviceId = accessory.context.deviceId;
+        let filteredResponse = body.filter(device => (device.deviceid === deviceId));
+        
+        if (filteredResponse.length === 1) {
+            
+            let device = filteredResponse[0];
+            
+            if (device.deviceid === deviceId) {
+                if (device.online !== true) {
+                    accessory.reachable = false;
+                    platform.log("Device [%s] was reported to be offline by the API.", accessory.displayName);
+                    callback("API reported that [%s] is not online", device.name);
+                    return;
+                }
+                
+                if (device.params.switches[1].switch === 'on' && device.params.switches[2].switch === 'off' && device.params.switches[3].switch === 'off') {
+                    accessory.reachable = true;
+                    platform.log("API reported that [%s] speed is [33].", device.name);
+                    callback(null, 33);
+                    return;
+                } else if (device.params.switches[1].switch === 'on' && device.params.switches[2].switch === 'on' && device.params.switches[3].switch === 'off') {
+                    accessory.reachable = true;
+                    platform.log("API reported that [%s] speed is [66].", device.name);
+                    callback(null, 66);
+                    return;
+                } else if (device.params.switches[1].switch === 'on' && device.params.switches[2].switch === 'off' && device.params.switches[3].switch === 'on') {
+                    accessory.reachable = true;
+                    platform.log("API reported that [%s] speed is [100].", device.name);
+                    callback(null, 100);
+                    return;
+                } else {
+                    accessory.reachable = false;
+                    platform.log("API reported an unknown status for [%s].", accessory.displayName);
+                    callback('API returned an unknown status for device ' + accessory.displayName);
+                    return;
+                }
+            }
+            
+        } else if (filteredResponse.length > 1) {
+            // More than one device matches our Device ID. This should not happen.
+            platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
+            platform.log(filteredResponse);
+            callback("The response contained more than one device with ID " + device.deviceid);
+        } else if (filteredResponse.length < 1) {
+            // The device is no longer registered
+            platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
+            platform.removeAccessory(accessory);
+        } else {
+            callback('An error occurred while requesting fan speed for your device');
+        }
+    });
+};
+
+eWeLink.prototype.getCurrentHumidity = function(accessory, callback) {
+    let platform = this;
+    
+    if (!platform.log) {
+        return;
+    }
+    
+    if (!this.webClient) {
+        callback("this.webClient not yet ready while obtaining humidity for your device.");
+        accessory.reachable = false;
+        return;
+    }
+    
+    platform.log("Requesting humidity for [%s]...", accessory.displayName);
+    this.webClient.get('/api/user/device?' + this.getArguments(), function(err, res, body) {
+        
+        if (err) {
+            if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
+                platform.log('Sonoff API 503 error. Will try again.');
+                setTimeout(function() {
+                    platform.getCurrentHumidity(accessory, callback);
+                }, 1000);
+            } else {
+                platform.log("An error occurred while requesting humidity for [%s]. Error [%s].", accessory.displayName, err);
+            }
+            return;
+        } else if (!body) {
+            platform.log("An error occurred while requesting humidity for [%s]. Error [No data in response].", accessory.displayName);
+            return;
+        } else if (body.hasOwnProperty('error') && body.error != 0) {
+            platform.log("An error occurred while requesting humidity for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
+            if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
+                platform.relogin();
+            }
+            callback('An error occurred while requesting humidity for your device');
+            return;
+        }
+        
+        body = body.devicelist;
+        
+        let size = Object.keys(body).length;
+        
+        if (body.length < 1) {
+            callback('An error occurred while requesting humidity for your device');
+            accessory.reachable = false;
+            return;
+        }
+        
+        let deviceId = accessory.context.deviceId;
+        let filteredResponse = body.filter(device => (device.deviceid === deviceId));
+        
+        if (filteredResponse.length === 1) {
+            
+            let device = filteredResponse[0];
+            
+            if (device.deviceid === deviceId) {
+                
+                if (device.online !== true) {
+                    accessory.reachable = false;
+                    platform.log("Device [%s] was reported to be offline by the API.", accessory.displayName);
+                    callback("API reported that [%s] is not online", device.name);
+                    return;
+                }
+                
                 let currentHumidity = device.params.currentHumidity;
-                platform.log("getCurrentHumidity:", currentHumidity);
-
+                
                 if (accessory.getService(Service.Thermostat)) {
                     accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumidity);
                 }
@@ -1551,124 +1608,195 @@ eWeLink.prototype.getCurrentHumidity = function (accessory, callback) {
                     accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumidity);
                 }
                 accessory.reachable = true;
+                platform.log("API reported that [%s] humidity is [%s].", device.name, currentHumidity);
                 callback(null, currentHumidity);
-
             }
-
+            
         } else if (filteredResponse.length > 1) {
             // More than one device matches our Device ID. This should not happen.
-            platform.log("ERROR: The response contained more than one device with Device ID [%s]. Filtered response follows.", device.deviceid);
+            platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
             platform.log(filteredResponse);
-            callback("The response contained more than one device with Device ID " + device.deviceid);
-
+            callback("The response contained more than one device with ID " + device.deviceid);
         } else if (filteredResponse.length < 1) {
-
             // The device is no longer registered
-
-            platform.log("Device [%s] did not exist in the response. It will be removed", accessory.displayName);
+            platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
             platform.removeAccessory(accessory);
-
+        } else {
+            callback('An error occurred while requesting humidity for your device');
         }
-
     });
-
 };
 
-eWeLink.prototype.setTemperatureState = function (accessory, value, callback) {
+eWeLink.prototype.getPositionState = function(accessory, callback) {
+    
     let platform = this;
-    let deviceId = accessory.context.deviceId;
-    let deviceInformationFromWebApi = platform.devicesFromApi.get(deviceId);
-    platform.log("setting temperature: ", value);
-    /*
-    deviceInformationFromWebApi.params.currentHumidity = value;
-    if(accessory.getService(Service.Thermostat)) {
-        accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.CurrentTemperature, value);
-    } else if(accesory.getService(Service.TemperatureSensor)) {
-        accessory.getService(Service.TemperatureSensor).setCharacteristic(Characteristic.CurrentTemperature, value);
+    
+    if (!platform.log) {
+        return;
     }
-    */
-    callback();
-};
-
-eWeLink.prototype.setHumidityState = function (accessory, value, callback) {
-    let platform = this;
-    let deviceId = accessory.context.deviceId;
-    let deviceInformationFromWebApi = platform.devicesFromApi.get(deviceId);
-    platform.log("setting humidity: ", value);
-    /*
-    deviceInformationFromWebApi.params.currentHumidity = value;
-    if(accessory.getService(Service.Thermostat)) {
-        accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.CurrentRelativeHumidity, value);
-    } else if(accesory.getService(Service.HumiditySensor)) {
-        accessory.getService(Service.HumiditySensor).setCharacteristic(Characteristic.CurrentRelativeHumidity, value);
+    
+    if (!this.webClient) {
+        callback("this.webClient not yet ready while obtaining blind position for your device.");
+        accessory.reachable = false;
+        return;
     }
-    */
-    callback();
-};
-
-eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
-    let platform = this;
-
-    if (!platform.hasOwnProperty('delaySend')) {
-        platform.delaySend = 0;
-    }
-    const delayOffset = 280;
-
-    let sendOperation = function (string) {
-        if (!platform.isSocketOpen) {
-            // socket not open, retry later
-            setTimeout(function () {
-                sendOperation(string);
-            }, delayOffset);
+    
+    platform.log("Requesting blind position for [%s]", accessory.displayName);
+    
+    this.webClient.get('/api/user/device?' + this.getArguments(), function(err, res, body) {
+        
+        if (err) {
+            if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
+                platform.log('Sonoff API 503 error. Will try again.');
+                setTimeout(function() {
+                    platform.getCurrentHumidity(accessory, callback);
+                }, 1000);
+            } else {
+                platform.log("An error occurred while requesting blind position for [%s]. Error [%s].", accessory.displayName, err);
+            }
+            return;
+        } else if (!body) {
+            platform.log("An error occurred while requesting blind position for [%s]. Error [No data in response].", accessory.displayName);
+            return;
+        } else if (body.hasOwnProperty('error') && body.error != 0) {
+            platform.log("An error occurred while requesting blind position for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
+            if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
+                platform.relogin();
+            }
+            callback('An error occurred while requesting blind position for your device');
             return;
         }
-
-        if (platform.wsc) {
-            platform.wsc.send(string);
-            //platform.log("WS message sent");
-            callback();
+        
+        body = body.devicelist;
+        
+        let size = Object.keys(body).length;
+        if (body.length < 1) {
+            callback('An error occurred while requesting blind position for your device');
+            accessory.reachable = false;
+            return;
         }
-
-        if (platform.delaySend <= 0) {
-            platform.delaySend = 0;
-        } else {
-            platform.delaySend -= delayOffset;
+        let deviceId = accessory.context.deviceId;
+        if (accessory.context.switches > 1) {
+            deviceId = deviceId.replace("CH" + accessory.context.channel, "");
         }
-    };
-
-    if (!platform.isSocketOpen) {
-        platform.log('Socket was closed. It will reconnect automatically');
-
-        let interval;
-        let waitToSend = function (string) {
-            if (platform.isSocketOpen) {
-                clearInterval(interval);
-                sendOperation(string);
-            } else {
-                //platform.log('Connection not ready.....');
+        let filteredResponse = body.filter(device => (device.deviceid === deviceId));
+        
+        if (filteredResponse.length === 1) {
+            let device = filteredResponse[0];
+            if (device.deviceid === deviceId) {
+                if (device.online !== true) {
+                    accessory.reachable = false;
+                    platform.log("Device [%s] was reported to be offline by the API", accessory.displayName);
+                    callback('API reported that [%s] is not online', device.name);
+                    return;
+                }
+                let switchesAmount = platform.getDeviceChannelCount(device);
+                for (let i = 0; i !== switchesAmount; i++) {
+                    if (device.params.switches[i].switch === 'on') {
+                        accessory.reachable = true;
+                        platform.log("API reported that [%s CH-%s] is [on].", device.name, i);
+                    }
+                }
+                let blindState = platform.getBlindState(device.params.switches, accessory);
+                platform.log("[%s] 'CurrentPositionState' is [%s].", accessory.displayName, blindState);
+                // Handling error;
+                if (blindState > 2) {
+                    blindState = 2;
+                    accessory.context.currentPositionState = 2;
+                    platform.setBlindFinalState(accessory);
+                    platform.log("Error with requesting [%s] position. Stopping.", accessory.displayName);
+                }
+                callback(null, blindState);
             }
-        };
-        interval = setInterval(waitToSend, 750, string);
-    } else {
-        setTimeout(sendOperation, platform.delaySend, string);
-        platform.delaySend += delayOffset;
-    }
+        } else if (filteredResponse.length > 1) {
+            // More than one device matches our Device ID. This should not happen.
+            platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
+            platform.log(filteredResponse);
+            callback("The response contained more than one device with ID " + device.deviceid);
+        } else if (filteredResponse.length < 1) {
+            // The device is no longer registered
+            platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
+            platform.removeAccessory(accessory);
+        } else {
+            callback('An error occurred while requesting blind position for your device');
+        }
+    });
 };
 
-eWeLink.prototype.setPowerState = function (accessory, isOn, callback) {
+eWeLink.prototype.getBlindState = function(switches, accessory) {
+    
     let platform = this;
-    let options = {};
-    let deviceId = accessory.context.deviceId;
-    options.protocolVersion = 13;
-
-    let targetState = 'off';
-
-    if (isOn) {
-        targetState = 'on';
+    
+    if (!platform.log) {
+        return;
     }
+    
+    // platform.log("Switches: %s", switches);
+    var switch0 = 0;
+    if (switches[accessory.context.switchUp].switch === 'on') {
+        switch0 = 1;
+    }
+    
+    var switch1 = 0;
+    if (switches[accessory.context.switchDown].switch === 'on') {
+        switch1 = 1;
+    }
+    
+    let sum = (switch0 * 2) + switch1;
+    
+    // this.log("Sum: ", sum);
+    // [0,0] = 0 => 2 Stopped
+    // [0,1] = 1 => 1 Moving down
+    // [1,0] = 2 => 0 Moving up
+    // [1,1] = 3 => Error
+    
+    const MAPPING = {
+        0: 2,
+        1: 1,
+        2: 0,
+        3: 3
+    };
+    // this.log("Sum: %s => Blind State: %s", sum, MAPPING[sum]);
+    return MAPPING[sum];
+};
 
-    platform.log("Setting power state to [%s] for device [%s]", targetState, accessory.displayName);
+eWeLink.prototype.getCurrentPosition = function(accessory, callback) {
+    let platform = this;
+    if (!platform.log) {
+        return;
+    }
+    
+    let lastPosition = accessory.context.lastPosition;
+    if (lastPosition === undefined) {
+        lastPosition = 0;
+    }
+    
+    platform.log("[%s] 'getCurrentPosition' is [%s].", accessory.displayName, lastPosition);
+    callback(null, lastPosition);
+};
 
+eWeLink.prototype.getTargetPosition = function(accessory, callback) {
+    let platform = this;
+    if (!platform.log) {
+        return;
+    }
+    let currentTargetPosition = accessory.context.currentTargetPosition;
+    platform.log("[%s] 'getTargetPosition' is [%s].", accessory.displayName, currentTargetPosition);
+    callback(null, currentTargetPosition);
+};
+
+eWeLink.prototype.setPowerState = function(accessory, isOn, callback) {
+    
+    let platform = this;
+    if (!platform.log) {
+        return;
+    }
+    let deviceId = accessory.context.deviceId;
+    
+    let targetState = isOn ? 'on' : 'off';
+    
+    platform.log("[%s] power state has been turned [%s].", accessory.displayName, targetState);
+    
     let payload = {};
     payload.action = 'update';
     payload.userAgent = 'app';
@@ -1683,64 +1811,73 @@ eWeLink.prototype.setPowerState = function (accessory, isOn, callback) {
     }
     payload.apikey = '' + accessory.context.apiKey;
     payload.deviceid = '' + deviceId;
-
+    
     payload.sequence = platform.getSequence();
-
+    
     let string = JSON.stringify(payload);
-    // platform.log( string );
-
+    
     platform.sendWebSocketMessage(string, callback);
 };
 
 
-eWeLink.prototype.setFanLightState = function (accessory, isOn, callback) {
+eWeLink.prototype.setTemperatureState = function(accessory, value, callback) {
     let platform = this;
-    let options = {};
-    let deviceId = accessory.context.deviceId;
-    options.protocolVersion = 13;
-
-    let targetState = 'off';
-
-    if (isOn) {
-        targetState = 'on';
+    
+    if (!platform.log) {
+        return;
     }
-
-    platform.log("Setting light state to [%s] for device [%s]", targetState, accessory.displayName);
-
-    let payload = {};
-    payload.action = 'update';
-    payload.userAgent = 'app';
-    payload.params = {};
+    
+    let deviceId = accessory.context.deviceId;
     let deviceInformationFromWebApi = platform.devicesFromApi.get(deviceId);
-    payload.params.switches = deviceInformationFromWebApi.params.switches;
-    payload.params.switches[0].switch = targetState;
-
-    payload.apikey = '' + accessory.context.apiKey;
-    payload.deviceid = '' + deviceId;
-
-    payload.sequence = platform.getSequence();
-
-    let string = JSON.stringify(payload);
-    // platform.log( string );
-
-    platform.sendWebSocketMessage(string, callback);
-
+    platform.log("Setting [%s] temperature to [%s].", accessory.displayName, value);
+    /*
+    deviceInformationFromWebApi.params.currentHumidity = value;
+    if(accessory.getService(Service.Thermostat)) {
+        accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.CurrentTemperature, value);
+    } else if(accesory.getService(Service.TemperatureSensor)) {
+        accessory.getService(Service.TemperatureSensor).setCharacteristic(Characteristic.CurrentTemperature, value);
+    }
+    */
+    callback();
 };
 
-eWeLink.prototype.setFanState = function (accessory, isOn, callback) {
+eWeLink.prototype.setHumidityState = function(accessory, value, callback) {
     let platform = this;
-    let options = {};
+    
+    if (!platform.log) {
+        return;
+    }
     let deviceId = accessory.context.deviceId;
-    options.protocolVersion = 13;
+    let deviceInformationFromWebApi = platform.devicesFromApi.get(deviceId);
+    
+    platform.log("Setting [%s] humidity to [%s].", accessory.displayName, value);
+    /*
+    deviceInformationFromWebApi.params.currentHumidity = value;
+    if(accessory.getService(Service.Thermostat)) {
+        accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.CurrentRelativeHumidity, value);
+    } else if(accesory.getService(Service.HumiditySensor)) {
+        accessory.getService(Service.HumiditySensor).setCharacteristic(Characteristic.CurrentRelativeHumidity, value);
+    }
+    */
+    callback();
+};
 
+eWeLink.prototype.setFanState = function(accessory, isOn, callback) {
+    let platform = this;
+    
+    if (!platform.log) {
+        return;
+    }
+    let deviceId = accessory.context.deviceId;
+    
     let targetState = 'off';
-
+    
     if (isOn) {
         targetState = 'on';
     }
-
-    platform.log("Setting fan state to [%s] for device [%s]", targetState, accessory.displayName);
-
+    
+    platform.log("Setting [%s] fan to [%s].", accessory.displayName, targetState);
+    
     let payload = {};
     payload.action = 'update';
     payload.userAgent = 'app';
@@ -1750,41 +1887,41 @@ eWeLink.prototype.setFanState = function (accessory, isOn, callback) {
     payload.params.switches[1].switch = targetState;
     payload.apikey = '' + accessory.context.apiKey;
     payload.deviceid = '' + deviceId;
-
+    
     payload.sequence = platform.getSequence();
-
+    
     let string = JSON.stringify(payload);
-    // platform.log( string );
-
+    
     platform.sendWebSocketMessage(string, callback);
-
+    
 };
 
-eWeLink.prototype.setFanSpeed = function (accessory, value, callback) {
+eWeLink.prototype.setFanSpeed = function(accessory, value, callback) {
     let platform = this;
-    let options = {};
+    
+    if (!platform.log) {
+        return;
+    }
     let deviceId = accessory.context.deviceId;
-    options.protocolVersion = 13;
-
-
-    platform.log("Setting fan state to [%s] for device [%s]", value, accessory.displayName);
-
+    
+    platform.log("Setting [%s] fan speed to [%s].", accessory.displayName, value);
+    
     let payload = {};
     payload.action = 'update';
     payload.userAgent = 'app';
     payload.params = {};
     let deviceInformationFromWebApi = platform.devicesFromApi.get(deviceId);
     payload.params.switches = deviceInformationFromWebApi.params.switches;
-
+    
     if (value < 33) {
         payload.params.switches[1].switch = 'off';
         payload.params.switches[2].switch = 'off';
         payload.params.switches[3].switch = 'off';
-    } else if (value >=33 && value < 66) {
+    } else if (value >= 33 && value < 66) {
         payload.params.switches[1].switch = 'on';
         payload.params.switches[2].switch = 'off';
         payload.params.switches[3].switch = 'off';
-    } else if (value >=66 && value < 99) {
+    } else if (value >= 66 && value < 99) {
         payload.params.switches[1].switch = 'on';
         payload.params.switches[2].switch = 'on';
         payload.params.switches[3].switch = 'off';
@@ -1793,30 +1930,453 @@ eWeLink.prototype.setFanSpeed = function (accessory, value, callback) {
         payload.params.switches[2].switch = 'off';
         payload.params.switches[3].switch = 'on';
     }
-
+    
     payload.apikey = '' + accessory.context.apiKey;
     payload.deviceid = '' + deviceId;
-
+    
     payload.sequence = platform.getSequence();
-
+    
     let string = JSON.stringify(payload);
-    // platform.log( string );
-
+    
     platform.sendWebSocketMessage(string, callback);
 };
 
-// Sample function to show how developer can remove accessory dynamically from outside event
-eWeLink.prototype.removeAccessory = function (accessory) {
-
-    this.log('Removing accessory [%s]', accessory.displayName);
-
-    this.accessories.delete(accessory.context.deviceId);
-
-    this.api.unregisterPlatformAccessories('homebridge-eWeLink',
-        'eWeLink', [accessory]);
+eWeLink.prototype.setFanLightState = function(accessory, isOn, callback) {
+    let platform = this;
+    
+    if (!platform.log) {
+        return;
+    }
+    let deviceId = accessory.context.deviceId;
+    
+    let targetState = 'off';
+    
+    if (isOn) {
+        targetState = 'on';
+    }
+    
+    platform.log("Setting [%s] fan light to [%s].", accessory.displayName, targetState);
+    
+    let payload = {};
+    payload.action = 'update';
+    payload.userAgent = 'app';
+    payload.params = {};
+    let deviceInformationFromWebApi = platform.devicesFromApi.get(deviceId);
+    payload.params.switches = deviceInformationFromWebApi.params.switches;
+    payload.params.switches[0].switch = targetState;
+    
+    payload.apikey = '' + accessory.context.apiKey;
+    payload.deviceid = '' + deviceId;
+    
+    payload.sequence = platform.getSequence();
+    
+    let string = JSON.stringify(payload);
+    platform.sendWebSocketMessage(string, callback);
+    
 };
 
-eWeLink.prototype.getSignature = function (string) {
+eWeLink.prototype.setBlindTargetPosition = function(accessory, pos, callback) {
+    
+    let platform = this;
+    
+    if (!platform.log) {
+        return;
+    }
+    platform.log("Setting [%s] new target position from [%s] to [%s].", accessory.displayName, accessory.context.currentTargetPosition, pos,);
+    
+    let timestamp = Date.now();
+    
+    if (accessory.context.currentPositionState != 2) {
+        
+        var diffPosition = Math.abs(pos - accessory.context.currentTargetPosition);
+        var actualPosition;
+        var diffTime;
+        var diff;
+        
+        if (diffPosition == 0) {
+            actualPosition = pos;
+            diffTime = 0;
+            diff = 0;
+        } else {
+            if (accessory.context.currentPositionState == 1) {
+                diffPosition = accessory.context.currentTargetPosition - pos;
+                diffTime = Math.round(accessory.context.percentDurationDown * diffPosition);
+            } else {
+                diffPosition = pos - accessory.context.currentTargetPosition;
+                diffTime = Math.round(accessory.context.percentDurationUp * diffPosition);
+            }
+            diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
+            actualPosition = platform.actualPosition(accessory);
+            
+            // platform.log("diffPosition:", diffPosition);
+            // platform.log("diffTime:", diffTime);
+            // platform.log("actualPosition:", actualPosition);
+            // platform.log("diff:", diff);
+            
+            if (diff > 0) {
+                accessory.context.targetTimestamp += diffTime;
+                // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+                accessory.context.currentTargetPosition = pos;
+                platform.log("[%s] Blinds are moving. Current position: %s, new targuet: %s, adjusting target milliseconds: %s", accessory.displayName, actualPosition, pos, diffTime);
+                callback();
+                return false;
+            }
+            if (diff < 0) {
+                platform.log("[%s] ==> Revert Blinds moving. Current pos: %s, new targuet: %s, new duration: %s", accessory.displayName, actualPosition, pos, Math.abs(diff));
+                accessory.context.startTimestamp = timestamp;
+                accessory.context.targetTimestamp = timestamp + Math.abs(diff);
+                // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+                accessory.context.lastPosition = actualPosition;
+                accessory.context.currentTargetPosition = pos;
+                accessory.context.currentPositionState = accessory.context.currentPositionState == 0 ? 1 : 0;
+                
+                let payload = platform.prepareBlindSwitchesPayload(accessory);
+                let string = JSON.stringify(payload);
+                
+                if (platform.isSocketOpen) {
+                    platform.sendWebSocketMessage(string, function() {
+                        return;
+                    });
+                    platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.currentPositionState == 1 ? "moving up" : "moving down");
+                    let service = accessory.getService(Service.WindowCovering);
+                    service.getCharacteristic(Characteristic.CurrentPosition).updateValue(accessory.context.lastPosition);
+                    service.getCharacteristic(Characteristic.TargetPosition).updateValue(accessory.context.currentTargetPosition);
+                    service.getCharacteristic(Characteristic.PositionState).updateValue(accessory.context.currentPositionState);
+                } else {
+                    platform.log('Socket was closed. It will reconnect automatically; please retry your command');
+                    callback('Socket was closed. It will reconnect automatically; please retry your command');
+                    return false;
+                }
+            }
+            callback();
+            return false;
+        }
+        callback();
+        return false;
+    }
+    
+    if (accessory.context.lastPosition == pos) {
+        platform.log("[%s] Current position already matches target position. There is nothing to do.", accessory.displayName);
+        callback();
+        return true;
+    }
+    
+    accessory.context.currentTargetPosition = pos;
+    moveUp = (pos > accessory.context.lastPosition);
+    
+    var withoutmarginetimeUP;
+    var withoutmarginetimeDOWN;
+    var duration;
+    withoutmarginetimeUP = accessory.context.durationUp - accessory.context.durationBMU;
+    withoutmarginetimeDOWN = accessory.context.durationDown - accessory.context.durationBMD;
+    
+    if (moveUp) {
+        if (accessory.context.lastPosition == 0) {
+            duration = ((pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP) + accessory.context.durationBMU;
+        } else {
+            duration = (pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP;
+        }
+    } else {
+        if (pos == 0) {
+            duration = ((accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN) + accessory.context.durationBMD;
+        } else {
+            duration = (accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN;
+        }
+    }
+    if (pos == 0 || pos == 100) duration += accessory.context.fullOverdrive;
+    if (pos == 0 || pos == 100) platform.log("[%s] add overdive: %s", accessory.displayName, accessory.context.fullOverdrive);
+    
+    duration = Math.round(duration * 100) / 100;
+    
+    platform.log("[%s] %s, Duration: %s", accessory.displayName, moveUp ? "Moving up" : "Moving down", duration);
+    
+    accessory.context.startTimestamp = timestamp;
+    accessory.context.targetTimestamp = timestamp + (duration * 1000);
+    // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+    accessory.context.currentPositionState = (moveUp ? 0 : 1);
+    accessory.getService(Service.WindowCovering).setCharacteristic(Characteristic.PositionState, (moveUp ? 0 : 1));
+    
+    let payload = platform.prepareBlindSwitchesPayload(accessory);
+    let string = JSON.stringify(payload);
+    
+    if (platform.isSocketOpen) {
+        
+        setTimeout(function() {
+            platform.sendWebSocketMessage(string, function() {
+                return;
+            });
+            platform.log("[%s] Request sent for %s", accessory.displayName, moveUp ? "moving up" : "moving down");
+            
+            var interval = setInterval(function() {
+                if (Date.now() >= accessory.context.targetTimestamp) {
+                    platform.setBlindFinalState(accessory);
+                    clearInterval(interval);
+                    return true;
+                }
+            }, 100);
+            callback();
+        }, 1);
+    } else {
+        platform.log('Socket was closed. It will reconnect automatically; please retry your command');
+        callback('Socket was closed. It will reconnect automatically; please retry your command');
+        return false;
+    }
+};
+
+eWeLink.prototype.setBlindFinalState = function(accessory) {
+    
+    let platform = this;
+    
+    if (!platform.log) {
+        return;
+    }
+    accessory.context.currentPositionState = 2;
+    let payload = platform.prepareBlindSwitchesPayload(accessory);
+    let string = JSON.stringify(payload);
+    
+    if (platform.isSocketOpen) {
+        
+        setTimeout(function() {
+            platform.sendWebSocketMessage(string, function() {
+                return;
+            });
+            platform.log("[%s] Request sent to stop moving", accessory.displayName);
+            accessory.context.currentPositionState = 2;
+            
+            let currentTargetPosition = accessory.context.currentTargetPosition;
+            accessory.context.lastPosition = currentTargetPosition;
+            let service = accessory.getService(Service.WindowCovering);
+            // Using updateValue to avoid loop
+            service.getCharacteristic(Characteristic.CurrentPosition).updateValue(currentTargetPosition);
+            service.getCharacteristic(Characteristic.TargetPosition).updateValue(currentTargetPosition);
+            service.setCharacteristic(Characteristic.PositionState, Characteristic.PositionState.STOPPED);
+            
+            platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, currentTargetPosition);
+            return true;
+            // TODO Here we need to wait for the response to the socket
+        }, 1);
+        
+    } else {
+        platform.log('Socket was closed. It will reconnect automatically; please retry your command');
+        return false;
+    }
+};
+
+eWeLink.prototype.prepareBlindSwitchesPayload = function(accessory) {
+    
+    let platform = this;
+    if (!platform.log) {
+        return;
+    }
+    let payload = {};
+    payload.action = 'update';
+    payload.userAgent = 'app';
+    payload.params = {};
+    let deviceInformationFromWebApi = platform.devicesFromApi.get(accessory.context.deviceId);
+    
+    payload.params.switches = deviceInformationFromWebApi.params.switches;
+    
+    // [0,0] = 0 => 2 Stopped
+    // [0,1] = 1 => 1 Moving down
+    // [1,0] = 2 => 0 Moving up
+    // [1,1] = 3 => should not happen...
+    
+    var switch0 = 'off';
+    var switch1 = 'off';
+    
+    let state = accessory.context.currentPositionState;
+    
+    switch (state) {
+        case 2:
+        switch0 = 'off';
+        switch1 = 'off';
+        break;
+        case 1:
+        switch0 = 'off';
+        switch1 = 'on';
+        break;
+        case 0:
+        switch0 = 'on';
+        switch1 = 'off';
+        break;
+        default:
+        platform.log('[%s] PositionState type error !', accessory.displayName);
+        break;
+    }
+    
+    payload.params.switches[accessory.context.switchUp].switch = switch0;
+    payload.params.switches[accessory.context.switchDown].switch = switch1;
+    payload.apikey = '' + accessory.context.apiKey;
+    payload.deviceid = '' + accessory.context.deviceId;
+    payload.sequence = platform.getSequence();
+    // platform.log("Payload genretad:", JSON.stringify(payload))
+    return payload;
+};
+
+eWeLink.prototype.actualPosition = function(accessory) {
+    let timestamp = Date.now();
+    if (accessory.context.currentPositionState == 1) {
+        return Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
+    } else if (accessory.context.currentPositionState == 0) {
+        return Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
+    } else {
+        return accessory.context.lastPosition;
+    }
+};
+
+eWeLink.prototype.initSwitchesConfig = function(accessory) {
+    // This method is called from addAccessory() and checkIfDeviceIsAlreadyConfigured().
+    // Don't called from configureAccessory() because we need to be connected to the socket.
+    let platform = this;
+    if (!platform.log) {
+        return;
+    }
+    let payload = {};
+    payload.action = 'update';
+    payload.userAgent = 'app';
+    payload.params = {
+        "lock": 0,
+        "zyx_clear_timers": false,
+        "configure": [{
+            "startup": "off",
+            "outlet": 0
+        },
+        {
+            "startup": "off",
+            "outlet": 1
+        },
+        {
+            "startup": "off",
+            "outlet": 2
+        },
+        {
+            "startup": "off",
+            "outlet": 3
+        }],
+        "pulses": [{
+            "pulse": "off",
+            "width": 1000,
+            "outlet": 0
+        },
+        {
+            "pulse": "off",
+            "width": 1000,
+            "outlet": 1
+        },
+        {
+            "pulse": "off",
+            "width": 1000,
+            "outlet": 2
+        },
+        {
+            "pulse": "off",
+            "width": 1000,
+            "outlet": 3
+        }],
+        "switches": [{
+            "switch": "off",
+            "outlet": 0
+        },
+        {
+            "switch": "off",
+            "outlet": 1
+        },
+        {
+            "switch": "off",
+            "outlet": 2
+        },
+        {
+            "switch": "off",
+            "outlet": 3
+        }]
+    };
+    payload.apikey = '' + accessory.context.apiKey;
+    payload.deviceid = '' + accessory.context.deviceId;
+    payload.sequence = platform.getSequence();
+    
+    let string = JSON.stringify(payload);
+    
+    // Delaying execution to be sure Socket is open
+    platform.log("[%s] Waiting 5 sec before sending init config request...", accessory.displayName);
+    
+    setTimeout(function() {
+        if (platform.isSocketOpen) {
+            
+            setTimeout(function() {
+                platform.wsc.send(string);
+                platform.log("[%s] Request sent to configure switches", accessory.displayName);
+                return true;
+                // TODO Here we need to wait for the response to the socket
+            }, 1);
+            
+        } else {
+            platform.log("[%s] Socket was closed. Retrying is 5 sec...", accessory.displayName);
+            setTimeout(function() {
+                platform.initSwitchesConfig(accessory);
+                platform.log("[%s] Request sent to configure switches", accessory.displayName);
+                return false;
+                // TODO Here we need to wait for the response to the socket
+            }, 5000);
+        }
+    }, 5000);
+};
+
+eWeLink.prototype.getSequence = function() {
+    let time_stamp = new Date() / 1000;
+    this.sequence = Math.floor(time_stamp * 1000);
+    return this.sequence;
+};
+
+eWeLink.prototype.sendWebSocketMessage = function(string, callback) {
+    let platform = this;
+    if (!platform.log) {
+        return;
+    }
+    if (!platform.hasOwnProperty('delaySend')) {
+        platform.delaySend = 0;
+    }
+    const delayOffset = 280;
+    
+    let sendOperation = function(string) {
+        if (!platform.isSocketOpen) {
+            // socket not open, retry later
+            setTimeout(function() {
+                sendOperation(string);
+            }, delayOffset);
+            return;
+        }
+        
+        if (platform.wsc) {
+            platform.wsc.send(string);
+            if (platform.debug) platform.log("WS message sent [%s].", string);
+            callback();
+        }
+        
+        if (platform.delaySend <= 0) {
+            platform.delaySend = 0;
+        } else {
+            platform.delaySend -= delayOffset;
+        }
+    };
+    
+    if (!platform.isSocketOpen) {
+        platform.log('Socket was closed. It will reconnect automatically.');
+        
+        let interval;
+        let waitToSend = function(string) {
+            if (platform.isSocketOpen) {
+                clearInterval(interval);
+                sendOperation(string);
+            }
+        };
+        interval = setInterval(waitToSend, 750, string);
+    } else {
+        setTimeout(sendOperation, platform.delaySend, string);
+        platform.delaySend += delayOffset;
+    }
+};
+
+eWeLink.prototype.getSignature = function(string) {
     //let appSecret = "248,208,180,108,132,92,172,184,256,152,256,144,48,172,220,56,100,124,144,160,148,88,28,100,120,152,244,244,120,236,164,204";
     //let f = "ab!@#$ijklmcdefghBCWXYZ01234DEFGHnopqrstuvwxyzAIJKLMNOPQRSTUV56789%^&*()";
     //let decrypt = function(r){var n="";return r.split(',').forEach(function(r){var t=parseInt(r)>>2,e=f.charAt(t);n+=e}),n.trim()};
@@ -1824,187 +2384,204 @@ eWeLink.prototype.getSignature = function (string) {
     return crypto.createHmac('sha256', decryptedAppSecret).update(string).digest('base64');
 };
 
-eWeLink.prototype.login = function (callback) {
-    if (!this.config.phoneNumber && !this.config.email || !this.config.password || !this.config.imei) {
-        this.log('phoneNumber / email / password / imei not found in config, skipping login');
+eWeLink.prototype.login = function(callback) {
+    let platform = this;
+    if (!platform.log) {
+        return;
+    }
+    if (!platform.config.phoneNumber && !platform.config.email || !platform.config.password || !platform.config.imei) {
+        platform.log("Please ensure you have set the username and password for your eWeLink account.");
         callback();
         return;
     }
-
+    
     var data = {};
-    if (this.config.phoneNumber) {
-        data.phoneNumber = this.config.phoneNumber;
-    } else if (this.config.email) {
-        data.email = this.config.email;
+    if (platform.config.phoneNumber) {
+        data.phoneNumber = platform.config.phoneNumber;
+    } else if (platform.config.email) {
+        data.email = platform.config.email;
     }
-    data.password = this.config.password;
+    data.password = platform.config.password;
     data.version = '6';
     data.ts = '' + Math.floor(new Date().getTime() / 1000);
     data.nonce = '' + nonce();
     data.appid = 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq';
-    data.imei = this.config.imei;
+    data.imei = platform.config.imei;
     data.os = 'iOS';
     data.model = 'iPhone10,6';
     data.romVersion = '11.1.2';
     data.appVersion = '3.5.3';
-
+    
     let json = JSON.stringify(data);
-    this.log('Sending login request with user credentials: %s', json);
-
-    let sign = this.getSignature(json);
-    this.log('Login signature: %s', sign);
-
-    let webClient = request.createClient('https://' + this.config.apiHost);
+    if (platform.debug) platform.log("Sending login request with credentials: [%s]", json);
+    
+    let sign = platform.getSignature(json);
+    if (platform.debug) platform.log("Login signature [%s]", sign);
+    let webClient = request.createClient('https://' + platform.config.apiHost);
     webClient.headers['Authorization'] = 'Sign ' + sign;
     webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
-    webClient.post('/api/user/login', data, function (err, res, body) {
+    webClient.post('/api/user/login', data, function(err, res, body) {
         if (err) {
-            this.log("An error was encountered while logging in. Error was [%s]", err);
+            platform.log("An error occurred while logging in. [%s]", err);
             callback();
             return;
         }
-
+        
         // If we receive 301 error, switch to new region and try again
         if (body.hasOwnProperty('error') && body.error == 301 && body.hasOwnProperty('region')) {
-            let idx = this.config.apiHost.indexOf('-');
+            let idx = platform.config.apiHost.indexOf('-');
             if (idx == -1) {
-                this.log("Received new region [%s]. However we cannot construct the new API host url.", body.region);
+                platform.log("Received new region [%s]. However we cannot construct the new API host url.", body.region);
                 callback();
                 return;
             }
-            let newApiHost = body.region + this.config.apiHost.substring(idx);
-            if (this.config.apiHost != newApiHost) {
-                this.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
-                this.config.apiHost = newApiHost;
-                this.login(callback);
+            let newApiHost = body.region + platform.config.apiHost.substring(idx);
+            if (platform.config.apiHost != newApiHost) {
+                platform.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
+                platform.config.apiHost = newApiHost;
+                platform.login(callback);
                 return;
             }
         }
-
+        
         if (!body.at) {
             let response = JSON.stringify(body);
-            this.log("Server did not response with an authentication token. Response was [%s]", response);
+            platform.log("Server did not response with an authentication token. Response was [%s].", response);
             callback();
             return;
         }
-
-        this.log('Authentication token received [%s]', body.at);
-        this.authenticationToken = body.at;
-        this.config.authenticationToken = body.at;
-        this.webClient = request.createClient('https://' + this.config['apiHost']);
-        this.webClient.headers['Authorization'] = 'Bearer ' + body.at;
-
-        this.getWebSocketHost(function () {
+        
+        if (platform.debug) platform.log('Received authToken [%s] and apiKey.', body.at, body.user.apikey);
+        platform.authenticationToken = body.at;
+        platform.apiKey = body.user.apikey;
+        platform.webClient = request.createClient('https://' + platform.config['apiHost']);
+        platform.webClient.headers['Authorization'] = 'Bearer ' + body.at;
+        
+        platform.getWebSocketHost(function() {
             callback(body.at);
         }.bind(this));
     }.bind(this));
 };
 
-eWeLink.prototype.getRegion = function (countryCode, callback) {
+eWeLink.prototype.getRegion = function(countryCode, callback) {
+    let platform = this;
+    if (!platform.log) {
+        return;
+    }
     var data = {};
     data.country_code = countryCode;
     data.version = '6';
     data.ts = '' + Math.floor(new Date().getTime() / 1000);
     data.nonce = '' + nonce();
     data.appid = 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq';
-    data.imei = this.config.imei;
+    data.imei = platform.config.imei;
     data.os = 'iOS';
     data.model = 'iPhone10,6';
     data.romVersion = '11.1.2';
     data.appVersion = '3.5.3';
-
+    
     let query = querystring.stringify(data);
-    this.log('getRegion query: %s', query);
-
+    if (platform.debug) platform.log("Info: getRegion query [%s]", query);
+    
     let dataToSign = [];
-    Object.keys(data).forEach(function (key) {
-        dataToSign.push({key: key, value: data[key]});
+    Object.keys(data).forEach(function(key) {
+        dataToSign.push({
+            key: key,
+            value: data[key]
+        });
     });
-    dataToSign.sort(function (a, b) {
+    dataToSign.sort(function(a, b) {
         return a.key < b.key ? -1 : 1;
     });
-    dataToSign = dataToSign.map(function (kv) {
+    dataToSign = dataToSign.map(function(kv) {
         return kv.key + "=" + kv.value;
     }).join('&');
-
-    let sign = this.getSignature(dataToSign);
-    this.log('getRegion signature: %s', sign);
-
+    
+    let sign = platform.getSignature(dataToSign);
+    if (platform.debug) platform.log("Info: getRegion signature [%s]", sign);
+    
     let webClient = request.createClient('https://api.coolkit.cc:8080');
     webClient.headers['Authorization'] = 'Sign ' + sign;
     webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
-    webClient.get('/api/user/region?' + query, function (err, res, body) {
+    webClient.get('/api/user/region?' + query, function(err, res, body) {
         if (err) {
-            this.log("An error was encountered while getting region. Error was [%s]", err);
+            platform.log("An error occurred while getting region [%s]", err);
             callback();
             return;
         }
-
+        
         if (!body.region) {
             let response = JSON.stringify(body);
-            this.log("Server did not response with a region. Response was [%s]", response);
+            platform.log("Server did not response with a region [%s]", response);
             callback();
             return;
         }
-
-        let idx = this.config.apiHost.indexOf('-');
+        
+        let idx = platform.config.apiHost.indexOf('-');
         if (idx == -1) {
-            this.log("Received region [%s]. However we cannot construct the new API host url.", body.region);
+            platform.log("Received region [%s]. However we cannot construct the new API host url.", body.region);
             callback();
             return;
         }
-        let newApiHost = body.region + this.config.apiHost.substring(idx);
-        if (this.config.apiHost != newApiHost) {
-            this.log("Received region [%s], updating API host to [%s].", body.region, newApiHost);
-            this.config.apiHost = newApiHost;
+        let newApiHost = body.region + platform.config.apiHost.substring(idx);
+        if (platform.config.apiHost != newApiHost) {
+            platform.log("Received region [%s], updating API host to [%s].", body.region, newApiHost);
+            platform.config.apiHost = newApiHost;
         }
         callback(body.region);
     }.bind(this));
 };
 
-eWeLink.prototype.getWebSocketHost = function (callback) {
+eWeLink.prototype.getWebSocketHost = function(callback) {
+    let platform = this;
+    if (!platform.log) {
+        return;
+    }
     var data = {};
     data.accept = 'mqtt,ws';
     data.version = '6';
     data.ts = '' + Math.floor(new Date().getTime() / 1000);
     data.nonce = '' + nonce();
     data.appid = 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq';
-    data.imei = this.config.imei;
+    data.imei = platform.config.imei;
     data.os = 'iOS';
     data.model = 'iPhone10,6';
     data.romVersion = '11.1.2';
     data.appVersion = '3.5.3';
-
-    let webClient = request.createClient('https://' + this.config.apiHost.replace('-api', '-disp'));
-    webClient.headers['Authorization'] = 'Bearer ' + this.authenticationToken;
+    
+    let webClient = request.createClient('https://' + platform.config.apiHost.replace('-api', '-disp'));
+    webClient.headers['Authorization'] = 'Bearer ' + platform.authenticationToken;
     webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
-    webClient.post('/dispatch/app', data, function (err, res, body) {
+    webClient.post('/dispatch/app', data, function(err, res, body) {
         if (err) {
-            this.log("An error was encountered while getting websocket host. Error was [%s]", err);
+            platform.log("An error occurred while getting websocket host [%s]", err);
             callback();
             return;
         }
-
+        
         if (!body.domain) {
             let response = JSON.stringify(body);
-            this.log("Server did not response with a websocket host. Response was [%s]", response);
+            platform.log("Server did not response with a websocket host [%s]", response);
             callback();
             return;
         }
-
-        this.log('WebSocket host received [%s]', body.domain);
-        this.config['webSocketApi'] = body.domain;
-        if (this.wsc) {
-            this.wsc.url = 'wss://' + body.domain + ':8080/api/ws';
+        
+        
+        if (platform.debug) platform.log('Web socket host received [%s].', body.domain);
+        platform.config['webSocketApi'] = body.domain;
+        if (platform.wsc) {
+            platform.wsc.url = 'wss://' + body.domain + ':8080/api/ws';
         }
         callback(body.domain);
     }.bind(this));
 };
 
-eWeLink.prototype.relogin = function (callback) {
+eWeLink.prototype.relogin = function(callback) {
     let platform = this;
-    platform.login(function () {
-        // Reconnect websocket
+    if (!platform.log) {
+        return;
+    }
+    platform.login(function() {
         if (platform.isSocketOpen) {
             platform.wsc.instance.terminate();
             platform.wsc.onclose();
@@ -2014,7 +2591,7 @@ eWeLink.prototype.relogin = function (callback) {
     });
 };
 
-eWeLink.prototype.getDeviceTypeByUiid = function (uiid) {
+eWeLink.prototype.getDeviceTypeByUiid = function(uiid) {
     const MAPPING = {
         1: "SOCKET",
         2: "SOCKET_2",
@@ -2074,7 +2651,7 @@ eWeLink.prototype.getDeviceTypeByUiid = function (uiid) {
     return MAPPING[uiid] || "";
 };
 
-eWeLink.prototype.getDeviceChannelCountByType = function (deviceType) {
+eWeLink.prototype.getDeviceChannelCountByType = function(deviceType) {
     const DEVICE_CHANNEL_LENGTH = {
         SOCKET: 1,
         SWITCH_CHANGE: 1,
@@ -2100,20 +2677,23 @@ eWeLink.prototype.getDeviceChannelCountByType = function (deviceType) {
     return DEVICE_CHANNEL_LENGTH[deviceType] || 0;
 };
 
-eWeLink.prototype.getDeviceChannelCount = function (device) {
-    let deviceType = this.getDeviceTypeByUiid(device.uiid);
-    this.log('Device type for %s is %s', device.uiid, deviceType);
+eWeLink.prototype.getDeviceChannelCount = function(device) {
+    let platform = this;
+    if (!platform.log) {
+        return;
+    }
+    let deviceType = platform.getDeviceTypeByUiid(device.uiid);
+    if (platform.debug) platform.log("Device type for [%s] is [%s].", device.uiid, deviceType);
     let channels = this.getDeviceChannelCountByType(deviceType);
     return channels;
 };
 
-//create arguments for later get request
-eWeLink.prototype.getArguments = function () {
+eWeLink.prototype.getArguments = function() {
     let args = {};
     args.lang = 'en';
     args.apiKey = this.apiKey;
     args.getTags = '1';
-    args.version = '6';
+    args.version = '8';
     args.ts = '' + Math.floor(new Date().getTime() / 1000);
     args.nounce = '' + nonce();
     args.appid = 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq';
@@ -2133,495 +2713,71 @@ function WebSocketClient() {
     this.pendingReconnect = false;
 }
 
-WebSocketClient.prototype.open = function (url) {
+WebSocketClient.prototype.open = function(url) {
     this.url = url;
     this.instance = new WebSocket(this.url);
     this.instance.on('open', () => {
         this.onopen();
     });
-
+    
     this.instance.on('message', (data, flags) => {
         this.number++;
         this.onmessage(data, flags, this.number);
     });
-
+    
     this.instance.on('close', (e) => {
         switch (e) {
-            case 1000: // CLOSE_NORMAL
-                // console.log("WebSocket: closed");
-                break;
+            case 1005: // CLOSE_NORMAL
+            // console.log("WebSocket: closed");
+            break;
             default: // Abnormal closure
-                this.reconnect(e);
-                break;
+            this.reconnect(e);
+            break;
         }
         this.onclose(e);
     });
     this.instance.on('error', (e) => {
         switch (e.code) {
             case 'ECONNREFUSED':
-                this.reconnect(e);
-                break;
+            this.reconnect(e);
+            break;
             default:
-                this.onerror(e);
-                break;
+            this.onerror(e);
+            break;
         }
     });
 };
-WebSocketClient.prototype.send = function (data, option) {
+WebSocketClient.prototype.send = function(data, option) {
     try {
         this.instance.send(data, option);
     } catch (e) {
         this.instance.emit('error', e);
     }
 };
-WebSocketClient.prototype.reconnect = function (e) {
+WebSocketClient.prototype.reconnect = function(e) {
     // console.log(`WebSocketClient: retry in ${this.autoReconnectInterval}ms`, e);
-
+    
     if (this.pendingReconnect) return;
     this.pendingReconnect = true;
-
+    
     this.instance.removeAllListeners();
-
+    
     let platform = this;
-    setTimeout(function () {
+    setTimeout(function() {
         platform.pendingReconnect = false;
-        console.log("WebSocketClient: reconnecting...");
+        console.log("WebSocketClient: Reconnecting...");
         platform.open(platform.url);
     }, this.autoReconnectInterval);
 };
-WebSocketClient.prototype.onopen = function (e) {
+WebSocketClient.prototype.onopen = function(e) {
     // console.log("WebSocketClient: open", arguments);
 };
-WebSocketClient.prototype.onmessage = function (data, flags, number) {
+WebSocketClient.prototype.onmessage = function(data, flags, number) {
     // console.log("WebSocketClient: message", arguments);
 };
-WebSocketClient.prototype.onerror = function (e) {
+WebSocketClient.prototype.onerror = function(e) {
     console.log("WebSocketClient: error", arguments);
 };
-WebSocketClient.prototype.onclose = function (e) {
+WebSocketClient.prototype.onclose = function(e) {
     // console.log("WebSocketClient: closed", arguments);
-};
-
-//////////////
-// Blind Stuff
-//////////////
-
-eWeLink.prototype.getBlindState = function (switches, accessory) {
-
-    let platform = this;
-    // platform.log("Switches: %s", switches);
-    var switch0 = 0;
-    if (switches[accessory.context.switchUp].switch === 'on') {
-        switch0 = 1;
-    }
-
-    var switch1 = 0;
-    if (switches[accessory.context.switchDown].switch === 'on') {
-        switch1 = 1;
-    }
-
-    let sum = (switch0 * 2) + switch1;
-
-    // this.log("Sum: ", sum);
-    // [0,0] = 0 => 2 Stopped
-    // [0,1] = 1 => 1 Moving down
-    // [1,0] = 2 => 0 Moving up
-    // [1,1] = 3 => Error
-
-    const MAPPING = {
-        0: 2,
-        1: 1,
-        2: 0,
-        3: 3
-    };
-    // this.log("Sum: %s => Blind State: %s", sum, MAPPING[sum]);
-    return MAPPING[sum];
-};
-eWeLink.prototype.getCurrentPosition = function (accessory, callback) {
-    let platform = this;
-    let lastPosition = accessory.context.lastPosition;
-    if (lastPosition === undefined) {
-        lastPosition = 0;
-    }
-    platform.log("[%s] getCurrentPosition: %s", accessory.displayName, lastPosition);
-    callback(null, lastPosition);
-};
-
-eWeLink.prototype.getPositionState = function (accessory, callback) {
-    let platform = this;
-
-    if (!platform.webClient) {
-        callback('platform.webClient not yet ready while obtaining power status for your device');
-        accessory.reachable = false;
-        return;
-    }
-
-    platform.log("Requesting power state for [%s]", accessory.displayName);
-
-    this.webClient.get('/api/user/device?' + this.getArguments(), function (err, res, body) {
-
-        if (err) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating current temperature. Verify your configuration options. Error was [%s]", err);
-            return;
-        } else if (!body) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating current temperature. Verify your configuration options. No data in response.", err);
-            return;
-        } else if (body.hasOwnProperty('error') && body.error != 0) {
-            platform.log("An error was encountered while requesting a list of devices while interrogating current temperature. Verify your configuration options. Response was [%s]", JSON.stringify(body));
-            callback('An error was encountered while requesting a list of devices to interrogate current temperature for your device');
-            return;
-        }
-
-        body = body.devicelist;
-
-        let size = Object.keys(body).length;
-        if (body.length < 1) {
-            callback('An error was encountered while requesting a list of devices to interrogate power status for your device');
-            accessory.reachable = false;
-            return;
-        }
-        let deviceId = accessory.context.deviceId;
-        if (accessory.context.switches > 1) {
-            deviceId = deviceId.replace("CH" + accessory.context.channel, "");
-        }
-        let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-        if (filteredResponse.length === 1) {
-            let device = filteredResponse[0];
-            if (device.deviceid === deviceId) {
-                if (device.online !== true) {
-                    accessory.reachable = false;
-                    platform.log("Device [%s] was reported to be offline by the API", accessory.displayName);
-                    callback('API reported that [%s] is not online', device.name);
-                    return;
-                }
-                let switchesAmount = platform.getDeviceChannelCount(device);
-                for (let i = 0; i !== switchesAmount; i++) {
-                    if (device.params.switches[i].switch === 'on') {
-                        accessory.reachable = true;
-                        platform.log('API reported that [%s] CH %s is On', device.name, i);
-                    }
-                }
-                let blindState = platform.getBlindState(device.params.switches, accessory);
-                platform.log("[%s] Requested CurrentPositionState: %s", accessory.displayName, blindState);
-                // Handling error;
-                if (blindState > 2) {
-                    blindState = 2;
-                    accessory.context.currentPositionState = 2;
-                    platform.setFinalBlindsState(accessory);
-                    platform.log("[%s] Error! Stopping!", accessory.displayName);
-                }
-                callback(null, blindState);
-            }
-        } else if (filteredResponse.length > 1) {
-            // More than one device matches our Device ID. This should not happen.
-            platform.log("ERROR: The response contained more than one device with Device ID [%s]. Filtered response follows.", device.deviceid);
-            platform.log(filteredResponse);
-            callback("The response contained more than one device with Device ID " + device.deviceid);
-
-        } else if (filteredResponse.length < 1) {
-            // The device is no longer registered
-            platform.log("Device [%s] did not exist in the response. It will be removed", accessory.displayName);
-            platform.removeAccessory(accessory);
-        }
-    });
-};
-
-eWeLink.prototype.getTargetPosition = function (accessory, callback) {
-    let platform = this;
-    let currentTargetPosition = accessory.context.currentTargetPosition;
-    platform.log("[%s] getTargetPosition: %s", accessory.displayName, currentTargetPosition);
-    callback(null, currentTargetPosition);
-};
-
-eWeLink.prototype.setTargetPosition = function (accessory, pos, callback) {
-
-    let platform = this;
-    platform.log("[%s] Setting new target position to %s, was: %s", accessory.displayName, pos, accessory.context.currentTargetPosition);
-
-    let timestamp = Date.now();
-
-    if (accessory.context.currentPositionState != 2) {
-
-        var diffPosition = Math.abs(pos - accessory.context.currentTargetPosition);
-        var actualPosition;
-        var diffTime;
-        var diff;
-
-        if (diffPosition == 0) {
-            actualPosition = pos;
-            diffTime = 0;
-            diff = 0;
-        } else {
-            if (accessory.context.currentPositionState == 1) {
-                diffPosition = accessory.context.currentTargetPosition - pos;
-                diffTime = Math.round(accessory.context.percentDurationDown * diffPosition);
-            } else {
-                diffPosition = pos - accessory.context.currentTargetPosition;
-                diffTime = Math.round(accessory.context.percentDurationUp * diffPosition);
-            }
-            diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
-            actualPosition = platform.actualPosition(accessory);
-
-            // platform.log("diffPosition:", diffPosition);
-            // platform.log("diffTime:", diffTime);
-            // platform.log("actualPosition:", actualPosition);
-            // platform.log("diff:", diff);
-
-            if (diff > 0) {
-                accessory.context.targetTimestamp += diffTime;
-                // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-                accessory.context.currentTargetPosition = pos;
-                platform.log("[%s] Blinds are moving. Current position: %s, new targuet: %s, adjusting target milliseconds: %s", accessory.displayName, actualPosition, pos, diffTime);
-                callback();
-                return false;
-            }
-            if (diff < 0) {
-                platform.log("[%s] ==> Revert Blinds moving. Current pos: %s, new targuet: %s, new duration: %s", accessory.displayName, actualPosition, pos, Math.abs(diff));
-                accessory.context.startTimestamp = timestamp;
-                accessory.context.targetTimestamp = timestamp + Math.abs(diff);
-                // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-                accessory.context.lastPosition = actualPosition;
-                accessory.context.currentTargetPosition = pos;
-                accessory.context.currentPositionState = accessory.context.currentPositionState == 0 ? 1 : 0;
-
-                let payload = platform.prepareBlindSwitchesPayload(accessory);
-                let string = JSON.stringify(payload);
-
-                if (platform.isSocketOpen) {
-                    platform.sendWebSocketMessage(string, function(){return;});
-                    platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.currentPositionState == 1 ? "moving up" : "moving down");
-                    let service = accessory.getService(Service.WindowCovering);
-                    service.getCharacteristic(Characteristic.CurrentPosition).updateValue(accessory.context.lastPosition);
-                    service.getCharacteristic(Characteristic.TargetPosition).updateValue(accessory.context.currentTargetPosition);
-                    service.getCharacteristic(Characteristic.PositionState).updateValue(accessory.context.currentPositionState);
-                } else {
-                    platform.log('Socket was closed. It will reconnect automatically; please retry your command');
-                    callback('Socket was closed. It will reconnect automatically; please retry your command');
-                    return false;
-                }
-            }
-            callback();
-            return false;
-        }
-        callback();
-        return false;
-    }
-
-    if (accessory.context.lastPosition == pos) {
-        platform.log("[%s] Current position already matches target position. There is nothing to do.", accessory.displayName);
-        callback();
-        return true;
-    }
-
-    accessory.context.currentTargetPosition = pos;
-    moveUp = (pos > accessory.context.lastPosition);
-
-    var withoutmarginetimeUP;
-    var withoutmarginetimeDOWN;
-    var duration;
-    withoutmarginetimeUP = accessory.context.durationUp - accessory.context.durationBMU;
-    withoutmarginetimeDOWN = accessory.context.durationDown - accessory.context.durationBMD;
-
-    if (moveUp) {
-        if (accessory.context.lastPosition == 0) {
-            duration = ((pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP) + accessory.context.durationBMU;
-        } else {
-            duration = (pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP;
-        }
-    } else {
-        if (pos == 0) {
-            duration = ((accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN) + accessory.context.durationBMD;
-        } else {
-            duration = (accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN;
-        }
-    }
-		if (pos==0 || pos==100) duration += accessory.context.fullOverdrive;
-		if (pos==0 || pos==100) platform.log("[%s] add overdive: %s", accessory.displayName, accessory.context.fullOverdrive);
-
-    duration = Math.round(duration * 100) / 100;
-
-    platform.log("[%s] %s, Duration: %s", accessory.displayName, moveUp ? "Moving up" : "Moving down", duration);
-
-    accessory.context.startTimestamp = timestamp;
-    accessory.context.targetTimestamp = timestamp + (duration * 1000);
-    // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-    accessory.context.currentPositionState = (moveUp ? 0 : 1);
-    accessory.getService(Service.WindowCovering).setCharacteristic(Characteristic.PositionState, (moveUp ? 0 : 1));
-
-    let payload = platform.prepareBlindSwitchesPayload(accessory);
-    let string = JSON.stringify(payload);
-
-    if (platform.isSocketOpen) {
-
-        setTimeout(function () {
-            platform.sendWebSocketMessage(string, function(){return;});
-            platform.log("[%s] Request sent for %s", accessory.displayName, moveUp ? "moving up" : "moving down");
-
-            var interval = setInterval(function () {
-                if (Date.now() >= accessory.context.targetTimestamp) {
-                    platform.setFinalBlindsState(accessory);
-                    clearInterval(interval);
-                    return true;
-                }
-            }, 100);
-            callback();
-        }, 1);
-    } else {
-        platform.log('Socket was closed. It will reconnect automatically; please retry your command');
-        callback('Socket was closed. It will reconnect automatically; please retry your command');
-        return false;
-    }
-};
-
-eWeLink.prototype.setFinalBlindsState = function (accessory) {
-
-    let platform = this;
-    accessory.context.currentPositionState = 2;
-    let payload = platform.prepareBlindSwitchesPayload(accessory);
-    let string = JSON.stringify(payload);
-
-    if (platform.isSocketOpen) {
-
-        setTimeout(function () {
-            platform.sendWebSocketMessage(string, function(){return;});
-            platform.log("[%s] Request sent to stop moving", accessory.displayName);
-            accessory.context.currentPositionState = 2;
-
-            let currentTargetPosition = accessory.context.currentTargetPosition;
-            accessory.context.lastPosition = currentTargetPosition;
-            let service = accessory.getService(Service.WindowCovering);
-            // Using updateValue to avoid loop
-            service.getCharacteristic(Characteristic.CurrentPosition).updateValue(currentTargetPosition);
-            service.getCharacteristic(Characteristic.TargetPosition).updateValue(currentTargetPosition);
-            service.setCharacteristic(Characteristic.PositionState, Characteristic.PositionState.STOPPED);
-
-            platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, currentTargetPosition);
-            return true;
-            // TODO Here we need to wait for the response to the socket
-        }, 1);
-
-    } else {
-        platform.log('Socket was closed. It will reconnect automatically; please retry your command');
-        return false;
-    }
-};
-
-eWeLink.prototype.prepareBlindSwitchesPayload = function (accessory) {
-
-    let platform = this;
-    let payload = {};
-    payload.action = 'update';
-    payload.userAgent = 'app';
-    payload.params = {};
-    let deviceInformationFromWebApi = platform.devicesFromApi.get(accessory.context.deviceId);
-
-    payload.params.switches = deviceInformationFromWebApi.params.switches;
-
-    // [0,0] = 0 => 2 Stopped
-    // [0,1] = 1 => 1 Moving down
-    // [1,0] = 2 => 0 Moving up
-    // [1,1] = 3 => should not happen...
-
-    var switch0 = 'off';
-    var switch1 = 'off';
-
-    let state = accessory.context.currentPositionState;
-
-    switch (state) {
-        case 2:
-            switch0 = 'off';
-            switch1 = 'off';
-            break;
-        case 1:
-            switch0 = 'off';
-            switch1 = 'on';
-            break;
-        case 0:
-            switch0 = 'on';
-            switch1 = 'off';
-            break;
-        default:
-            platform.log('[%s] PositionState type error !', accessory.displayName);
-            break;
-    }
-
-    payload.params.switches[accessory.context.switchUp].switch = switch0;
-    payload.params.switches[accessory.context.switchDown].switch = switch1;
-    payload.apikey = '' + accessory.context.apiKey;
-    payload.deviceid = '' + accessory.context.deviceId;
-    payload.sequence = platform.getSequence();
-    // platform.log("Payload genretad:", JSON.stringify(payload))
-    return payload;
-};
-
-eWeLink.prototype.actualPosition = function (accessory) {
-    let timestamp = Date.now();
-    if (accessory.context.currentPositionState == 1) {
-        return Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
-    } else if (accessory.context.currentPositionState == 0) {
-        return Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
-    } else {
-        return accessory.context.lastPosition;
-    }
-};
-
-eWeLink.prototype.initSwitchesConfig = function (accessory) {
-    // This method is called from addAccessory() and checkIfDeviceIsAlreadyConfigured().
-    // Don't called from configureAccessory() because we need to be connected to the socket.
-    let platform = this;
-    let payload = {};
-    payload.action = 'update';
-    payload.userAgent = 'app';
-    payload.params = {
-        "lock": 0,
-        "zyx_clear_timers": false,
-        "configure": [
-            {"startup": "off", "outlet": 0},
-            {"startup": "off", "outlet": 1},
-            {"startup": "off", "outlet": 2},
-            {"startup": "off", "outlet": 3}
-        ],
-        "pulses": [
-            {"pulse": "off", "width": 1000, "outlet": 0},
-            {"pulse": "off", "width": 1000, "outlet": 1},
-            {"pulse": "off", "width": 1000, "outlet": 2},
-            {"pulse": "off", "width": 1000, "outlet": 3}
-        ],
-        "switches": [
-            {"switch": "off", "outlet": 0},
-            {"switch": "off", "outlet": 1},
-            {"switch": "off", "outlet": 2},
-            {"switch": "off", "outlet": 3}
-        ]
-    };
-
-    payload.apikey = '' + accessory.context.apiKey;
-    payload.deviceid = '' + accessory.context.deviceId;
-    payload.sequence = platform.getSequence();
-
-    let string = JSON.stringify(payload);
-
-    // Delaying execution to be sure Socket is open
-    platform.log("[%s] Waiting 5 sec before sending init config request...", accessory.displayName);
-
-    setTimeout(function () {
-        if (platform.isSocketOpen) {
-
-            setTimeout(function () {
-                platform.wsc.send(string);
-                platform.log("[%s] Request sent to configure switches", accessory.displayName);
-                return true;
-                // TODO Here we need to wait for the response to the socket
-            }, 1);
-
-        } else {
-            platform.log("[%s] Socket was closed. Retrying is 5 sec...", accessory.displayName);
-            setTimeout(function () {
-                platform.initSwitchesConfig(accessory);
-                platform.log("[%s] Request sent to configure switches", accessory.displayName);
-                return false;
-                // TODO Here we need to wait for the response to the socket
-            }, 5000);
-        }
-    }, 5000);
 };
