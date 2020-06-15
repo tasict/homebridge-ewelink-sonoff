@@ -13,6 +13,9 @@ More information about this package and how it's evolved from [homebridge-ewelin
 
 Thanks :)
 ## Installation
+### Through Homebridge Config UI X
+Simply go to the "Plugins" page, search `homebridge-ewelink-beta` and click "Install". You will be guided through the configuration.
+### Manually
 #### 1. Install
 ```bash
 sudo npm i homebridge-ewelink-beta -g
