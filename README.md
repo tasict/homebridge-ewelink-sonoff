@@ -47,3 +47,5 @@ add/remove devices upon websocket message if possible?
 multi switch flicking issue
 
 switching updating still isnt perfect
+
+more config options to override: apiHost, wsHost, etc...
