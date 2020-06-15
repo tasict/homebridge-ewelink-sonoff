@@ -55,7 +55,7 @@ function eWeLink(log, config, api) {
       "time_down":20,
       "group.time_botton_margin_up":0,
       "group.time_botton_margin_down":0,
-      "fullOverdrive":0
+      "full_overdrive":0
    };
 
    let platform = this;
@@ -145,8 +145,16 @@ function eWeLink(log, config, api) {
                   }
                   if (platform.devicesFromApi.has(realDeviceId) && (accessory.context.switches <= 1 || accessory.context.channel <= accessory.context.switches)) {
                      if ((deviceId != realDeviceId) && platform.deviceGroups.has(realDeviceId)) {
-                        platform.log('[%s] is part of a window blind group so removing from Homebridge.', accessory.displayName);
-                        platform.removeAccessory(accessory);
+                        let group = platform.deviceGroups.get(realDeviceId);
+                        switch (group.type) {
+                           case 'blind':
+                           platform.log('[%s] is part of a blind group so removing from Homebridge.', accessory.displayName);
+                           platform.removeAccessory(accessory);
+                           break;
+                           default:
+                           platform.log("Only blind group types are currently supported.");
+                           break;
+                        }
                      } else if (platform.getDeviceTypeByUiid(platform.devicesFromApi.get(realDeviceId).uiid) === 'FAN_LIGHT' && accessory.context.channel !== null) {
                         platform.log('[%s] is part of a fan so removing from Homebridge.', accessory.displayName);
                         platform.removeAccessory(accessory);
@@ -201,7 +209,7 @@ function eWeLink(log, config, api) {
                                  platform.prepareBlindSwitchConfig(accessory);
                                  break;
                               default:
-                                 platform.log("Only 'blind' group types are currently supported.");
+                                 platform.log("Only blind group types are currently supported.");
                                  break;
                            }
                         } else if (deviceType === 'FAN_LIGHT') {
@@ -256,7 +264,7 @@ function eWeLink(log, config, api) {
                                  platform.addAccessory(deviceToAdd, null, services);
                                  break;
                               default:
-                                 platform.log("Only 'blind' group types are currently supported.");
+                                 platform.log("Only blind group types are currently supported.");
                                  break;
                            }
                         } else if (deviceToAdd.extra.extra.model === "PSF-BFB-GL") {
@@ -314,7 +322,6 @@ function eWeLink(log, config, api) {
                      return;
                   }
                   if (json.hasOwnProperty("action")) {
-
                      if (json.action === 'update') {
 
                         platform.log("External update received via web socket.");
@@ -335,7 +342,7 @@ function eWeLink(log, config, api) {
                                     platform.updateBlindTargetPosition(json.deviceid, json.params.switches);
                                     break;
                                  default:
-                                    platform.log('Group type error ! Device ID : [%s] will not be updated.', json.deviceid);
+                                    platform.log('Only blind group types are currently supported.');
                                     break;
                               }
                            } else if (platform.devicesFromApi.has(json.deviceid) && platform.getDeviceTypeByUiid(platform.devicesFromApi.get(json.deviceid).uiid) === 'FAN_LIGHT') {
@@ -749,7 +756,7 @@ eWeLink.prototype.configureAccessory = function(accessory) {
          accessory.context.durationDown = (group.time_down || platform.groupDefaults['time_down']);
          accessory.context.durationBMU = group.time_bottom_margin_up || platform.groupDefaults['time_bottom_margin_up'];
          accessory.context.durationBMD = group.time_bottom_margin_down || platform.groupDefaults['time_bottom_margin_down'];
-         accessory.context.fullOverdrive = group.full_overdrive || platform.groupDefaults['full_overdrive'];
+         accessory.context.fullOverdrive = platform.groupDefaults['full_overdrive'];
          accessory.context.percentDurationDown = (accessory.context.durationDown / 100) * 1000;
          accessory.context.percentDurationUp = (accessory.context.durationUp / 100) * 1000;
       }

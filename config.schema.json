@@ -200,13 +200,13 @@
                      "type":"number",
                      "title":"Time Up",
                      "description":"Total time in seconds to fully open blinds (from closed).",
-                     "default" : 200
+                     "default" : 20
                   },
                   "time_down":{
                      "type":"number",
                      "title":"Time Down",
                      "description":"Total time in seconds to completely close blinds (from open).",
-                     "default" : 400
+                     "default" : 40
                   },
                   "time_botton_margin_up":{
                      "type":"number",

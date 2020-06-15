@@ -41,7 +41,6 @@ And voila your eWeLink devices *should* be added to your Homebridge instance.
 ## My Plans
 
 - add/remove devices upon websocket message if possible?
-
 - multi switch flicking issue
-
 - switching updating still isnt perfect
+- characteristics for multi channel devices not loading properly (eg firmware)
