@@ -31,7 +31,8 @@ The plugin can either be configured through homebridge-config-ui-x, or add the f
    "name" : "eWeLink",
    "username" : "your-ewelink-username (either phone or email)",
    "password" : "your-ewelink-password",
-   "countryCode" : "your-ewelink-country-code (eg 44 for UK or 1 for USA)"
+   "countryCode" : "your-ewelink-country-code (eg 44 for UK or 1 for USA)",
+   "debug" : false
 }
 ```
 
