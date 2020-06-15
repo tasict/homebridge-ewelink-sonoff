@@ -1,7 +1,5 @@
 # homebridge-ewelink-beta
 
-## About
-
 There seems to be a variety of Homebridge plugins for eWeLink/Sonoff devices.
 
 My aim for this package is to bring together the best from all the different ones.
@@ -40,7 +38,7 @@ The plugin can either be configured through homebridge-config-ui-x, or add the f
 #### 3. Restart Homebridge
 And voila your eWeLink devices *should* be added to your Homebridge instance.
 
-## More Information
+## About
 
 #### My future plans/ideas
 
