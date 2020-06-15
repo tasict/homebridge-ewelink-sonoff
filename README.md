@@ -12,6 +12,8 @@ If you want to give this package a try, by all means go ahead! But note there co
 
 If you're looking for a stable version then I would recommend the project I forked this from - [homebridge-ewelink-max](https://github.com/howanghk/homebridge-ewelink).
 
+More information about this package and how it's evolved from [homebridge-ewelink-max](https://github.com/howanghk/homebridge-ewelink) can be found at the end of this file.
+
 Thanks :)
 
 ## Installation
@@ -38,7 +40,9 @@ The plugin can either be configured through homebridge-config-ui-x, or add the f
 #### 3. Restart Homebridge
 And voila your eWeLink devices *should* be added to your Homebridge instance.
 
-## My Plans
+## More Information
+
+#### My future plans/ideas
 
 - add/remove devices upon websocket message if possible?
 - multi switch flicking issue
