@@ -103,11 +103,11 @@ function eWeLink(log, config, api) {
                }
                
                apiDevices = body.devicelist;
-               platform.log(JSON.stringify(apiDevices));
+               if (platform.debug) platform.log(JSON.stringify(apiDevices));
                let size = Object.keys(apiDevices).length;
                
                if (size === 0) {
-                  platform.log("[0] primary devices were loaded from your eWeLink account. Homebridge cache will be cleared.");
+                  platform.log("[0] primary devices were loaded from your eWeLink account. Devices will be removed from Homebridge.");
                   platform.api.unregisterPlatformAccessories("homebridge-eWeLink", "eWeLink", Array.from(platform.accessories.values()));
                   platform.accessories.clear();
                   return;
@@ -116,7 +116,7 @@ function eWeLink(log, config, api) {
                platform.log("[%s] primary devices were loaded from your eWeLink account.", size);
                
                apiDevices.forEach((device) => {
-                  // Skip Sonoff Bridge as it is not supported by this plugin
+                  // Skip Sonoff Bridge (uiid 28) as it is not supported by this plugin.
                   if (device.uiid !== 28) {
                      platform.devicesFromApi.set(device.deviceid, device);
                   }
@@ -134,10 +134,9 @@ function eWeLink(log, config, api) {
                }
                
                // Function to check each Homebridge cached device exists in the API response.
-               function checkIfDeviceIsStillRegistered(value, deviceId, map) {
+               function isHBDeviceStillInEwelink(value, deviceId, map) {
                   
                   let accessory = platform.accessories.get(deviceId);
-                  // deviceId does NOT include the CH% part for secondary devices
                   
                   let chDeviceId = accessory.context.switches > 1 ? deviceId.replace('CH' + accessory.context.channel, "") : deviceId;
                   
@@ -146,7 +145,7 @@ function eWeLink(log, config, api) {
                         let group = platform.deviceGroups.get(chDeviceId);
                         switch (group.type) {
                            case 'blind':
-                           platform.log('[%s] is part of a blind group so hiding from Homebridge.', accessory.displayName);
+                           platform.log('[%s] is part of a blind device so hiding from Homebridge.', accessory.displayName);
                            platform.removeAccessory(accessory);
                            break;
                            default:
@@ -160,9 +159,9 @@ function eWeLink(log, config, api) {
                         if (platform.debug) platform.log('[%s] is registered with the API. Nothing to do.', accessory.displayName);
                      }
                   } else if (platform.devicesFromApi.has(chDeviceId) && platform.devicesFromApi.get(chDeviceId).uiid === 34) {
-                     platform.log('[%s] is registered as a fan the with API. Nothing to do.', accessory.displayName);
+                     platform.log('[%s] is registered as a fan the with API. All good.', accessory.displayName);
                   } else if (platform.devicesFromApi.has(deviceId)) {
-                     if (platform.debug) platform.log('[%s] is registered the with API. Nothing to do.', accessory.displayName);
+                     if (platform.debug) platform.log('[%s] is registered the with API. All good.', accessory.displayName);
                   } else {
                      platform.log('[%s] was not present in the API response so removing from Homebridge.', accessory.displayName, accessory.UUID);
                      platform.removeAccessory(accessory);
@@ -172,14 +171,16 @@ function eWeLink(log, config, api) {
                // Using above function -> if we have devices in our cache, check that they exist in the web response.
                if (platform.accessories.size > 0) {
                   if (platform.debug) platform.log("Checking if devices need to be removed from the Homebridge cache...");
-                  platform.accessories.forEach(checkIfDeviceIsStillRegistered);
+                  platform.accessories.forEach(isHBDeviceStillInEwelink);
                }
                
                // Now the reverse.
                // Function to update the existing devices received from API and add new devices to Homebridge.
-               function checkIfDeviceIsAlreadyConfigured(value, deviceId, map) {
+               function isEwelinkDeviceStillInHB(value, deviceId, map) {
                   
                   if (platform.accessories.has(deviceId)) {
+                     
+                     // Perfect - a device in the API that exists in Homebridge
                      
                      let accessory = platform.accessories.get(deviceId);
                      let deviceFromApi = platform.devicesFromApi.get(deviceId);
@@ -251,6 +252,8 @@ function eWeLink(log, config, api) {
                      
                   } else {
                      
+                     // Device from the API that's not in Homebridge that needs to be added.
+                     
                      let deviceToAdd = platform.devicesFromApi.get(deviceId);
                      let switchesAmount = platform.getDeviceChannelCount(deviceToAdd);
                      if (platform.debug) platform.log('[%s] was not found in Homebridge so will be added.', deviceToAdd.name);
@@ -305,7 +308,7 @@ function eWeLink(log, config, api) {
                // Using above function -> update existing and add new devices
                if (platform.devicesFromApi.size > 0) {
                   if (platform.debug) platform.log("Checking if devices need to be added/updated in the Homebridge cache...");
-                  platform.devicesFromApi.forEach(checkIfDeviceIsAlreadyConfigured);
+                  platform.devicesFromApi.forEach(isEwelinkDeviceStillInHB);
                }
                
                // Let's open a connection to the WebSocket API.
@@ -2234,8 +2237,7 @@ eWeLink.prototype.prepareBlindPosition = function (accessory) {
 };
 
 eWeLink.prototype.prepareBlindSwitchConfig = function (accessory) {
-   // This method is called from addAccessory() and checkIfDeviceIsAlreadyConfigured().
-   // Don't called from configureAccessory() because we need to be connected to the socket.
+   // This function should not be called from configureAccessory() because we need to be connected to the web socket.
    let platform = this;
    if (!platform.log) {
       return;
