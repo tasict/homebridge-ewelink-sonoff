@@ -37,3 +37,12 @@ The plugin can either be configured through homebridge-config-ui-x, or add the f
 
 #### 3. Restart Homebridge
 And voila your eWeLink devices *should* be added to your Homebridge instance.
+
+## My Plans
+required fields in config schemas
+
+add/remove devices upon websocket message if possible?
+
+multi switch flicking issue
+
+switching updating still isnt perfect

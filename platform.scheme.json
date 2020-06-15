@@ -1,35 +1,124 @@
 {
-	"plugin_alias": "eWeLink",
-	"schema": {
-		"type": "object",
-		"properties": {
-			"platform": {
-				"title": "Platform",
+	"plugin_alias":"eWeLink",
+	"schema":{
+		"type":"object",
+		"properties":{
+			"name": {
 				"type": "string",
-				"const": "eWeLink",
-				"readOnly": true
+				"default": "eWeLink"
 			},
-			"countryCode": {
-				"title": "The telephone country code linked to your eWeLink account (without the +).",
-				"type": "string",
-				"required": true
+			"countryCode":{
+				"type":"integer",
+				"title":"Country Code",
+				"description":"The telephone country code linked to your eWeLink account (without the +).",
+				"placeholder":"1",
+				"maximum":999
 			},
-			"username": {
-				"title": "The phone number or email address linked to your eWeLink account.",
-				"type": "string"
+			"username":{
+				"type":"string",
+				"title":"Username",
+				"description":"The phone number or email address linked to your eWeLink account.",
+				"placeholder":""
 			},
-			"password": {
-				"title": "The password for your eWeLink account.",
-				"type": "string",
-				"required": true
+			"password":{
+				"type":"string",
+				"title":"Password",
+				"placeholder":"",
+				"description":"The password for your eWeLink account."
 			},
-			"groups": {
-				"title": "You can group channels of multi-switch devices to simulate another accessory instead of having each switch separately. Currently only 'blind' (WindowCovering) is supported.",
-				"type": "array",
-				"items": {
-					"type": "string"
+			"debug": {
+				"title": "Debug Logging",
+				"type": "boolean",
+				"description": "If enabled, more information will be added to the Homebridge log.",
+				"default":false
+			},
+			"groups":{
+				"type":"array",
+				"title":"Groups",
+				"description":"You can group channels of multi-switch devices to simulate another accessory instead of having each switch separately. Currently only 'blind' (WindowCovering) is supported.",
+				"items":{
+					"type":"object",
+					"properties":{
+						"type":{
+							"type":"string",
+							"title":"Type",
+							"default":"blind",
+							"description":"A description of this group. Currently must be 'blind'."
+						},
+						"deviceId":{
+							"type":"string",
+							"title":"Device ID",
+							"description":"Device ID from your eWeLink app."
+						},
+						"relay_up":{
+							"type":"number",
+							"title":"Relay Up",
+							"description":"Relay number for the up motor."
+						},
+						"relay_down":{
+							"type":"number",
+							"title":"Relay Down",
+							"description":"Relay number for the down motor."
+						},
+						"time_up":{
+							"type":"number",
+							"title":"Time Up",
+							"description":"Total time in seconds to fully open blinds (from closed).",
+							"default" : 20000
+						},
+						"time_down":{
+							"type":"number",
+							"title":"Time Down",
+							"description":"Total time in seconds to completely close blinds (from open).",
+							"default" : 40000
+						},
+						"time_botton_margin_up":{
+							"type":"number",
+							"title":"Time Bottom Margin Up",
+							"description":"Please refer <a href=\"https://github.com/manolab/homebridge-sonoff-stateful-blinds#readme\" target=\"_blank\">to this link</a> for more information about this setting.",
+							"default" : 0
+						},
+						"time_botton_margin_down":{
+							"type":"number",
+							"title":"Time Bottom Margin Down",
+							"description":"Please refer <a href=\"https://github.com/manolab/homebridge-sonoff-stateful-blinds#readme\" target=\"_blank\">to this link</a> for more information about this setting.",
+							"default" : 0
+						}
+					}
 				}
 			}
+		},
+		"required":[
+			"countryCode",
+			"username",
+			"password"
+		]
+	},
+	"layout": [
+		{
+			"type": "fieldset",
+			"items": ["countryCode", "username", "password"]
+		},
+		{
+			"key": "groups",
+			"expandable": true,
+			"add": "Add Another Group",
+			"type": "array",
+			"items": [
+				{
+					"type":"fieldset",
+					"items": ["groups[].type", "groups[].deviceId", "groups[].relay_up", "groups[].relay_down", "groups[].time_up", "groups[].time_down", "groups[].time_botton_margin_up", "groups[].time_botton_margin_up"]
+				}
+			]
+		},
+		{
+			"type": "fieldset",
+			"title": "Optional",
+			"description": "Only adjust these settings if you know what you are doing.",
+			"expandable": true,
+			"items": [
+				"debug"
+			]
 		}
-	}
+	]
 }

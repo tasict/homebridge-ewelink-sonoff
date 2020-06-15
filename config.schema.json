@@ -2,11 +2,15 @@
    "pluginAlias":"eWeLink",
    "pluginType":"platform",
    "singular": true,
-   "headerDisplay":"Homebridge plugin to control Sonoff relays with OEM firmware. It uses the same API as the iOS app to communicate with your devices.",
-   "footerDisplay":"If you have any suggestions, please open an issue on [GitHub](https://github.com/howanghk/homebridge-ewelink/issues).",
+   "headerDisplay":"Homebridge plugin to control Sonoff relays with OEM firmware.",
+   "footerDisplay":"If you have any suggestions, please open an issue on [GitHub](https://github.com/thepotterfamily/homebridge-ewelink-beta/issues).",
    "schema":{
       "type":"object",
       "properties":{
+         "name": {
+            "type": "string",
+            "default": "eWeLink"
+         },
          "countryCode":{
             "type":"integer",
             "title":"Country Code",
@@ -25,6 +29,12 @@
             "title":"Password",
             "placeholder":"",
             "description":"The password for your eWeLink account."
+         },
+         "debug": {
+            "title": "Debug Logging",
+            "type": "boolean",
+            "description": "If enabled, more information will be added to the Homebridge log.",
+            "default":false
          },
          "groups":{
             "type":"array",
@@ -57,28 +67,26 @@
                   "time_up":{
                      "type":"number",
                      "title":"Time Up",
-                     "description":"Total time in seconds to fully open blinds (from closed)."
+                     "description":"Total time in seconds to fully open blinds (from closed).",
+                     "default" : 20000
                   },
                   "time_down":{
                      "type":"number",
                      "title":"Time Down",
-                     "description":"Total time in seconds to completely close blinds (from open)."
+                     "description":"Total time in seconds to completely close blinds (from open).",
+                     "default" : 40000
                   },
                   "time_botton_margin_up":{
                      "type":"number",
                      "title":"Time Bottom Margin Up",
-                     "description":"Please refer <a href=\"https://github.com/manolab/homebridge-sonoff-stateful-blinds#readme\" target=\"_blank\">to this link</a> for more information about this setting."
+                     "description":"Please refer <a href=\"https://github.com/manolab/homebridge-sonoff-stateful-blinds#readme\" target=\"_blank\">to this link</a> for more information about this setting.",
+                     "default" : 0
                   },
                   "time_botton_margin_down":{
                      "type":"number",
                      "title":"Time Bottom Margin Down",
-                     "description":"Please refer <a href=\"https://github.com/manolab/homebridge-sonoff-stateful-blinds#readme\" target=\"_blank\">to this link</a> for more information about this setting."
-                  },
-                  "handle_api_changes":{
-                     "type":"boolean",
-                     "default":true,
-                     "title":"Handle API Changes",
-                     "description":"Uncheck if you don't want this group to respond to eWeLink App changes."
+                     "description":"Please refer <a href=\"https://github.com/manolab/homebridge-sonoff-stateful-blinds#readme\" target=\"_blank\">to this link</a> for more information about this setting.",
+                     "default" : 0
                   }
                }
             }
@@ -89,5 +97,32 @@
          "username",
          "password"
       ]
-   }
+   },
+   "layout": [
+      {
+         "type": "fieldset",
+         "items": ["countryCode", "username", "password"]
+      },
+      {
+         "key": "groups",
+         "expandable": true,
+         "add": "Add Another Group",
+         "type": "array",
+         "items": [
+            {
+               "type":"fieldset",
+               "items": ["groups[].type", "groups[].deviceId", "groups[].relay_up", "groups[].relay_down", "groups[].time_up", "groups[].time_down", "groups[].time_botton_margin_up", "groups[].time_botton_margin_up"]
+            }
+         ]
+      },
+      {
+         "type": "fieldset",
+         "title": "Optional",
+         "description": "Only adjust these settings if you know what you are doing.",
+         "expandable": true,
+         "items": [
+            "debug"
+         ]
+      }
+   ]
 }
