@@ -340,7 +340,7 @@ function eWeLink(log, config, api) {
                            let switchesAmount = platform.getDeviceChannelCount(deviceFromApi);
                            if (json.params.hasOwnProperty("switch")) {
                               // single switch device
-                              platform.updatePowerState(json.deviceid, json.params.switch);
+                              platform.updatePowerState(json.deviceid, json.params.switch, true);
                               
                            } else if (json.params.hasOwnProperty("switches") && Array.isArray(json.params.switches)) {
                               // multi switch device
