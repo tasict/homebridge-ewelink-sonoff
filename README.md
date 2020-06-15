@@ -35,6 +35,8 @@ And voila your eWeLink devices *should* be added to your Homebridge instance.
 - For multi-switch devices, a "master" accessory will now appear in Homebridge. Turning it on/off will turn all the switches on/off respectively. The "master" accessory will show as on if **any** of the switches are on, and will show as off if **all** the switches are off.
 - If a switch is externally updated (eg physically or through eWeLink app), the plugin will no longer notice the change and then send a request to update the device with eWeLink ([see here](https://github.com/howanghk/homebridge-ewelink/issues/96)).
 - Certain devices are no longer removed and re-added upon Homebridge (re)start ([see here](https://github.com/howanghk/homebridge-ewelink/issues/105)).
+#### Current issues that need addressing
+- The new "master" accessory is reactive to changes. Currently trying to change the switches through Homebridge can be quite temperamental! 
 #### My future plans/ideas
 - Add/remove devices upon web socket message if possible?
 - Characteristics for multi channel non-master devices not loading properly (eg firmware).
