@@ -35,15 +35,17 @@ Add the following to your Homebridge configuration file in the appropriate place
 And voila your eWeLink devices *should* be added to your Homebridge instance.
 ## About
 #### Changes from [homebridge-ewelink-max](https://github.com/howanghk/homebridge-ewelink)
-- For multi-switch devices, a "master" accessory will now appear in Homebridge. Turning it on/off will turn all the switches on/off respectively. The "master" accessory will show as on if **any** of the switches are on, and will show as off if **all** the switches are off.
-- If a switch is externally updated (eg. physically or through eWeLink app/alexa/google), the plugin will no longer notice the change and send a request to update the device with eWeLink ([see here](https://github.com/howanghk/homebridge-ewelink/issues/96)).
+> By "primary device", I mean the main device (whether it just have one switch or more).
+> By "secondary device", I mean an accessory that is created from a particular channel from a "primary device".
+- For multi-switch devices, a primary device will now appear in Homebridge. Turning it on/off will turn all its secondary devices on/off respectively. The primary device will show as on if **any** of its secondary devices are on, otherwise it will show as off.
+- If any device is externally updated (eg. physically or through eWeLink app/alexa/google), the plugin will no longer {notice the change and send a request to update the device with eWeLink} ([see here](https://github.com/howanghk/homebridge-ewelink/issues/96)).
 - Certain devices are no longer removed and re-added upon Homebridge (re)start ([see here](https://github.com/howanghk/homebridge-ewelink/issues/105)).
 #### Current issues that need addressing
-- The new "master" accessory is only reactive to external changes. Currently trying to change the switches through Homebridge can be quite temperamental! 
+- The new master device is only reactive to external changes. Currently trying to change the master device and/or secondary devices through Homebridge can be quite temperamental! 
 #### My future plans/ideas
 - Add/remove devices upon web socket message if possible?
-- Characteristics for multi channel non-master devices not loading properly (eg firmware).
-- Add config option to disable "master" devices showing.
+- Characteristics for multi channel secondary devices not loading properly (eg firmware) upon Homebridge restart.
+- Add config option to disable master devices showing.
 - Support for more devices is always a good thing. If you have a device and could help me with testing let me know!
 #### My limitations
 - I am not an expert in javascript, but can certainly work around the template I have
