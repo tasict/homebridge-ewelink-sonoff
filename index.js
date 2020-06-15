@@ -103,27 +103,26 @@ function eWeLink(log, config, api) {
                }
                
                apiDevices = body.devicelist;
-               let size = Object.keys(apiDevices)
-               .length;
+               platform.log(JSON.stringify(apiDevices));
+               let size = Object.keys(apiDevices).length;
                
                if (size === 0) {
-                  platform.log("[0] devices were loaded from your eWeLink account. Homebridge cache will be cleared.");
+                  platform.log("[0] primary devices were loaded from your eWeLink account. Homebridge cache will be cleared.");
                   platform.api.unregisterPlatformAccessories("homebridge-eWeLink", "eWeLink", Array.from(platform.accessories.values()));
                   platform.accessories.clear();
                   return;
                }
                
-               platform.log("[%s] devices were loaded from your eWeLink account.", size);
+               platform.log("[%s] primary devices were loaded from your eWeLink account.", size);
                
                apiDevices.forEach((device) => {
                   // Skip Sonoff Bridge as it is not supported by this plugin
-                  if (['RF_BRIDGE'].indexOf(platform.getDeviceTypeByUiid(device.uiid)) == -1) {
+                  if (device.uiid !== 28) {
                      platform.devicesFromApi.set(device.deviceid, device);
                   }
                });
                
-               if (platform.config['groups'] && Object.keys(platform.config['groups'])
-               .length > 0) {
+               if (platform.config['groups'] && Object.keys(platform.config['groups']).length > 0) {
                   platform.config.groups.forEach((group) => {
                      if (typeof group.deviceId !== 'undefined' && platform.devicesFromApi.has(group.deviceId)) {
                         platform.deviceGroups.set(group.deviceId, group);
@@ -138,34 +137,30 @@ function eWeLink(log, config, api) {
                function checkIfDeviceIsStillRegistered(value, deviceId, map) {
                   
                   let accessory = platform.accessories.get(deviceId);
+                  // deviceId does NOT include the CH% part for secondary devices
                   
-                  // To handle multi-channel devices
-                  let realDeviceId = deviceId;
-                  if (accessory.context.switches > 1) {
-                     realDeviceId = deviceId.replace('CH' + accessory.context.channel, "");
-                  }
-                  if (platform.devicesFromApi.has(realDeviceId) && (accessory.context.switches <= 1 || accessory.context.channel <= accessory.context.switches)) {
-                     if ((deviceId != realDeviceId) && platform.deviceGroups.has(realDeviceId)) {
-                        let group = platform.deviceGroups.get(realDeviceId);
+                  let chDeviceId = accessory.context.switches > 1 ? deviceId.replace('CH' + accessory.context.channel, "") : deviceId;
+                  
+                  if (platform.devicesFromApi.has(chDeviceId) && (accessory.context.switches <= 1 || accessory.context.channel <= accessory.context.switches)) {
+                     if ((deviceId != chDeviceId) && platform.deviceGroups.has(chDeviceId)) {
+                        let group = platform.deviceGroups.get(chDeviceId);
                         switch (group.type) {
                            case 'blind':
-                           platform.log('[%s] is part of a blind group so removing from Homebridge.', accessory.displayName);
+                           platform.log('[%s] is part of a blind group so hiding from Homebridge.', accessory.displayName);
                            platform.removeAccessory(accessory);
                            break;
                            default:
                            platform.log("Only blind group types are currently supported.");
                            break;
                         }
-                     } else if (platform.getDeviceTypeByUiid(platform.devicesFromApi.get(realDeviceId)
-                     .uiid) === 'FAN_LIGHT' && accessory.context.channel !== null) {
-                        platform.log('[%s] is part of a fan so removing from Homebridge.', accessory.displayName);
+                     } else if (platform.devicesFromApi.get(chDeviceId).uiid === 34 && accessory.context.channel !== null) {
+                        platform.log('[%s] is part of a fan so hiding from Homebridge.', accessory.displayName);
                         platform.removeAccessory(accessory);
                      } else {
                         if (platform.debug) platform.log('[%s] is registered with the API. Nothing to do.', accessory.displayName);
                      }
-                  } else if (platform.devicesFromApi.has(realDeviceId) && platform.getDeviceTypeByUiid(platform.devicesFromApi.get(realDeviceId)
-                  .uiid) === 'FAN_LIGHT') {
-                     platform.log('[%s] is registered the with API. Nothing to do.', accessory.displayName);
+                  } else if (platform.devicesFromApi.has(chDeviceId) && platform.devicesFromApi.get(chDeviceId).uiid === 34) {
+                     platform.log('[%s] is registered as a fan the with API. Nothing to do.', accessory.displayName);
                   } else if (platform.devicesFromApi.has(deviceId)) {
                      if (platform.debug) platform.log('[%s] is registered the with API. Nothing to do.', accessory.displayName);
                   } else {
@@ -221,7 +216,7 @@ function eWeLink(log, config, api) {
                               platform.log("Only blind group types are currently supported.");
                               break;
                            }
-                        } else if (deviceType === 'FAN_LIGHT') {
+                        } else if (deviceFromApi.uiid == 34) {
                            if (platform.debug) platform.log("[%s] fan device will be refreshed.", accessory.displayName);
                            accessory.getService(Service.AccessoryInformation)
                            .setCharacteristic(Characteristic.Name, deviceFromApi.name);
@@ -229,17 +224,17 @@ function eWeLink(log, config, api) {
                            platform.updateFanSpeed(deviceId, deviceFromApi.params.switches[1].switch, deviceFromApi.params.switches[2].switch, deviceFromApi.params.switches[3].switch, platform.devicesFromApi.get(deviceId));
                         } else {
                            
-                           if (platform.debug) platform.log("[%s] master switch with its [%s] switches will be initialised.", accessory.displayName, switchesAmount);
-                           let masterOn = 'off';
+                           if (platform.debug) platform.log("[%s] primary device with its [%s] secondary switches will be refreshed.", accessory.displayName, switchesAmount);
+                           let primaryOn = 'off';
                            let isOn;
                            for (let i = 0; i !== switchesAmount; i++) {
                               accessory.getService(Service.AccessoryInformation)
-                              .setCharacteristic(Characteristic.Name, deviceFromApi.name + ' CH ' + (i + 1));
+                              .setCharacteristic(Characteristic.Name, deviceFromApi.name + ' CH' + (i + 1));
                               isOn = deviceFromApi.params.switches[i].switch === 'on' ? true : false;
                               platform.updatePowerState(deviceId + 'CH' + (i + 1), deviceFromApi.params.switches[i].switch, false);
-                              if (isOn) masterOn = 'on';
+                              if (isOn) primaryOn = 'on';
                            }
-                           platform.updatePowerState(deviceId, masterOn, false);
+                           platform.updatePowerState(deviceId, primaryOn, false);
                         }
                      } else {
                         if (deviceFromApi.extra.extra.model === "PSA-BHA-GL") {
@@ -284,7 +279,7 @@ function eWeLink(log, config, api) {
                            platform.addAccessory(deviceToAdd, deviceToAdd.deviceid, services);
                         } else {
                            services.switch = true;
-                           if (platform.debug) platform.log("[%s] master switch with its [%s] switches will be added.", deviceToAdd.name, switchesAmount);
+                           if (platform.debug) platform.log("[%s] primary switch with its [%s] switches will be added.", deviceToAdd.name, switchesAmount);
                            platform.addAccessory(deviceToAdd, deviceToAdd.deviceid, services);
                            for (let i = 0; i !== switchesAmount; i++) {
                               platform.addAccessory(deviceToAdd, deviceToAdd.deviceid + 'CH' + (i + 1), services);
@@ -369,13 +364,13 @@ function eWeLink(log, config, api) {
                                  
                                  let switchesAmount = platform.getDeviceChannelCount(deviceFromApi);
                                  let isOn;
-                                 let masterOn = 'off';
+                                 let primaryOn = 'off';
                                  for (let i = 0; i !== switchesAmount; i++) {
                                     isOn = json.params.switches[i].switch === 'on' ? true : false;
                                     platform.updatePowerState(json.deviceid + 'CH' + (i + 1), json.params.switches[i].switch, true);
-                                    if (isOn) masterOn = 'on';
+                                    if (isOn) primaryOn = 'on';
                                  }
-                                 platform.updatePowerState(json.deviceid, masterOn, true);
+                                 platform.updatePowerState(json.deviceid, primaryOn, true);
                               }
                            }
                            if (json.params.hasOwnProperty("currentTemperature") || json.params.hasOwnProperty("currentHumidity")) {
@@ -446,10 +441,10 @@ eWeLink.prototype.addAccessory = function (device, deviceId = null, services) {
    }
    
    let channel = 0;
-   let realDeviceId = deviceId ? deviceId : device.deviceid;
+   let chDeviceId = deviceId ? deviceId : device.deviceid;
    
-   if (platform.accessories.get(realDeviceId)) {
-      platform.log("Not adding [%s] as it already exists in the Homebridge cache.", realDeviceId);
+   if (platform.accessories.get(chDeviceId)) {
+      platform.log("Not adding [%s] as it already exists in the Homebridge cache.", chDeviceId);
       return;
    }
    
@@ -485,10 +480,10 @@ eWeLink.prototype.addAccessory = function (device, deviceId = null, services) {
       return;
    }
    
-   const accessory = new Accessory(deviceName, UUIDGen.generate(realDeviceId)
+   const accessory = new Accessory(deviceName, UUIDGen.generate(chDeviceId)
    .toString());
    
-   accessory.context.deviceId = realDeviceId;
+   accessory.context.deviceId = chDeviceId;
    accessory.context.apiKey = device.apikey;
    accessory.context.switches = 1;
    accessory.context.channel = channel;
@@ -639,7 +634,7 @@ eWeLink.prototype.addAccessory = function (device, deviceId = null, services) {
    if (switchesAmount > 1) {
       accessory.context.switches = switchesAmount;
    }
-   platform.accessories.set(realDeviceId, accessory);
+   platform.accessories.set(chDeviceId, accessory);
    platform.api.registerPlatformAccessories("homebridge-eWeLink", "eWeLink", [accessory]);
 };
 
@@ -1057,12 +1052,12 @@ eWeLink.prototype.getPowerState = function (accessory, callback) {
       return;
    }
    let deviceId = accessory.context.deviceId;
-   let realDeviceId = accessory.context.deviceId;
+   let chDeviceId = accessory.context.deviceId;
    if (accessory.context.switches > 1) {
-      realDeviceId = deviceId.replace("CH" + accessory.context.channel, "");
+      chDeviceId = deviceId.replace("CH" + accessory.context.channel, "");
    }
    if (platform.debug) platform.log("[%s] Requesting power status...", accessory.displayName);
-   platform.webClient.get('/api/user/device/' + realDeviceId + '?deviceid=' + realDeviceId + '&' + platform.getArguments(accessory.context.apiKey), function (err, res, body) {
+   platform.webClient.get('/api/user/device/' + chDeviceId + '?deviceid=' + chDeviceId + '&' + platform.getArguments(accessory.context.apiKey), function (err, res, body) {
       
       if (err) {
          if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
@@ -1092,7 +1087,7 @@ eWeLink.prototype.getPowerState = function (accessory, callback) {
          return;
       }
       
-      if (body.hasOwnProperty("deviceid") && body.deviceid == realDeviceId) {
+      if (body.hasOwnProperty("deviceid") && body.deviceid == chDeviceId) {
          let device = body;
          if (device.online !== true) {
             accessory.reachable = false;
@@ -1102,8 +1097,8 @@ eWeLink.prototype.getPowerState = function (accessory, callback) {
          }
          if (accessory.context.switches > 1) {
             let state = 'off';
-            if (deviceId == realDeviceId) {
-               // multi channel but requesting master position
+            if (deviceId == chDeviceId) {
+               // multi channel but requesting primary position
                for (let i = 0; i !== accessory.context.switches; i++) {
                   isOn = device.params.switches[i].switch === 'on' ? true : false;
                   if (isOn) state = 'on';
