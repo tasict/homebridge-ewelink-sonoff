@@ -21,7 +21,7 @@ Simply go to the "Plugins" page, search `homebridge-ewelink-beta` and click "Ins
 sudo npm i homebridge-ewelink-beta -g
 ```
 #### 2. Configure
-The plugin can either be configured through homebridge-config-ui-x, or add the following to your Homebridge configuration file.
+Add the following to your Homebridge configuration file in the appropriate place. These are the basic required fields.
 ```json
 {
    "platform" : "eWeLink",
