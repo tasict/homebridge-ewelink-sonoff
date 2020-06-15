@@ -31,10 +31,22 @@
             "description":"The password for your eWeLink account."
          },
          "debug": {
-            "title": "Debug Logging",
-            "type": "boolean",
-            "description": "If enabled, more information will be added to the Homebridge log.",
-            "default":false
+           "title": "Debug Logging",
+           "type": "boolean",
+           "description": "If enabled, more information will be added to the Homebridge log.",
+           "default":false
+         },
+         "apiHost": {
+           "title": "API Host",
+           "type": "string",
+           "description": "Specify a custom API host for your eWeLink account.",
+           "default":"eu-api.coolkit.cc"
+         },
+         "wsHost": {
+           "title": "Web Socket Host",
+           "type": "string",
+           "description": "Specify a custom web socket host for your eWeLink account.",
+           "default":"eu-pconnect3.coolkit.cc"
          },
          "groups":{
             "type":"array",
@@ -47,7 +59,15 @@
                      "type":"string",
                      "title":"Type",
                      "default":"blind",
-                     "description":"A description of this group. Currently must be 'blind'."
+                     "description":"A description of this group. Currently must be 'blind'.",
+                     "oneOf": [
+                       {
+                         "title": "Blind",
+                         "enum": [
+                           "blind"
+                         ]
+                       }
+                     ]
                   },
                   "deviceId":{
                      "type":"string",
@@ -57,24 +77,81 @@
                   "relay_up":{
                      "type":"number",
                      "title":"Relay Up",
-                     "description":"Relay number for the up motor."
+                     "default":1,
+        "required": true,
+                     "description":"Relay number for the up motor.",
+                    "oneOf": [
+                       {
+                         "title": "1",
+                         "enum": [
+                           1
+                         ]
+                       },
+                       {
+                         "title": "2",
+                         "enum": [
+                           2
+                         ]
+                       },
+                       {
+                         "title": "3",
+                         "enum": [
+                           3
+                         ]
+                       },
+                       {
+                         "title": "4",
+                         "enum": [
+                           4
+                         ]
+                       }
+                     ]
                   },
+                  
                   "relay_down":{
                      "type":"number",
                      "title":"Relay Down",
-                     "description":"Relay number for the down motor."
+                     "default":2,
+        "required": true,
+                     "description":"Relay number for the down motor.",
+                     "oneOf": [
+                       {
+                         "title": "1",
+                         "enum": [
+                           1
+                         ]
+                       },
+                       {
+                         "title": "2",
+                         "enum": [
+                           2
+                         ]
+                       },
+                       {
+                         "title": "3",
+                         "enum": [
+                           3
+                         ]
+                       },
+                       {
+                         "title": "4",
+                         "enum": [
+                           4
+                         ]
+                       }
+                     ]
                   },
                   "time_up":{
                      "type":"number",
                      "title":"Time Up",
                      "description":"Total time in seconds to fully open blinds (from closed).",
-                     "default" : 20000
+                     "default" : 200
                   },
                   "time_down":{
                      "type":"number",
                      "title":"Time Down",
                      "description":"Total time in seconds to completely close blinds (from open).",
-                     "default" : 40000
+                     "default" : 400
                   },
                   "time_botton_margin_up":{
                      "type":"number",
@@ -99,30 +176,30 @@
       ]
    },
    "layout": [
-      {
-         "type": "fieldset",
-         "items": ["countryCode", "username", "password"]
-      },
-      {
-         "key": "groups",
-         "expandable": true,
-         "add": "Add Another Group",
-         "type": "array",
-         "items": [
-            {
-               "type":"fieldset",
-               "items": ["groups[].type", "groups[].deviceId", "groups[].relay_up", "groups[].relay_down", "groups[].time_up", "groups[].time_down", "groups[].time_botton_margin_up", "groups[].time_botton_margin_up"]
-            }
-         ]
-      },
-      {
-         "type": "fieldset",
-         "title": "Optional",
-         "description": "Only adjust these settings if you know what you are doing.",
-         "expandable": true,
-         "items": [
-            "debug"
-         ]
-      }
-   ]
+    {
+      "type": "fieldset",
+      "items": ["countryCode", "username", "password"]
+    },
+    {
+       "key": "groups",
+       "expandable": true,
+       "add": "Add Another Group",
+       "type": "array",
+       "items": [
+          {
+             "type":"fieldset",
+             "items": ["groups[].type", "groups[].deviceId", "groups[].relay_up", "groups[].relay_down", "groups[].time_up", "groups[].time_down", "groups[].time_botton_margin_up", "groups[].time_botton_margin_up"]
+          }
+      ]
+    },
+    {
+      "type": "fieldset",
+      "title": "Optional",
+      "description": "Only adjust these settings if you know what you are doing.",
+      "expandable": true,
+      "items": [
+        "debug", "apiHost", "wsHost"
+      ]
+    }
+  ]
 }
