@@ -36,9 +36,10 @@ And voila your eWeLink devices *should* be added to your Homebridge instance.
 - If a switch is externally updated (eg physically or through eWeLink app), the plugin will no longer notice the change and then send a request to update the device with eWeLink ([see here](https://github.com/howanghk/homebridge-ewelink/issues/96)).
 - Certain devices are no longer removed and re-added upon Homebridge (re)start ([see here](https://github.com/howanghk/homebridge-ewelink/issues/105)).
 #### My future plans/ideas
-- Add/remove devices upon websocket message if possible?
+- Add/remove devices upon web socket message if possible?
 - Characteristics for multi channel non-master devices not loading properly (eg firmware).
 - Add config option to disable "master" devices showing.
+- Support for more devices is always a good thing. If you have a device and could help me with testing let me know!
 #### My limitations
 - I am not an expert in javascript, but can certainly work around the template I have
 - The only devices I own are T1-1CH and T1-2CH light switches so I can only test with those.
