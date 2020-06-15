@@ -31,8 +31,7 @@ The plugin can either be configured through homebridge-config-ui-x, or add the f
    "name" : "eWeLink",
    "username" : "your-ewelink-username (either phone or email)",
    "password" : "your-ewelink-password",
-   "countryCode" : "your-ewelink-country-code (eg 44 for UK or 1 for USA)",
-   "debug" : false
+   "countryCode" : "your-ewelink-country-code (eg 44 for UK or 1 for USA)"
 }
 ```
 
@@ -40,12 +39,9 @@ The plugin can either be configured through homebridge-config-ui-x, or add the f
 And voila your eWeLink devices *should* be added to your Homebridge instance.
 
 ## My Plans
-required fields in config schemas
 
-add/remove devices upon websocket message if possible?
+- add/remove devices upon websocket message if possible?
 
-multi switch flicking issue
+- multi switch flicking issue
 
-switching updating still isnt perfect
-
-more config options to override: apiHost, wsHost, etc...
+- switching updating still isnt perfect
