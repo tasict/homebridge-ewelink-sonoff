@@ -134,6 +134,7 @@ function eWeLink(log, config, api) {
                }
                
                // Function to check each Homebridge cached device exists in the API response.
+               // With regards to multi-channel devices there's no complications (unlike adding/refreshing!)
                function isHBDeviceStillInEwelink(value, deviceId, map) {
                   
                   let accessory = platform.accessories.get(deviceId);
@@ -312,17 +313,17 @@ function eWeLink(log, config, api) {
                }
                
                // Let's open a connection to the WebSocket API.
-               platform.log("Opening web socket for real time updates.");
+               if (platform.debug) platform.log("Opening web socket for real time updates.");
                platform.wsc = new WebSocketClient();
                platform.wsc.open('wss://' + platform.wsHost + ':8080/api/ws');
                
                platform.wsc.onmessage = function (message) {
                   
-                  if (platform.debug) platform.log("Web socket message received.");
+                  if (platform.debug) platform.log("Web socket message received:");
+                  if (platform.debug) platform.log("[%s]", message);
                   if (message == 'pong') {
                      return;
                   }
-                  if (platform.debug) platform.log("[%s]", message);
                   let json;
                   try {
                      json = JSON.parse(message);
