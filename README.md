@@ -42,8 +42,6 @@ And voila your eWeLink devices *should* be added to your Homebridge instance.
 - If any device is externally updated (eg. physically or through eWeLink app/alexa/google), the plugin will no longer {notice the change and send a request to update the device with eWeLink} ([see here](https://github.com/howanghk/homebridge-ewelink/issues/96)).
 - Certain devices are no longer removed and re-added upon Homebridge (re)start ([see here](https://github.com/howanghk/homebridge-ewelink/issues/105)).
 #### Current issues that need addressing
-- The new master device is only reactive to external changes. Currently trying to change the master device and/or its secondary devices through Homebridge can be quite temperamental! 
-- Secondary device characteristics (eg. serial number, firmware) are correctly recorded when added to Homebridge but then lose their correct characteristics when restarting Homebridge.
 - I have no idea if this plugin works correctly with devices apart from what I own (see below).
 #### My future plans/ideas
 - Add/remove devices upon web socket message if possible?
