@@ -19,7 +19,7 @@ module.exports = function (homebridge) {
 
 function eWeLink(log, config, api) {
    if (!config || (!config['username'] || !config['password'] || !config['countryCode'])) {
-      log("Please check you have set your username, password and country code in the Homebridge config.");
+      log.error("Please check you have set your username, password and country code in the Homebridge config.");
       return;
    }
    this.log = log;
@@ -60,27 +60,27 @@ function eWeLink(log, config, api) {
             
             // Get a list of all devices from eWeLink via the HTTPS API, and compare it to the list of Homebridge cached devices (and then vice versa).
             // That is: new devices will be added, existing will be refreshed and those in the Homebridge cache but not in the web list will be removed.
-            platform.log("[%s] eWeLink devices were loaded from the Homebridge cache.", platform.devicesInHB.size);
-            platform.log("Requesting a list of devices through the eWeLink HTTP API...");
+            platform.log("[%s] eWeLink devices were loaded from the Homebridge cache and will be refreshed.", platform.devicesInHB.size);
+            if (platform.debug) platform.log("Requesting a list of devices through the eWeLink HTTP API...");
             
             platform.webClient = request.createClient('https://' + platform.apiHost);
             platform.webClient.headers['Authorization'] = 'Bearer ' + platform.authenticationToken;
             platform.webClient.get('/api/user/device?' + platform.getArguments(platform.apiKey), function (err, res, body) {
                if (err) {
-                  platform.log("An error occurred requesting devices through the API...");
-                  platform.log("[%s].", err);
+                  platform.log.error("An error occurred requesting devices through the API...");
+                  platform.log.error("[%s].", err);
                   return;
                } else if (!body) {
-                  platform.log("An error occurred requesting devices through the API...");
-                  platform.log("[No data in response].");
+                  platform.log.error("An error occurred requesting devices through the API...");
+                  platform.log.error("[No data in response].");
                   return;
                } else if (body.hasOwnProperty('error') && body.error != 0) {
                   let response = JSON.stringify(body);
-                  platform.log("An error occurred requesting devices through the API...");
+                  platform.log.error("An error occurred requesting devices through the API...");
                   if (body.error === '401') {
-                     platform.log("[Authorisation token error].");
+                     platform.log.error("[Authorisation token error].");
                   } else {
-                     platform.log("[%s].", response);
+                     platform.log.error("[%s].", response);
                   }
                   return;
                }
@@ -117,15 +117,15 @@ function eWeLink(log, config, api) {
                         if (platform.deviceGroups.has(deviceId)) { // BLINDS //
                            let group = platform.deviceGroups.get(deviceId);
                            if (group.type == 'blind') {
-                              platform.log('[%s] is part of a blind so hiding from Homebridge.', accessory.displayName);
+                              if (platform.debug) platform.log('[%s] is part of a blind so hiding from Homebridge.', accessory.displayName);
                               platform.removeAccessory(accessory);
                            }
                         } else if (platform.devicesInEwe.get(eweDeviceId).uiid === 34 && accessory.context.channel !== null) { // FANS //
-                           platform.log('[%s] is part of a fan so hiding from Homebridge.', accessory.displayName);
+                           if (platform.debug) platform.log('[%s] is part of a fan so hiding from Homebridge.', accessory.displayName);
                            platform.removeAccessory(accessory);
                         }
                      } else { // OTHER SUPPORTED DEVICES //
-                        platform.log('[%s] was not present in the API response so removing from Homebridge.', accessory.displayName);
+                        if (platform.debug) platform.log('[%s] was not present in the API response so removing from Homebridge.', accessory.displayName);
                         platform.removeAccessory(accessory);
                      }
                   };
@@ -142,7 +142,7 @@ function eWeLink(log, config, api) {
                      if (platform.devicesInHB.has(device.deviceid + "SWX")) { //Here yes the API device exists in Homebridge so refreshing.
                         accessory = platform.devicesInHB.get(device.deviceid + "SWX");
                         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                        if (platform.debug) platform.log("[%s] is already configured so we just need to refresh it's current state (and firmware version).", accessory.displayName);
+                        if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
                         if (platform.deviceGroups.has(device.deviceid + "SWX")) { // BLINDS //
                            let group = platform.deviceGroups.get(device.deviceid + "SWX");
                            if (group.type == 'blind') {
@@ -163,7 +163,7 @@ function eWeLink(log, config, api) {
                         for (i = 1; i <= channelCount; i++) {
                            if (platform.devicesInHB.has(device.deviceid + "SW" + i)) {
                               accessory = platform.devicesInHB.get(device.deviceid + "SW" + i);
-                              if (platform.debug) platform.log("[%s] is already configured so we just need to refresh it's characteristics.", accessory.displayName);
+                              if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
                               accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
                               accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on' ? true : false);
                               if (device.params.switches[i - 1].switch == 'on') primaryState = true;
@@ -171,7 +171,7 @@ function eWeLink(log, config, api) {
                            }
                         }
                         accessory = platform.devicesInHB.get(device.deviceid + "SW0");
-                        if (platform.debug) platform.log("[%s] is already configured so we just need to refresh it's characteristics.", accessory.displayName);
+                        if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
                         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
                         accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, primaryState);
                         if (platform.debug) platform.log("[%s] has been refreshed.", accessory.displayName);
@@ -204,7 +204,7 @@ function eWeLink(log, config, api) {
                            }
                         }
                      }
-                     if (platform.debug) platform.log("[%s] will be added to Homebridge. eweToHB().", device.name);
+                     if (platform.debug) platform.log("[%s] will be added to Homebridge.", device.name);
                   }
                }
             }
@@ -215,8 +215,8 @@ function eWeLink(log, config, api) {
             platform.wsc = new WebSocketClient();
             platform.wsc.open('wss://' + platform.wsHost + ':8080/api/ws');
             platform.wsc.onmessage = function (message) {
-               platform.log("Web socket message received:");
-               platform.log("[%s]", message);
+               if (platform.debug) platform.log("Web socket message received:");
+               if (platform.debug) platform.log("[%s]", message);
                if (message == 'pong') {
                   return;
                }
@@ -254,7 +254,7 @@ function eWeLink(log, config, api) {
                               for (i = 1; i <= channelCount; i++) {
                                  if (platform.devicesInHB.has(deviceId + "SW" + i)) {
                                     accessory = platform.devicesInHB.get(deviceId + "SW" + i);
-                                    if (platform.debug) platform.log("[%s] is already configured so we just need to refresh it's characteristics.", accessory.displayName);
+                                    if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
                                     accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, json.params.switches[i - 1].switch === 'on' ? true : false);
                                     accessory.getService(Service.AccessoryInformation).updateCharacteristic(Characteristic.FirmwareRevision, json.params.fwVersion);
                                     if (json.params.switches[i - 1].switch == 'on') primaryState = true;
@@ -262,7 +262,7 @@ function eWeLink(log, config, api) {
                                  }
                               }
                               accessory = platform.devicesInHB.get(deviceId + "SW0");
-                              if (platform.debug) platform.log("[%s] is already configured so we just need to refresh it's characteristics.", accessory.displayName);
+                              if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
                               accessory.getService(Service.AccessoryInformation).updateCharacteristic(Characteristic.FirmwareRevision, json.params.fwVersion);
                               accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, primaryState);
                            }
@@ -275,10 +275,10 @@ function eWeLink(log, config, api) {
                            platform.updateTempAndHumidity(deviceId, json.params);
                         }
                      } else {
-                        if (platform.debug) platform.log("Accessory received via web socket does not exist in Homebridge.");
+                        if (platform.debug) platform.log.error("Accessory received via web socket does not exist in Homebridge.");
                      }
                   } else {
-                     if (platform.debug) platform.log("Unknown action property or no params received via web socket.");
+                     if (platform.debug) platform.log.error("Unknown action property or no params received via web socket.");
                   }
                } else if (json.hasOwnProperty("config") && json.config.hb && json.config.hbInterval) {
                   if (!platform.hbInterval) {
@@ -287,7 +287,7 @@ function eWeLink(log, config, api) {
                      }, json.config.hbInterval * 1000);
                   }
                } else {
-                  if (platform.debug) platform.log("Unknown command received via web socket.");
+                  if (platform.debug) platform.log.error("Unknown command received via web socket.");
                }
             };
             platform.wsc.onopen = function (e) {
@@ -307,13 +307,14 @@ function eWeLink(log, config, api) {
                platform.wsc.send(string);
             };
             platform.wsc.onclose = function (e) {
-               platform.log("Web socket was closed [%s].", e);
+               if (platform.debug) platform.log("Web socket was closed [%s].", e);
                platform.webSocketOpen = false;
                if (platform.hbInterval) {
                   clearInterval(platform.hbInterval);
                   platform.hbInterval = null;
                }
             };
+            platform.log("Plugin initialisation has been successful.");
          });
       };
       this.getRegion(this.config['countryCode'], function () {
@@ -330,11 +331,11 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       return;
    }
    if (platform.devicesInHB.get(hbDeviceId)) {
-      platform.log("Not adding [%s] as it already exists in the Homebridge cache.", hbDeviceId);
+      if (platform.debug) platform.log("Not adding [%s] as it already exists in the Homebridge cache.", hbDeviceId);
       return;
    }
    if (device.type != 10) {
-      platform.log("Not adding [%s] as it is not compatible with this plugin.", hbDeviceId);
+      if (platform.debug) platform.log.warn("Not adding [%s] as it is not compatible with this plugin.", hbDeviceId);
       return;
    }
    let channelCount;
@@ -363,9 +364,9 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    }
    
    status = status === undefined ? 'off' : status;
-   platform.log("[%s] has been added which is currently [%s].", newDeviceName, status);
+   if (platform.debug) platform.log("[%s] has been added which is currently [%s].", newDeviceName, status);
    if (switchNumber > channelCount) {
-      platform.log("[%s] has not been added since the [%s] only has [%s] switches].", newDeviceName, device.productModel, channelCount);
+      if (platform.debug) platform.log.warn("[%s] has not been added since the [%s] only has [%s] switches].", newDeviceName, device.productModel, channelCount);
       return;
    }
    const accessory = new Accessory(newDeviceName, UUIDGen.generate(hbDeviceId).toString());
@@ -510,7 +511,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       accessory.getService(Service.AccessoryInformation)
       .setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
    } catch (e) {
-      platform.log("[%s] has not been added [%s].", accessory.displayName, e);
+      platform.log.error("[%s] has not been added [%s].", accessory.displayName, e);
    }
    
    platform.devicesInHB.set(hbDeviceId, accessory);
@@ -615,7 +616,7 @@ eWeLink.prototype.removeAccessory = function (accessory) {
    }
    platform.devicesInHB.delete(accessory.context.deviceId);
    platform.api.unregisterPlatformAccessories('homebridge-eWeLink', 'eWeLink', [accessory]);
-   platform.log("[%s] has been removed from Homebridge.", accessory.displayName);
+   if (platform.debug) platform.log("[%s] has been removed from Homebridge.", accessory.displayName);
 };
 
 eWeLink.prototype.updateTempAndHumidity = function (deviceId, state) {
@@ -628,15 +629,15 @@ eWeLink.prototype.updateTempAndHumidity = function (deviceId, state) {
    }
    let accessory = platform.devicesInHB.get(deviceId);
    if (!accessory) {
-      platform.log("Error updating device with ID [%s] as it is not in Homebridge.", deviceId);
+      platform.log.error("Error updating device with ID [%s] as it is not in Homebridge.", deviceId);
       return;
    }
    
    let currentTemperature = state.currentTemperature;
    let currentHumidity = state.currentHumidity;
    
-   platform.log("Updating 'Characteristic.CurrentTemperature' for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, currentTemperature);
-   platform.log("Updating 'Characteristic.CurrentRelativeHumiditgy' for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, currentHumidity);
+   if (platform.debug) platform.log("Updating 'Characteristic.CurrentTemperature' for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, currentTemperature);
+   if (platform.debug) platform.log("Updating 'Characteristic.CurrentRelativeHumiditgy' for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, currentHumidity);
    
    if (accessory.getService(Service.Thermostat)) {
       accessory.getService(Service.Thermostat)
@@ -1436,7 +1437,6 @@ eWeLink.prototype.internalSwitchChange = function (accessory, isOn, callback) {
       let masterState = "off";
       for (i = 1; i <= 4; i++) {
          if (platform.devicesInHB.has(deviceToUpdate + "SW" + i)) {
-            platform.log.info(i);
             ch = platform.devicesInHB.get(deviceToUpdate + "SW" + i).getService(Service.Switch).getCharacteristic(Characteristic.On).value;
             if (ch) {
                masterState = "on";
@@ -2031,7 +2031,7 @@ eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
    };
    
    if (!platform.webSocketOpen) {
-      platform.log('Socket was closed. It will reconnect automatically.');
+      if (platform.debug) platform.log.warn('Socket was closed. It will reconnect automatically.');
       
       let interval;
       let waitToSend = function (string) {
@@ -2063,7 +2063,7 @@ eWeLink.prototype.login = function (callback) {
       return;
    }
    if (!platform.config.username || !platform.config.password || !platform.config.countryCode) {
-      platform.log("Please check you have set your username, password and country code in the Homebridge config.");
+      platform.log.error("Please check you have set your username, password and country code in the Homebridge config.");
       callback();
       return;
    }
@@ -2091,7 +2091,7 @@ eWeLink.prototype.login = function (callback) {
    webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
    webClient.post('/api/user/login', data, function (err, res, body) {
       if (err) {
-         platform.log("An error occurred while logging in. [%s]", err);
+         platform.log.error("An error occurred while logging in. [%s]", err);
          callback();
          return;
       }
@@ -2100,13 +2100,13 @@ eWeLink.prototype.login = function (callback) {
       if (body.hasOwnProperty('error') && body.error == 301 && body.hasOwnProperty('region')) {
          let idx = platform.apiHost.indexOf('-');
          if (idx == -1) {
-            platform.log("Received new region [%s]. However we cannot construct the new API host url.", body.region);
+            platform.log.error("Received new region [%s]. However we cannot construct the new API host url.", body.region);
             callback();
             return;
          }
          let newApiHost = body.region + platform.apiHost.substring(idx);
          if (platform.apiHost != newApiHost) {
-            platform.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
+            if (platform.debug) platform.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
             platform.apiHost = newApiHost;
             platform.login(callback);
             return;
@@ -2115,12 +2115,10 @@ eWeLink.prototype.login = function (callback) {
       
       if (!body.at) {
          let response = JSON.stringify(body);
-         platform.log("Server did not response with an authentication token. Response was [%s].", response);
+         platform.log.error("Server did not response with an authentication token. Response was [%s].", response);
          callback();
          return;
       }
-      
-      if (platform.debug) platform.log('Received authToken [%s] and apiKey.', body.at, body.user.apikey);
       platform.authenticationToken = body.at;
       platform.apiKey = body.user.apikey;
       platform.webClient = request.createClient('https://' + platform.apiHost);
@@ -2146,7 +2144,7 @@ eWeLink.prototype.getRegion = function (countryCode, callback) {
    data.appid = platform.appid;
    
    let query = querystring.stringify(data);
-   if (platform.debug) platform.log("Info: getRegion query [%s]", query);
+   if (platform.debug) platform.log("Info: getRegion query [%s].", query);
    
    let dataToSign = [];
    Object.keys(data)
@@ -2165,34 +2163,34 @@ eWeLink.prototype.getRegion = function (countryCode, callback) {
    .join('&');
    
    let sign = platform.getSignature(dataToSign);
-   if (platform.debug) platform.log("Info: getRegion signature [%s]", sign);
+   if (platform.debug) platform.log("Info: getRegion signature [%s].", sign);
    
    let webClient = request.createClient('https://api.coolkit.cc:8080');
    webClient.headers['Authorization'] = 'Sign ' + sign;
    webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
    webClient.get('/api/user/region?' + query, function (err, res, body) {
       if (err) {
-         platform.log("An error occurred while getting region [%s]", err);
+         platform.log.error("An error occurred while getting region [%s]", err);
          callback();
          return;
       }
       
       if (!body.region) {
          let response = JSON.stringify(body);
-         platform.log("Server did not response with a region [%s]", response);
+         platform.log.error("Server did not response with a region [%s]", response);
          callback();
          return;
       }
       
       let idx = platform.apiHost.indexOf('-');
       if (idx == -1) {
-         platform.log("Received region [%s]. However we cannot construct the new API host url.", body.region);
+         platform.log.error("Received region [%s]. However we cannot construct the new API host url.", body.region);
          callback();
          return;
       }
       let newApiHost = body.region + platform.apiHost.substring(idx);
       if (platform.apiHost != newApiHost) {
-         platform.log("Received region [%s], updating API host to [%s].", body.region, newApiHost);
+         if (platform.debug) platform.log("Received region [%s], updating API host to [%s].", body.region, newApiHost);
          platform.apiHost = newApiHost;
       }
       callback(body.region);
@@ -2217,14 +2215,14 @@ eWeLink.prototype.getWebSocketHost = function (callback) {
    webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
    webClient.post('/dispatch/app', data, function (err, res, body) {
       if (err) {
-         platform.log("An error occurred while getting websocket host [%s]", err);
+         platform.log.error("An error occurred while getting web socket host [%s].", err);
          callback();
          return;
       }
       
       if (!body.domain) {
          let response = JSON.stringify(body);
-         platform.log("Server did not response with a websocket host [%s]", response);
+         platform.log.error("Server did not response with a web socket host [%s].", response);
          callback();
          return;
       }
@@ -2357,8 +2355,7 @@ eWeLink.prototype.getArguments = function (apiKey) {
    let args = {};
    args.apiKey = apiKey;
    args.version = '8';
-   args.ts = '' + Math.floor(new Date()
-   .getTime() / 1000);
+   args.ts = '' + Math.floor(new Date().getTime() / 1000);
    args.nonce = '' + nonce();
    args.appid = platform.appid;
    return querystring.stringify(args);
@@ -2387,7 +2384,7 @@ WebSocketClient.prototype.open = function (url) {
    this.instance.on('close', (e) => {
       switch (e) {
          case 1005: // CLOSE_NORMAL
-         // console.log("WebSocket: closed");
+         // console.log("WebSocketClient: Web socket closed [1005].");
          break;
          default: // Abnormal closure
          this.reconnect(e);
@@ -2414,7 +2411,7 @@ WebSocketClient.prototype.send = function (data, option) {
    }
 };
 WebSocketClient.prototype.reconnect = function (e) {
-   // console.log(`WebSocketClient: retry in ${this.autoReconnectInterval}ms`, e);
+   // console.log(`WebSocketClient: Retrying in ${this.autoReconnectInterval}ms.`, e);
    
    if (this.pendingReconnect) return;
    this.pendingReconnect = true;
@@ -2429,14 +2426,14 @@ WebSocketClient.prototype.reconnect = function (e) {
    }, this.autoReconnectInterval);
 };
 WebSocketClient.prototype.onopen = function (e) {
-   // console.log("WebSocketClient: open", arguments);
+   // console.log("WebSocketClient: Web socket opened.", arguments);
 };
 WebSocketClient.prototype.onmessage = function (data, flags, number) {
-   // console.log("WebSocketClient: message", arguments);
+   // console.log("WebSocketClient: Message received.", arguments);
 };
 WebSocketClient.prototype.onerror = function (e) {
-   console.log("WebSocketClient: error", arguments);
+   console.log("WebSocketClient: Error", arguments);
 };
 WebSocketClient.prototype.onclose = function (e) {
-   // console.log("WebSocketClient: closed", arguments);
+   // console.log("WebSocketClient: Web socket closed.", arguments);
 };
