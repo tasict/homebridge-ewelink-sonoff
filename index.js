@@ -276,7 +276,12 @@ function eWeLink(log, config, api) {
                                  if (platform.devicesInHB.has(deviceId + "SW" + i)) {
                                     accessory = platform.devicesInHB.get(deviceId + "SW" + i);
                                     if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
-                                    accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, json.params.switches[i - 1].switch === 'on' ? true : false);
+                                    if (json.device.productModel === "T1 2C" || json.device.productModel === "T1 3C")
+                                    {  
+                                       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, json.params.switches[i - 1].switch === 'on' ? true : false);
+                                    } else {
+                                       accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, json.params.switches[i - 1].switch === 'on' ? true : false);
+                                    }
                                     accessory.getService(Service.AccessoryInformation).updateCharacteristic(Characteristic.FirmwareRevision, json.params.fwVersion);
                                     if (json.params.switches[i - 1].switch == 'on') primaryState = true;
                                     if (platform.debug) platform.log("[%s] has been refreshed.", accessory.displayName);
@@ -289,7 +294,11 @@ function eWeLink(log, config, api) {
                            }
                         } else if (json.params.hasOwnProperty("switch")) { // OTHER SINGLE-SWITCH SUPPORTED DEVICES //
                            accessory = platform.devicesInHB.get(deviceId + "SWX");
-                           accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, json.params.switch === 'on' ? true : false);
+                           if (json.device.productModel === "T1 1C"){
+                              accessory.getService(Service.LightBulb).updateCharacteristic(Characteristic.On, json.params.switch === 'on' ? true : false);
+                           }else {
+                              accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, json.params.switch === 'on' ? true : false);
+                           }
                            accessory.getService(Service.AccessoryInformation).updateCharacteristic(Characteristic.FirmwareRevision, json.params.fwVersion);
                         }
                         if (json.hasOwnProperty("extra") && json.extra.hasOwnProperty("extra") && json.extra.extra.hasOwnProperty("model") && json.extra.extra.model === "PSA-BHA-GL") { // THERMOSTATS //
