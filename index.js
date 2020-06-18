@@ -276,7 +276,7 @@ function eWeLink(log, config, api) {
                                  if (platform.devicesInHB.has(deviceId + "SW" + i)) {
                                     accessory = platform.devicesInHB.get(deviceId + "SW" + i);
                                     if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
-                                    if (json.device.productModel === "T1 2C" || json.device.productModel === "T1 3C")
+                                    if (json.productModel === "T1 2C" || json.device.productModel === "T1 3C")
                                     {  
                                        accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, json.params.switches[i - 1].switch === 'on' ? true : false);
                                     } else {
@@ -294,7 +294,7 @@ function eWeLink(log, config, api) {
                            }
                         } else if (json.params.hasOwnProperty("switch")) { // OTHER SINGLE-SWITCH SUPPORTED DEVICES //
                            accessory = platform.devicesInHB.get(deviceId + "SWX");
-                           if (json.device.productModel === "T1 1C"){
+                           if (json.productModel === "T1 1C"){
                               accessory.getService(Service.LightBulb).updateCharacteristic(Characteristic.On, json.params.switch === 'on' ? true : false);
                            }else {
                               accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, json.params.switch === 'on' ? true : false);
