@@ -1471,22 +1471,19 @@ eWeLink.prototype.internalSwitchChange = function (accessory, isOn, callback) {
       return;
    }
    
-   let hbDeviceId = accessory.context.hbDeviceId;      // eg 10006253b8SW2    <- deviceId in Homebridge
-   let eweDeviceId = hbDeviceId.slice(0, -3);    // eg 10006253b8       <- deviceId in eWeLink
-   let actionChar = hbDeviceId.substr(-1);             // ie X, 0, 1, 2, 3, 4       <- see above
-   let targetState = isOn ? 'on' : 'off';                  // ie "on" or "off"
+   let targetState = isOn ? 'on' : 'off';
    let otherAccessory;
    let i;
-   
    let payload = {};
+   
    payload.action = 'update';
    payload.userAgent = 'app';
    payload.params = {};
    payload.apikey = accessory.context.eweApiKey;
-   payload.deviceid = eweDeviceId;
+   payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = platform.getSequence();
    
-   switch (actionChar) {
+   switch (accessory.context.switchNumber) {
       case "X":
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
       payload.params.switch = targetState;
@@ -1494,15 +1491,15 @@ eWeLink.prototype.internalSwitchChange = function (accessory, isOn, callback) {
       break;
       case "0":
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
-      payload.params.switches = platform.devicesInEwe.get(eweDeviceId).params.switches;
+      payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
       payload.params.switches[0].switch = targetState;
       payload.params.switches[1].switch = targetState;
       payload.params.switches[2].switch = targetState;
       payload.params.switches[3].switch = targetState;
       accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
       for (i = 1; i <= 4; i++) {
-         if (platform.devicesInHB.has(eweDeviceId + "SW" + i)) {
-            otherAccessory = platform.devicesInHB.get(eweDeviceId + "SW" + i);
+         if (platform.devicesInHB.has(accessory.context.eweDeviceId + "SW" + i)) {
+            otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW" + i);
             if (platform.debug) platform.log("[%s] requesting to turn [%s].", otherAccessory.displayName, targetState);
             otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
          }
@@ -1513,21 +1510,21 @@ eWeLink.prototype.internalSwitchChange = function (accessory, isOn, callback) {
       case "3":
       case "4":
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
-      payload.params.switches = platform.devicesInEwe.get(eweDeviceId).params.switches;
-      payload.params.switches[parseInt(actionChar) - 1].switch = targetState;
+      payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
+      payload.params.switches[parseInt(accessory.context.switchNumber) - 1].switch = targetState;
       accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
       let ch;
       let masterState = "off";
       for (i = 1; i <= 4; i++) {
-         if (platform.devicesInHB.has(eweDeviceId + "SW" + i)) {
-            ch = platform.devicesInHB.get(eweDeviceId + "SW" + i).getService(Service.Switch).getCharacteristic(Characteristic.On).value;
+         if (platform.devicesInHB.has(accessory.context.eweDeviceId + "SW" + i)) {
+            ch = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW" + i).getService(Service.Switch).getCharacteristic(Characteristic.On).value;
             if (ch) {
                masterState = "on";
             }
          }
       }
       
-      otherAccessory = platform.devicesInHB.get(eweDeviceId + "SW0");
+      otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW0");
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", otherAccessory.displayName, masterState);
       otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, masterState == 'on' ? true : false);
       break;
