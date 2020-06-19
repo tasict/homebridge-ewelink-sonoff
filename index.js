@@ -140,7 +140,7 @@ function eWeLink(log, config, api) {
                         
                         //*******************//
                         // HIDE FAN CHANNELS //
-                        //*******************//                        
+                        //*******************//                                    
                         else if (platform.devicesInEwe.get(idToCheck).uiid === 34 && accessory.context.channel !== null) { // FANS //
                            if (platform.debug) platform.log('[%s] is part of a fan so hiding from Homebridge.', accessory.displayName);
                            platform.removeAccessory(accessory);
@@ -173,7 +173,7 @@ function eWeLink(log, config, api) {
                         
                         //********//
                         // BLINDS //
-                        //********//     
+                        //********//       
                         if (platform.deviceGroups.has(idToCheck + "SWX")) { // BLINDS //
                            let group = platform.deviceGroups.get(idToCheck + "SWX");
                            if (group.type === "blind") {
@@ -184,21 +184,21 @@ function eWeLink(log, config, api) {
                         
                         //******//
                         // FANS //
-                        //******//                            
+                        //******//                                          
                         else if (device.uiid === 34) {
                            platform.updateFanDevice(idToCheck + "SWX", device.params.switches);
                         }
                         
                         //*************//
                         // THERMOSTATS //
-                        //*************//                        
+                        //*************//                                    
                         else if (device.extra.extra.model === "PSA-BHA-GL") { // THERMOSTATS //
                            platform.updateTempAndHumidity(idToCheck + "SWX", device.params);
                         }
                         
                         //******************************//
                         // OTHER SINGLE CHANNEL DEVICES //
-                        //******************************//     
+                        //******************************//       
                         else {
                            accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switch === 'on' ? true : false);
                         }
@@ -247,7 +247,7 @@ function eWeLink(log, config, api) {
                         
                         //******//
                         // FANS //
-                        //******//                       
+                        //******//                                  
                         else if (device.uiid == 34) {
                            services.fan = true;
                            platform.addAccessory(device, idToCheck + "SWX", services);
@@ -255,7 +255,7 @@ function eWeLink(log, config, api) {
                         
                         //*************//
                         // THERMOSTATS //
-                        //*************//                                                    
+                        //*************//                                                                              
                         else if (device.extra.extra.model === "PSA-BHA-GL") { // THERMOSTATS //
                            services.thermostat = true;
                            services.temperature = true;
@@ -265,7 +265,7 @@ function eWeLink(log, config, api) {
                         
                         //***************//
                         // OTHER DEVICES //
-                        //***************//                            
+                        //***************//                                          
                         else {
                            services.switch = true;
                            channelCount = platform.getDeviceChannelCount(device);
@@ -320,6 +320,7 @@ function eWeLink(log, config, api) {
                                  } else if (platform.devicesInEwe.get(idToUpdate).uiid === 34) { // FANS //
                                     platform.updateFanDevice(idToUpdate + "SWX", device.params.switches);
                                  } else { // OTHER MULTI-SWITCH SUPPORTED DEVICES
+                                    platform.log("we are here");
                                     primaryState = false;
                                     for (i = 1; i <= channelCount; i++) {
                                        if (platform.devicesInHB.has(idToUpdate + "SW" + i)) {
@@ -449,12 +450,12 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    accessory.context.eweDeviceId = hbDeviceId.slice(0, -3);
    accessory.context.eweUIID = device.uiid;
    accessory.context.eweApiKey = device.apikey;
-   accessory.context.switches = 1;
-   accessory.context.channel = switchNumber - 1;
+   accessory.context.switchNumber = switchNumber;
    accessory.reachable = device.online === 'true';
    
    if (services.switch) {
-      accessory.addService(Service.Switch, newDeviceName).getCharacteristic(Characteristic.On).on('set', function (value, callback) {
+      accessory.addService(Service.Switch, newDeviceName).getCharacteristic(Characteristic.On)
+      .on('set', function (value, callback) {
          platform.internalSwitchChange(accessory, value, callback);
       });
    }
@@ -615,7 +616,8 @@ eWeLink.prototype.configureAccessory = function (accessory) {
    
    if (accessory.getService(Service.Switch)) {
       service = accessory.getService(Service.Switch);
-      service.getCharacteristic(Characteristic.On).on('set', function (value, callback) {
+      service.getCharacteristic(Characteristic.On)
+      .on('set', function (value, callback) {
          platform.internalSwitchChange(accessory, value, callback);
       });
    }
@@ -1469,10 +1471,10 @@ eWeLink.prototype.internalSwitchChange = function (accessory, isOn, callback) {
       return;
    }
    
-   let hbDeviceId = accessory.context.hbDeviceId;    // eg 10006253b8SW2   <- deviceId in Homebridge
-   let eweDeviceId = hbDeviceId.slice(0, -3);   // eg 10006253b8     <- deviceId in eWeLink
-   let actionChar = hbDeviceId.substr(-1);         // ie X, 0, 1, 2, 3, 4     <- see above
-   let targetState = isOn ? 'on' : 'off';            // ie "on" or "off"
+   let hbDeviceId = accessory.context.hbDeviceId;      // eg 10006253b8SW2    <- deviceId in Homebridge
+   let eweDeviceId = hbDeviceId.slice(0, -3);    // eg 10006253b8       <- deviceId in eWeLink
+   let actionChar = hbDeviceId.substr(-1);             // ie X, 0, 1, 2, 3, 4       <- see above
+   let targetState = isOn ? 'on' : 'off';                  // ie "on" or "off"
    let otherAccessory;
    let i;
    
@@ -1540,10 +1542,10 @@ eWeLink.prototype.internalLightBulbChange = function (accessory, isOn, callback)
       return;
    }
    
-   let hbDeviceId = accessory.context.hbDeviceId;    // eg 10006253b8SW2   <- deviceId in Homebridge
-   let eweDeviceId = hbDeviceId.slice(0, -3);   // eg 10006253b8     <- deviceId in eWeLink
-   let actionChar = hbDeviceId.substr(-1);         // ie X, 0, 1, 2, 3, 4     <- see above
-   let targetState = isOn ? 'on' : 'off';            // ie "on" or "off"
+   let hbDeviceId = accessory.context.hbDeviceId;      // eg 10006253b8SW2    <- deviceId in Homebridge
+   let eweDeviceId = hbDeviceId.slice(0, -3);    // eg 10006253b8       <- deviceId in eWeLink
+   let actionChar = hbDeviceId.substr(-1);             // ie X, 0, 1, 2, 3, 4       <- see above
+   let targetState = isOn ? 'on' : 'off';                  // ie "on" or "off"
    let otherAccessory;
    let i;
    
