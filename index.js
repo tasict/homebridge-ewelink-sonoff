@@ -98,6 +98,7 @@ function eWeLink(log, config, api) {
                }
                
                // The eWeLink devices are stored in the "platform.devicesInEwe" map with the device ID as the key (without the SW*) part.
+               if (platform.debugReqRes) platform.log.warn(JSON.stringify(eWeLinkDevices, null, 2));
                eWeLinkDevices.forEach((device) => {
                   if (!platform.unsupportedDevices.includes(device.uiid)) {
                      platform.devicesInEwe.set(device.deviceid, device);
