@@ -162,76 +162,10 @@ function eWeLink(log, config, api) {
                      let accessory;
                      let idToCheck = device.deviceid;
                      
-                     //************************//
-                     // SINGLE CHANNEL DEVICES //
-                     //************************//
-                     if (platform.devicesInHB.has(idToCheck + "SWX")) {
-                        accessory = platform.devicesInHB.get(idToCheck + "SWX");
-                        accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                        if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
-                        
-                        //********//
-                        // BLINDS //
-                        //********//       
-                        if (platform.deviceGroups.has(idToCheck + "SWX")) { // BLINDS //
-                           let group = platform.deviceGroups.get(idToCheck + "SWX");
-                           if (group.type === "blind") {
-                              platform.prepareBlindDeviceConfig(accessory);
-                              platform.updateBlindTargetPosition(idToCheck + "SWX", device.params.switches);
-                           }
-                        }
-                        
-                        //******//
-                        // FANS //
-                        //******//                                          
-                        else if (device.uiid === 34) {
-                           platform.updateFanDevice(idToCheck + "SWX", device.params.switches);
-                        }
-                        
-                        //*************//
-                        // THERMOSTATS //
-                        //*************//                                    
-                        else if (device.extra.extra.model === "PSA-BHA-GL") { // THERMOSTATS //
-                           platform.updateTempAndHumidity(idToCheck + "SWX", device.params);
-                        }
-                        
-                        //******************************//
-                        // OTHER SINGLE CHANNEL DEVICES //
-                        //******************************//       
-                        else {
-                           accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switch == 'on' ? true : false);
-                        }
-                     }
-                     
-                     //***********************//
-                     // MULTI CHANNEL DEVICES //
-                     //***********************//
-                     else if (platform.devicesInHB.has(idToCheck + "SW0")) {
-                        let i;
-                        let primaryState = false;
-                        let channelCount = platform.getDeviceChannelCount(device);
-                        if (channelCount > 1) {
-                           for (i = 1; i <= channelCount; i++) {
-                              if (platform.devicesInHB.has(idToCheck + "SW" + i)) {
-                                 accessory = platform.devicesInHB.get(idToCheck + "SW" + i);
-                                 if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
-                                 accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                                 accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch == 'on' ? true : false);
-                                 if (device.params.switches[i - 1].switch == 'on') primaryState = true;
-                                 if (platform.debug) platform.log("[%s] has been refreshed.", accessory.displayName);
-                              }
-                           }
-                           accessory = platform.devicesInHB.get(idToCheck + "SW0");
-                           if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
-                           accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                           accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, primaryState);
-                        }
-                     }
-                     
-                     //**********************//
-                     // NON EXISTING DEVICES //
-                     //**********************//
-                     else {
+                     //**************************//
+                     // ADD NON EXISTING DEVICES //
+                     //**************************//
+                     if (!platform.devicesInHB.has(idToCheck + "SWX") && !platform.devicesInHB.has(idToCheck + "SW0")) {
                         
                         //********//
                         // BLINDS //
@@ -280,7 +214,73 @@ function eWeLink(log, config, api) {
                               platform.log("[%s] is currently incompatible with this plugin.", device.name);
                            }
                         }
-                     } // @somewhere around here we need to query the status of added devices
+                     }
+                     
+                     //********************************//
+                     // REFRESH SINGLE CHANNEL DEVICES //
+                     //********************************//
+                     if (platform.devicesInHB.has(idToCheck + "SWX")) {
+                        accessory = platform.devicesInHB.get(idToCheck + "SWX");
+                        accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                        if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
+                        
+                        //********//
+                        // BLINDS //
+                        //********//       
+                        if (platform.deviceGroups.has(idToCheck + "SWX")) { // BLINDS //
+                           let group = platform.deviceGroups.get(idToCheck + "SWX");
+                           if (group.type === "blind") {
+                              platform.prepareBlindDeviceConfig(accessory);
+                              platform.updateBlindTargetPosition(idToCheck + "SWX", device.params.switches);
+                           }
+                        }
+                        
+                        //******//
+                        // FANS //
+                        //******//                                          
+                        else if (device.uiid === 34) {
+                           platform.updateFanDevice(idToCheck + "SWX", device.params.switches);
+                        }
+                        
+                        //*************//
+                        // THERMOSTATS //
+                        //*************//                                    
+                        else if (device.extra.extra.model === "PSA-BHA-GL") { // THERMOSTATS //
+                           platform.updateTempAndHumidity(idToCheck + "SWX", device.params);
+                        }
+                        
+                        //******************************//
+                        // OTHER SINGLE CHANNEL DEVICES //
+                        //******************************//       
+                        else {
+                           accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switch == 'on' ? true : false);
+                        }
+                     }
+                     
+                     //*******************************//
+                     // REFRESH MULTI CHANNEL DEVICES //
+                     //*******************************//
+                     else if (platform.devicesInHB.has(idToCheck + "SW0")) {
+                        let i;
+                        let primaryState = false;
+                        let channelCount = platform.getDeviceChannelCount(device);
+                        if (channelCount > 1) {
+                           for (i = 1; i <= channelCount; i++) {
+                              if (platform.devicesInHB.has(idToCheck + "SW" + i)) {
+                                 accessory = platform.devicesInHB.get(idToCheck + "SW" + i);
+                                 if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
+                                 accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                                 accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch == 'on' ? true : false);
+                                 if (device.params.switches[i - 1].switch == 'on') primaryState = true;
+                                 if (platform.debug) platform.log("[%s] has been refreshed.", accessory.displayName);
+                              }
+                           }
+                           accessory = platform.devicesInHB.get(idToCheck + "SW0");
+                           if (platform.debug) platform.log("[%s] is already in Homebridge so refresh status.", accessory.displayName);
+                           accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                           accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, primaryState);
+                        }
+                     }
                   });
                }
                
