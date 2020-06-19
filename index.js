@@ -266,16 +266,18 @@ function eWeLink(log, config, api) {
                         else {
                            services.switch = true;
                            channelCount = platform.getDeviceChannelCount(device);
-                           if (channelCount === 1) {
-                              platform.addAccessory(device, idToCheck + "SWX", services);
-                           } else {
+                           if (channelCount > 1) {
                               for (i = 0; i <= channelCount; i++) {
                                  platform.addAccessory(device, idToCheck + "SW" + i, services);
                               }
+                              if (platform.debug) platform.log("[%s] has been added to Homebridge.", device.name);
+                           } else if (channelCount === 1) {
+                              platform.addAccessory(device, idToCheck + "SWX", services);
+                              if (platform.debug) platform.log("[%s] has been added to Homebridge.", device.name);
+                           } else {
+                              platform.log("[%s] is currently incompatible with this plugin.", device.name);
                            }
                         }
-                        
-                        if (platform.debug) platform.log("[%s] has been added to Homebridge.", device.name);
                      }
                   });
                }
@@ -285,11 +287,11 @@ function eWeLink(log, config, api) {
                platform.wsc = new WebSocketClient();
                platform.wsc.open('wss://' + platform.wsHost + ':8080/api/ws');
                platform.wsc.onmessage = function (message) {
-                  if (platform.debug) platform.log("Web socket message received:");
-                  if (platform.debug) platform.log("[%s]", message);
                   if (message == 'pong') {
                      return;
                   }
+                  if (platform.debug) platform.log("Web socket message received:");
+                  if (platform.debug) platform.log("[%s]", message);
                   let device;
                   try {
                      device = JSON.parse(message);
@@ -2195,9 +2197,7 @@ eWeLink.prototype.getSignature = function (string) {
    //let f = "ab!@#$ijklmcdefghBCWXYZ01234DEFGHnopqrstuvwxyzAIJKLMNOPQRSTUV56789%^&*()";
    //let decrypt = function(r){var n="";return r.split(',').forEach(function(r){var t=parseInt(r)>>2,e=f.charAt(t);n+=e}),n.trim()};
    let decryptedAppSecret = '6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'; //decrypt(appSecret);
-   return crypto.createHmac('sha256', decryptedAppSecret)
-   .update(string)
-   .digest('base64');
+   return crypto.createHmac('sha256', decryptedAppSecret).update(string).digest('base64');
 };
 
 eWeLink.prototype.login = function (callback) {
@@ -2475,7 +2475,8 @@ eWeLink.prototype.getDeviceChannelCountByType = function (deviceType) {
       GSM_SOCKET_4: 4,
       SWITCH_4: 4,
       CUN_YOU_DOOR: 4,
-      FAN_LIGHT: 4
+      FAN_LIGHT: 4,
+      MEARICAMERA: 1
    };
    return DEVICE_CHANNEL_LENGTH[deviceType] || 0;
 };
