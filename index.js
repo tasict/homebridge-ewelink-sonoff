@@ -298,10 +298,10 @@ function eWeLink(log, config, api) {
                   } catch (e) {
                      return;
                   }
+                  let idToUpdate = device.deviceid;
                   if (device.hasOwnProperty("action")) {
                      if (device.action === 'update' && device.hasOwnProperty("params")) {
                         if (platform.debug) platform.log("External update received via web socket.");
-                        let idToUpdate = device.deviceid;
                         let device;
                         let accessory;
                         let deviceType;
