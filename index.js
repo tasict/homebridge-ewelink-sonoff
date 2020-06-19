@@ -291,8 +291,8 @@ function eWeLink(log, config, api) {
                platform.wsc.open('wss://' + platform.wsHost + ':8080/api/ws');
                platform.wsc.onmessage = function (message) {
                   if (message == "pong") return;
-                  if (platform.debug) platform.log("Web socket message received.");
-                  if (platform.debugReqRes) platform.log.warn("\n" + JSON.stringify(JSON.parse(message), null, 2));
+                  if (platform.debugReqRes) platform.log.warn("Web socket message received.\n" + JSON.stringify(JSON.parse(message), null, 2));
+                  else if (platform.debug) platform.log("Web socket message received.");
                   let device;
                   try {
                      device = JSON.parse(message);
@@ -374,8 +374,8 @@ function eWeLink(log, config, api) {
                   payload.sequence = platform.getSequence();
                   payload.version = 8;
                   let string = JSON.stringify(payload);
-                  if (platform.debug) platform.log('Sending web socket login request.');
-                  if (platform.debugReqRes) platform.log.warn("\n" + JSON.stringify(payload, null, 2));
+                  if (platform.debugReqRes) platform.log.warn("Sending web socket login request.\n" + JSON.stringify(payload, null, 2));
+                  else if (platform.debug) platform.log("Sending web socket login request.");
                   
                   platform.wsc.send(string);
                };
@@ -1603,7 +1603,6 @@ eWeLink.prototype.internalLightBulbChange = function (accessory, isOn, callback)
    }
    
    let string = JSON.stringify(payload);
-   if (platform.debugReqRes) platform.log.warn(payload);
    platform.sendWebSocketMessage(string, callback);
 };
 
@@ -2175,8 +2174,8 @@ eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
       
       if (platform.wsc) {
          platform.wsc.send(string);
-         if (platform.debugReqRes) platform.log("Web socket message sent.");
-         if (platform.debugReqRes && string !== "ping") platform.log.warn("\n" + JSON.stringify(JSON.parse(string), null, 2));
+         if (platform.debugReqRes && string !== "ping") platform.log.warn("Web socket message sent.\n" + JSON.stringify(JSON.parse(string), null, 2));
+         else if (platform.debug && string !== "ping") platform.log("Web socket message sent.");
          callback();
       }
       
@@ -2237,8 +2236,8 @@ eWeLink.prototype.login = function (callback) {
    data.appid = platform.appid;
    
    let json = JSON.stringify(data);
-   if (platform.debug) platform.log("Sending HTTPS login request.");
-   if (platform.debugReqRes) platform.log.warn("\n" + JSON.stringify(data, null, 2));
+   if (platform.debugReqRes) platform.log.warn("Sending HTTPS login request.\n" + JSON.stringify(data, null, 2));
+   else if (platform.debug) platform.log("Sending HTTPS login request.");
    
    let sign = platform.getSignature(json);
    if (platform.debug) platform.log("Login signature [%s]", sign);
