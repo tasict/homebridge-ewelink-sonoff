@@ -28,6 +28,7 @@ function eWeLink(log, config, api) {
    this.authenticationToken = 'UNCONFIGURED';
    this.appid = 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq';
    this.debug = this.config['debug'] || false;
+   this.debugReqRes = this.config['debugReqRes'] || false;
    this.emailLogin = this.config['username'].includes("@") ? true : false;
    this.apiHost = (this.config['apiHost'] || 'eu-api.coolkit.cc') + ':8080';
    this.wsHost = this.config['wsHost'] || 'eu-pconnect3.coolkit.cc';
@@ -77,6 +78,7 @@ function eWeLink(log, config, api) {
                   return;
                } else if (body.hasOwnProperty('error') && body.error != 0) {
                   let response = JSON.stringify(body);
+                  if (platform.debugReqRes) platform.log.warn(response);
                   platform.log.error("An error occurred requesting devices through the API...");
                   if (body.error === '401') {
                      platform.log.error("[Authorisation token error].");
@@ -119,7 +121,7 @@ function eWeLink(log, config, api) {
                // ie each device in "platform.devicesInHB" exists in "platform.devicesInEwe"
                if (platform.devicesInHB.size > 0) {
                   platform.devicesInHB.forEach((accessory) => {
-                     let hbDeviceId = accessory.context.deviceId;
+                     let hbDeviceId = accessory.context.hbDeviceId;
                      let idToCheck = hbDeviceId.slice(0, -3); 
                      // Above to remove the "SW*" off the Homebridge ID to match it with the eWeLink ID
                      
@@ -288,9 +290,9 @@ function eWeLink(log, config, api) {
                platform.wsc = new WebSocketClient();
                platform.wsc.open('wss://' + platform.wsHost + ':8080/api/ws');
                platform.wsc.onmessage = function (message) {
-                  if (message == 'pong') return;
-                  if (platform.debug) platform.log("Web socket message received:");
-                  if (platform.debug) platform.log("[%s]", message);
+                  if (message == "pong") return;
+                  if (platform.debug) platform.log("Web socket message received.");
+                  if (platform.debugReqRes) platform.log.warn("\n" + JSON.stringify(JSON.parse(message), null, 2));
                   let device;
                   try {
                      device = JSON.parse(message);
@@ -366,13 +368,15 @@ function eWeLink(log, config, api) {
                   payload.at = platform.authenticationToken;
                   payload.apikey = platform.apiKey;
                   payload.appid = platform.appid;
-                  payload.nonce = '' + nonce();
-                  payload.ts = '' + Math.floor(new Date() / 1000);
+                  payload.nonce = nonce();
+                  payload.ts = Math.floor(new Date() / 1000);
                   payload.userAgent = 'app';
                   payload.sequence = platform.getSequence();
                   payload.version = 8;
                   let string = JSON.stringify(payload);
-                  if (platform.debug) platform.log('Sending web socket login request [%s].', string);
+                  if (platform.debug) platform.log('Sending web socket login request.');
+                  if (platform.debugReqRes) platform.log.warn("\n" + JSON.stringify(payload, null, 2));
+                  
                   platform.wsc.send(string);
                };
                platform.wsc.onclose = function (e) {
@@ -404,7 +408,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       return;
    }
    if (device.type != 10) {
-      if (platform.debug) platform.log.warn("Not adding [%s] as it is not compatible with this plugin.", hbDeviceId);
+      if (platform.debug) platform.log("Not adding [%s] as it is not compatible with this plugin.", hbDeviceId);
       return;
    }
    let channelCount;
@@ -435,15 +439,18 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    status = status === undefined ? 'off' : status;
    if (platform.debug) platform.log("[%s] has been added which is currently [%s].", newDeviceName, status);
    if (switchNumber > channelCount) {
-      if (platform.debug) platform.log.warn("[%s] has not been added since the [%s] only has [%s] switches].", newDeviceName, device.productModel, channelCount);
+      if (platform.debug) platform.log("[%s] has not been added since the [%s] only has [%s] switches].", newDeviceName, device.productModel, channelCount);
       return;
    }
+   
+   
    const accessory = new Accessory(newDeviceName, UUIDGen.generate(hbDeviceId).toString());
-   accessory.context.deviceId = hbDeviceId;
-   accessory.context.apiKey = device.apikey;
+   accessory.context.hbDeviceId = hbDeviceId;
+   accessory.context.eweDeviceId = hbDeviceId.slice(0, -3);
+   accessory.context.eweUIID = device.uiid;
+   accessory.context.eweApiKey = device.apikey;
    accessory.context.switches = 1;
    accessory.context.channel = switchNumber - 1;
-   
    accessory.reachable = device.online === 'true';
    
    if (services.switch) {
@@ -667,7 +674,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       accessory.context.currentTargetPosition = lastPosition;
       accessory.context.currentPositionState = 2;
       
-      let group = platform.deviceGroups.get(accessory.context.deviceId);
+      let group = platform.deviceGroups.get(accessory.context.hbDeviceId);
       if (group) {
          accessory.context.switchUp = (group.relay_up || platform.groupDefaults['relay_up']) - 1;
          accessory.context.switchDown = (group.relay_down || platform.groupDefaults['relay_down']) - 1;
@@ -680,7 +687,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
          accessory.context.percentDurationUp = (accessory.context.durationUp / 100) * 1000;
       }
    }
-   platform.devicesInHB.set(accessory.context.deviceId, accessory);
+   platform.devicesInHB.set(accessory.context.hbDeviceId, accessory);
 };
 
 eWeLink.prototype.removeAccessory = function (accessory) {
@@ -688,7 +695,7 @@ eWeLink.prototype.removeAccessory = function (accessory) {
    if (!platform.log) {
       return;
    }
-   platform.devicesInHB.delete(accessory.context.deviceId);
+   platform.devicesInHB.delete(accessory.context.hbDeviceId);
    platform.api.unregisterPlatformAccessories('homebridge-eWeLink', 'eWeLink', [accessory]);
    if (platform.debug) platform.log("[%s] has been removed from Homebridge.", accessory.displayName);
 };
@@ -894,7 +901,7 @@ eWeLink.prototype.getFanLightState = function (accessory, callback) {
          return;
       }
       
-      let deviceId = accessory.context.deviceId;
+      let deviceId = accessory.context.hbDeviceId;
       
       let filteredResponse = body.filter(device => (device.deviceid === deviceId));
       
@@ -992,7 +999,7 @@ eWeLink.prototype.getTemperatureState = function (accessory, callback) {
          return;
       }
       
-      let deviceId = accessory.context.deviceId;
+      let deviceId = accessory.context.hbDeviceId;
       let filteredResponse = body.filter(device => (device.deviceid === deviceId));
       
       if (filteredResponse.length === 1) {
@@ -1089,7 +1096,7 @@ eWeLink.prototype.getFanState = function (accessory, callback) {
          return;
       }
       
-      let deviceId = accessory.context.deviceId;
+      let deviceId = accessory.context.hbDeviceId;
       let filteredResponse = body.filter(device => (device.deviceid === deviceId));
       
       if (filteredResponse.length === 1) {
@@ -1186,7 +1193,7 @@ eWeLink.prototype.getFanSpeed = function (accessory, callback) {
          return;
       }
       
-      let deviceId = accessory.context.deviceId;
+      let deviceId = accessory.context.hbDeviceId;
       let filteredResponse = body.filter(device => (device.deviceid === deviceId));
       
       if (filteredResponse.length === 1) {
@@ -1288,7 +1295,7 @@ eWeLink.prototype.getHumidityState = function (accessory, callback) {
          return;
       }
       
-      let deviceId = accessory.context.deviceId;
+      let deviceId = accessory.context.hbDeviceId;
       let filteredResponse = body.filter(device => (device.deviceid === deviceId));
       
       if (filteredResponse.length === 1) {
@@ -1398,7 +1405,7 @@ eWeLink.prototype.getBlindMovementState = function (accessory, callback) {
          accessory.reachable = false;
          return;
       }
-      let deviceId = accessory.context.deviceId;
+      let deviceId = accessory.context.hbDeviceId;
       if (accessory.context.switches > 1) {
          deviceId = deviceId.replace("CH" + accessory.context.channel, "");
       }
@@ -1462,9 +1469,9 @@ eWeLink.prototype.internalSwitchChange = function (accessory, isOn, callback) {
       return;
    }
    
-   let fulldeviceId = accessory.context.deviceId;    // eg 10006253b8SW2   <- deviceId in Homebridge
-   let deviceToUpdate = fulldeviceId.slice(0, -3);   // eg 10006253b8     <- deviceId in eWeLink
-   let actionChar = fulldeviceId.substr(-1);         // ie X, 0, 1, 2, 3, 4     <- see above
+   let hbDeviceId = accessory.context.hbDeviceId;    // eg 10006253b8SW2   <- deviceId in Homebridge
+   let eweDeviceId = hbDeviceId.slice(0, -3);   // eg 10006253b8     <- deviceId in eWeLink
+   let actionChar = hbDeviceId.substr(-1);         // ie X, 0, 1, 2, 3, 4     <- see above
    let targetState = isOn ? 'on' : 'off';            // ie "on" or "off"
    let otherAccessory;
    let i;
@@ -1473,8 +1480,8 @@ eWeLink.prototype.internalSwitchChange = function (accessory, isOn, callback) {
    payload.action = 'update';
    payload.userAgent = 'app';
    payload.params = {};
-   payload.apikey = '' + accessory.context.apiKey;
-   payload.deviceid = '' + deviceToUpdate;
+   payload.apikey = accessory.context.eweApiKey;
+   payload.deviceid = eweDeviceId;
    payload.sequence = platform.getSequence();
    
    switch (actionChar) {
@@ -1485,15 +1492,15 @@ eWeLink.prototype.internalSwitchChange = function (accessory, isOn, callback) {
       break;
       case "0":
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
-      payload.params.switches = platform.devicesInEwe.get(deviceToUpdate).params.switches;
+      payload.params.switches = platform.devicesInEwe.get(eweDeviceId).params.switches;
       payload.params.switches[0].switch = targetState;
       payload.params.switches[1].switch = targetState;
       payload.params.switches[2].switch = targetState;
       payload.params.switches[3].switch = targetState;
       accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
       for (i = 1; i <= 4; i++) {
-         if (platform.devicesInHB.has(deviceToUpdate + "SW" + i)) {
-            otherAccessory = platform.devicesInHB.get(deviceToUpdate + "SW" + i);
+         if (platform.devicesInHB.has(eweDeviceId + "SW" + i)) {
+            otherAccessory = platform.devicesInHB.get(eweDeviceId + "SW" + i);
             if (platform.debug) platform.log("[%s] requesting to turn [%s].", otherAccessory.displayName, targetState);
             otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
          }
@@ -1504,26 +1511,25 @@ eWeLink.prototype.internalSwitchChange = function (accessory, isOn, callback) {
       case "3":
       case "4":
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
-      payload.params.switches = platform.devicesInEwe.get(deviceToUpdate).params.switches;
+      payload.params.switches = platform.devicesInEwe.get(eweDeviceId).params.switches;
       payload.params.switches[parseInt(actionChar) - 1].switch = targetState;
       accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
       let ch;
       let masterState = "off";
       for (i = 1; i <= 4; i++) {
-         if (platform.devicesInHB.has(deviceToUpdate + "SW" + i)) {
-            ch = platform.devicesInHB.get(deviceToUpdate + "SW" + i).getService(Service.Switch).getCharacteristic(Characteristic.On).value;
+         if (platform.devicesInHB.has(eweDeviceId + "SW" + i)) {
+            ch = platform.devicesInHB.get(eweDeviceId + "SW" + i).getService(Service.Switch).getCharacteristic(Characteristic.On).value;
             if (ch) {
                masterState = "on";
             }
          }
       }
       
-      otherAccessory = platform.devicesInHB.get(deviceToUpdate + "SW0");
+      otherAccessory = platform.devicesInHB.get(eweDeviceId + "SW0");
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", otherAccessory.displayName, masterState);
       otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, masterState == 'on' ? true : false);
       break;
    }
-   
    let string = JSON.stringify(payload);
    platform.sendWebSocketMessage(string, callback);
 };
@@ -1534,9 +1540,9 @@ eWeLink.prototype.internalLightBulbChange = function (accessory, isOn, callback)
       return;
    }
    
-   let fulldeviceId = accessory.context.deviceId;    // eg 10006253b8SW2   <- deviceId in Homebridge
-   let deviceToUpdate = fulldeviceId.slice(0, -3);   // eg 10006253b8     <- deviceId in eWeLink
-   let actionChar = fulldeviceId.substr(-1);         // ie X, 0, 1, 2, 3, 4     <- see above
+   let hbDeviceId = accessory.context.hbDeviceId;    // eg 10006253b8SW2   <- deviceId in Homebridge
+   let eweDeviceId = hbDeviceId.slice(0, -3);   // eg 10006253b8     <- deviceId in eWeLink
+   let actionChar = hbDeviceId.substr(-1);         // ie X, 0, 1, 2, 3, 4     <- see above
    let targetState = isOn ? 'on' : 'off';            // ie "on" or "off"
    let otherAccessory;
    let i;
@@ -1545,8 +1551,8 @@ eWeLink.prototype.internalLightBulbChange = function (accessory, isOn, callback)
    payload.action = 'update';
    payload.userAgent = 'app';
    payload.params = {};
-   payload.apikey = '' + accessory.context.apiKey;
-   payload.deviceid = '' + deviceToUpdate;
+   payload.apikey = accessory.context.eweApiKey;
+   payload.deviceid = eweDeviceId;
    payload.sequence = platform.getSequence();
    
    switch (actionChar) {
@@ -1557,15 +1563,15 @@ eWeLink.prototype.internalLightBulbChange = function (accessory, isOn, callback)
       break;
       case "0":
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
-      payload.params.switches = platform.devicesInEwe.get(deviceToUpdate).params.switches;
+      payload.params.switches = platform.devicesInEwe.get(eweDeviceId).params.switches;
       payload.params.switches[0].switch = targetState;
       payload.params.switches[1].switch = targetState;
       payload.params.switches[2].switch = targetState;
       payload.params.switches[3].switch = targetState;
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, isOn);
       for (i = 1; i <= 4; i++) {
-         if (platform.devicesInHB.has(deviceToUpdate + "SW" + i)) {
-            otherAccessory = platform.devicesInHB.get(deviceToUpdate + "SW" + i);
+         if (platform.devicesInHB.has(eweDeviceId + "SW" + i)) {
+            otherAccessory = platform.devicesInHB.get(eweDeviceId + "SW" + i);
             if (platform.debug) platform.log("[%s] requesting to turn [%s].", otherAccessory.displayName, targetState);
             otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, isOn);
          }
@@ -1576,27 +1582,28 @@ eWeLink.prototype.internalLightBulbChange = function (accessory, isOn, callback)
       case "3":
       case "4":
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
-      payload.params.switches = platform.devicesInEwe.get(deviceToUpdate).params.switches;
+      payload.params.switches = platform.devicesInEwe.get(eweDeviceId).params.switches;
       payload.params.switches[parseInt(actionChar) - 1].switch = targetState;
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, isOn);
       let ch;
       let masterState = "off";
       for (i = 1; i <= 4; i++) {
-         if (platform.devicesInHB.has(deviceToUpdate + "SW" + i)) {
-            ch = platform.devicesInHB.get(deviceToUpdate + "SW" + i).getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
+         if (platform.devicesInHB.has(eweDeviceId + "SW" + i)) {
+            ch = platform.devicesInHB.get(eweDeviceId + "SW" + i).getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
             if (ch) {
                masterState = "on";
             }
          }
       }
       
-      otherAccessory = platform.devicesInHB.get(deviceToUpdate + "SW0");
+      otherAccessory = platform.devicesInHB.get(eweDeviceId + "SW0");
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", otherAccessory.displayName, masterState);
       otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, masterState == 'on' ? true : false);
       break;
    }
    
    let string = JSON.stringify(payload);
+   if (platform.debugReqRes) platform.log.warn(payload);
    platform.sendWebSocketMessage(string, callback);
 };
 
@@ -1607,7 +1614,7 @@ eWeLink.prototype.setTemperatureState = function (accessory, value, callback) {
       return;
    }
    
-   let deviceId = accessory.context.deviceId;
+   let deviceId = accessory.context.hbDeviceId;
    let deviceFromApi = platform.devicesInEwe.get(deviceId);
    platform.log("Setting [%s] temperature to [%s].", accessory.displayName, value);
    /*
@@ -1627,7 +1634,7 @@ eWeLink.prototype.setHumidityState = function (accessory, value, callback) {
    if (!platform.log) {
       return;
    }
-   let deviceId = accessory.context.deviceId;
+   let deviceId = accessory.context.hbDeviceId;
    let deviceFromApi = platform.devicesInEwe.get(deviceId);
    
    platform.log("Setting [%s] humidity to [%s].", accessory.displayName, value);
@@ -1648,7 +1655,7 @@ eWeLink.prototype.setFanState = function (accessory, isOn, callback) {
    if (!platform.log) {
       return;
    }
-   let deviceId = accessory.context.deviceId;
+   let deviceId = accessory.context.hbDeviceId;
    
    let targetState = 'off';
    
@@ -1665,12 +1672,13 @@ eWeLink.prototype.setFanState = function (accessory, isOn, callback) {
    let deviceFromApi = platform.devicesInEwe.get(deviceId);
    payload.params.switches = deviceFromApi.params.switches;
    payload.params.switches[1].switch = targetState;
-   payload.apikey = '' + accessory.context.apiKey;
-   payload.deviceid = '' + deviceId;
+   payload.apikey = accessory.context.eweApiKey;
+   payload.deviceid = deviceId;
    
    payload.sequence = platform.getSequence();
    
    let string = JSON.stringify(payload);
+   if (platform.debugReqRes) platform.log.warn(payload);
    
    platform.sendWebSocketMessage(string, callback);
    
@@ -1682,7 +1690,7 @@ eWeLink.prototype.setFanSpeed = function (accessory, value, callback) {
    if (!platform.log) {
       return;
    }
-   let deviceId = accessory.context.deviceId;
+   let deviceId = accessory.context.hbDeviceId;
    
    platform.log("Setting [%s] fan speed to [%s].", accessory.displayName, value);
    
@@ -1711,12 +1719,13 @@ eWeLink.prototype.setFanSpeed = function (accessory, value, callback) {
       payload.params.switches[3].switch = 'on';
    }
    
-   payload.apikey = '' + accessory.context.apiKey;
-   payload.deviceid = '' + deviceId;
+   payload.apikey = accessory.context.eweApiKey;
+   payload.deviceid = deviceId;
    
    payload.sequence = platform.getSequence();
    
    let string = JSON.stringify(payload);
+   if (platform.debugReqRes) platform.log.warn(payload);
    
    platform.sendWebSocketMessage(string, callback);
 };
@@ -1727,7 +1736,7 @@ eWeLink.prototype.setFanLightState = function (accessory, isOn, callback) {
    if (!platform.log) {
       return;
    }
-   let deviceId = accessory.context.deviceId;
+   let deviceId = accessory.context.hbDeviceId;
    
    let targetState = 'off';
    
@@ -1745,12 +1754,13 @@ eWeLink.prototype.setFanLightState = function (accessory, isOn, callback) {
    payload.params.switches = deviceFromApi.params.switches;
    payload.params.switches[0].switch = targetState;
    
-   payload.apikey = '' + accessory.context.apiKey;
-   payload.deviceid = '' + deviceId;
+   payload.apikey = accessory.context.eweApiKey;
+   payload.deviceid = deviceId;
    
    payload.sequence = platform.getSequence();
    
    let string = JSON.stringify(payload);
+   if (platform.debugReqRes) platform.log.warn(payload);
    platform.sendWebSocketMessage(string, callback);
    
 };
@@ -1812,6 +1822,7 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
             
             let payload = platform.prepareBlindPayload(accessory);
             let string = JSON.stringify(payload);
+            if (platform.debugReqRes) platform.log.warn(payload);
             
             if (platform.webSocketOpen) {
                platform.sendWebSocketMessage(string, function () {
@@ -1882,6 +1893,7 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
    
    let payload = platform.prepareBlindPayload(accessory);
    let string = JSON.stringify(payload);
+   if (platform.debugReqRes) platform.log.warn(payload);
    
    if (platform.webSocketOpen) {
       
@@ -1954,6 +1966,7 @@ eWeLink.prototype.prepareBlindFinalState = function (accessory) {
    accessory.context.currentPositionState = 2;
    let payload = platform.prepareBlindPayload(accessory);
    let string = JSON.stringify(payload);
+   if (platform.debugReqRes) platform.log.warn(payload);
    
    if (platform.webSocketOpen) {
       
@@ -1995,7 +2008,7 @@ eWeLink.prototype.prepareBlindPayload = function (accessory) {
    payload.action = 'update';
    payload.userAgent = 'app';
    payload.params = {};
-   let deviceFromApi = platform.devicesInEwe.get(accessory.context.deviceId);
+   let deviceFromApi = platform.devicesInEwe.get(accessory.context.hbDeviceId);
    
    payload.params.switches = deviceFromApi.params.switches;
    
@@ -2029,8 +2042,8 @@ eWeLink.prototype.prepareBlindPayload = function (accessory) {
    
    payload.params.switches[accessory.context.switchUp].switch = switch0;
    payload.params.switches[accessory.context.switchDown].switch = switch1;
-   payload.apikey = '' + accessory.context.apiKey;
-   payload.deviceid = '' + accessory.context.deviceId;
+   payload.apikey = accessory.context.eweApiKey;
+   payload.deviceid = accessory.context.hbDeviceId;
    payload.sequence = platform.getSequence();
    // platform.log("Payload genretad:", JSON.stringify(payload))
    return payload;
@@ -2103,11 +2116,12 @@ eWeLink.prototype.prepareBlindDeviceConfig = function (accessory) {
          "outlet": 3
       }]
    };
-   payload.apikey = '' + accessory.context.apiKey;
-   payload.deviceid = '' + accessory.context.deviceId;
+   payload.apikey = accessory.context.eweApiKey;
+   payload.deviceid = accessory.context.hbDeviceId;
    payload.sequence = platform.getSequence();
    
    let string = JSON.stringify(payload);
+   if (platform.debugReqRes) platform.log.warn(payload);
    
    // Delaying execution to be sure Socket is open
    platform.log("[%s] Waiting 5 sec before sending init config request...", accessory.displayName);
@@ -2161,7 +2175,8 @@ eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
       
       if (platform.wsc) {
          platform.wsc.send(string);
-         if (platform.debug) platform.log("WS message sent [%s].", string);
+         if (platform.debugReqRes) platform.log("Web socket message sent.");
+         if (platform.debugReqRes && string !== "ping") platform.log.warn("\n" + JSON.stringify(JSON.parse(string), null, 2));
          callback();
       }
       
@@ -2173,7 +2188,7 @@ eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
    };
    
    if (!platform.webSocketOpen) {
-      if (platform.debug) platform.log.warn('Socket was closed. It will reconnect automatically.');
+      if (platform.debug) platform.log('Socket was closed. It will reconnect automatically.');
       
       let interval;
       let waitToSend = function (string) {
@@ -2216,13 +2231,14 @@ eWeLink.prototype.login = function (callback) {
    }
    data.password = platform.config.password;
    data.version = '8';
-   data.ts = '' + Math.floor(new Date()
+   data.ts = Math.floor(new Date()
    .getTime() / 1000);
-   data.nonce = '' + nonce();
+   data.nonce = nonce();
    data.appid = platform.appid;
    
    let json = JSON.stringify(data);
-   if (platform.debug) platform.log("Sending login request with credentials: [%s]", json);
+   if (platform.debug) platform.log("Sending HTTPS login request.");
+   if (platform.debugReqRes) platform.log.warn("\n" + JSON.stringify(data, null, 2));
    
    let sign = platform.getSignature(json);
    if (platform.debug) platform.log("Login signature [%s]", sign);
@@ -2278,9 +2294,9 @@ eWeLink.prototype.getRegion = function (countryCode, callback) {
    var data = {};
    data.country_code = countryCode;
    data.version = '8';
-   data.ts = '' + Math.floor(new Date()
+   data.ts = Math.floor(new Date()
    .getTime() / 1000);
-   data.nonce = '' + nonce();
+   data.nonce = nonce();
    data.appid = platform.appid;
    
    let query = querystring.stringify(data);
@@ -2345,9 +2361,9 @@ eWeLink.prototype.getWebSocketHost = function (callback) {
    var data = {};
    data.accept = 'mqtt,ws';
    data.version = '8';
-   data.ts = '' + Math.floor(new Date()
+   data.ts = Math.floor(new Date()
    .getTime() / 1000);
-   data.nonce = '' + nonce();
+   data.nonce = nonce();
    data.appid = platform.appid;
    
    let webClient = request.createClient('https://' + platform.apiHost.replace('-api', '-disp'));
@@ -2493,8 +2509,8 @@ eWeLink.prototype.getArguments = function (apiKey) {
    let args = {};
    args.apiKey = apiKey;
    args.version = '8';
-   args.ts = '' + Math.floor(new Date().getTime() / 1000);
-   args.nonce = '' + nonce();
+   args.ts = Math.floor(new Date().getTime() / 1000);
+   args.nonce = nonce();
    args.appid = platform.appid;
    return querystring.stringify(args);
 };

@@ -37,6 +37,13 @@
         "description": "If enabled, more information will be added to the Homebridge log.",
         "default":false
       },
+      "debugReqRes": {
+        "title": "Debug Logging (Requests & Responses)",
+        "type": "boolean",
+        "required": true,
+        "description": "If enabled, HTTP and web socket requests and responses will be added to the Homebridge log.",
+        "default":false
+      },
       "apiHost": {
         "title": "API Host",
         "type": "string",
@@ -253,7 +260,7 @@
       "description": "Only adjust these settings if you know what you are doing.",
       "expandable": true,
       "items": [
-        "debug", "apiHost", "wsHost"
+        "debug", "debugReqRes", "apiHost", "wsHost"
       ]
     }
   ]
