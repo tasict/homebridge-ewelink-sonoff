@@ -44,10 +44,9 @@ And voila your eWeLink devices *should* be added to your Homebridge instance.
 #### Current issues that need addressing
 - I have no idea if this plugin works correctly with devices apart from what I own (see below).
 #### My future plans/ideas
-- Devices get added to correct HomeKit rooms upon cache clear.
 - Add/remove devices upon web socket message if possible?
 - Add config option to disable master devices showing.
 - Support for more devices is always a good thing. If you have a device and could help me with testing let me know!
 #### My limitations
 - I am not an expert in javascript, but can certainly work around the template I have.
-- The only devices I own are T1-1CH and T1-2CH light switches so I can only test with those.
+- The only devices I own are T1-1C and T1-2C light switches so I can only test with those.
