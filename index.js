@@ -50,8 +50,8 @@ function eWeLink(log, config, api) {
       "switchDown": 2,
       "timeUp": 40,
       "timeDown": 20,
-      "group.time_botton_margin_up": 0,
-      "group.time_botton_margin_down": 0,
+      "timeBottomMarginUp": 0,
+      "timeBottomMarginDown": 0,
       "fullOverdrive": 0
    };
    

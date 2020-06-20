@@ -136,12 +136,12 @@
               "title":"Device ID",
               "description":"Device ID from your eWeLink app."
             },
-            "relay_up":{
+            "switchUp":{
               "type":"number",
-              "title":"Relay Up",
+              "title":"Switch Up",
               "default":1,
               "required": true,
-              "description":"Relay number for the up motor.",
+              "description":"Switch number for the up motor.",
               "oneOf": [
                 {
                   "title": "1",
@@ -170,12 +170,12 @@
               ]
             },
             
-            "relay_down":{
+            "switchDown":{
               "type":"number",
-              "title":"Relay Down",
+              "title":"Switch Down",
               "default":2,
               "required": true,
-              "description":"Relay number for the down motor.",
+              "description":"Switch number for the down motor.",
               "oneOf": [
                 {
                   "title": "1",
@@ -203,25 +203,25 @@
                 }
               ]
             },
-            "time_up":{
+            "timeUp":{
               "type":"number",
               "title":"Time Up",
               "description":"Total time in seconds to fully open blinds (from closed).",
               "default" : 20
             },
-            "time_down":{
+            "timeDown":{
               "type":"number",
               "title":"Time Down",
               "description":"Total time in seconds to completely close blinds (from open).",
               "default" : 40
             },
-            "time_botton_margin_up":{
+            "timeBottomMarginUp":{
               "type":"number",
               "title":"Time Bottom Margin Up",
               "description":"Please refer <a href=\"https://github.com/manolab/homebridge-sonoff-stateful-blinds#readme\" target=\"_blank\">to this link</a> for more information about this setting.",
               "default" : 0
             },
-            "time_botton_margin_down":{
+            "timeBottomMarginDown":{
               "type":"number",
               "title":"Time Bottom Margin Down",
               "description":"Please refer <a href=\"https://github.com/manolab/homebridge-sonoff-stateful-blinds#readme\" target=\"_blank\">to this link</a> for more information about this setting.",
@@ -250,7 +250,7 @@
       "items": [
         {
           "type":"fieldset",
-          "items": ["groups[].type", "groups[].deviceId", "groups[].relay_up", "groups[].relay_down", "groups[].time_up", "groups[].time_down", "groups[].time_botton_margin_up", "groups[].time_botton_margin_up"]
+          "items": ["groups[].type", "groups[].deviceId", "groups[].switchUp", "groups[].switchDown", "groups[].timeUp", "groups[].timeDown", "groups[].timeBottomMarginUp", "groups[].timeBottomMarginUp"]
         }
       ]
     },
