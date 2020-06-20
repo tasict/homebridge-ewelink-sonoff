@@ -49,5 +49,5 @@ And voila your eWeLink devices *should* be added to your Homebridge instance.
 - Add config option to disable master devices showing.
 - Support for more devices is always a good thing. If you have a device and could help me with testing let me know!
 #### My limitations
-- I am not an expert in javascript, but can certainly work around the template I have
+- I am not an expert in javascript, but can certainly work around the template I have.
 - The only devices I own are T1-1CH and T1-2CH light switches so I can only test with those.
