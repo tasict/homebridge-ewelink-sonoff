@@ -193,8 +193,6 @@ function eWeLink(log, config, api) {
                         //*************//                                                                              
                         else if (platform.devicesThermostat.includes(device.uiid)) {
                            services.thermostat = true;
-                           services.temperature = true;
-                           services.humidity = true;
                            platform.addAccessory(device, idToCheck + "SWX", services);
                         }
                         
@@ -287,7 +285,8 @@ function eWeLink(log, config, api) {
                         // THERMOSTATS //
                         //*************//                                    
                         else if (platform.devicesThermostat.includes(accessory.context.eweUIID)) {
-                           platform.updateTempAndHumidity(idToCheck + "SWX", device.params);
+                           //platform.updateTempAndHumidity(idToCheck + "SWX", device.params);
+                           platform.log("Thermostats coming soon");
                         }
                         
                         //************************//
@@ -418,7 +417,8 @@ function eWeLink(log, config, api) {
                            // THERMOSTATS //
                            //*************//                                    
                            else if (platform.devicesThermostat.includes(accessory.context.eweUIID)) {
-                              platform.updateTempAndHumidity(idToCheck + "SWX", device.params);
+                              //platform.updateTempAndHumidity(idToCheck + "SWX", device.params);
+                              platform.log("Thermostats coming soon");
                            }
                            
                            //************************//
@@ -633,6 +633,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    }
    if (services.fan) {
       accessory.context.isFan = true;
+      accessory.addService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.Active);
       accessory.addService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
          platform.internalFanUpdate(accessory, 'power', value, callback);
@@ -650,26 +651,15 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       });
    }
    if (services.thermostat) {
-      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentTemperature)
-      .on('set', function (value, callback) {
-         platform.setTemperatureState(accessory, value, callback);
-      });
-      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentRelativeHumidity)
-      .on('set', function (value, callback) {
-         platform.setHumidityState(accessory, value, callback);
-      });
-   }
-   if (services.temperature) {
-      accessory.addService(Service.TemperatureSensor, newDeviceName).getCharacteristic(Characteristic.CurrentTemperature)
-      .on('set', function (value, callback) {
-         platform.setTemperatureState(accessory, value, callback);
-      });
-   }
-   if (services.humidity) {
-      accessory.addService(Service.HumiditySensor, newDeviceName).getCharacteristic(Characteristic.CurrentRelativeHumidity)
-      .on('set', function (value, callback) {
-         platform.setHumidityState(accessory, value, callback);
-      });
+      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentHeatingCoolingState);
+      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetHeatingCoolingState);
+      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentTemperature);
+      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetTemperature);
+      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TemperatureDisplayUnits);
+      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CoolingThresholdTemperature);
+      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentRelativeHumidity);
+      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.HeatingThresholdTemperature);
+      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetRelativeHumidity);
    }
    if (services.blind) {
       accessory.context.switchUp = (services.group.switchUp || platform.groupDefaults['switchUp']) - 1;
@@ -759,6 +749,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       }
    }
    if (accessory.getService(Service.Fanv2)) {
+      accessory.getService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.Active).updateValue("1");
       accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
          platform.internalFanUpdate(accessory, 'power', value, callback);
@@ -776,26 +767,15 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       });
    }
    if (accessory.getService(Service.Thermostat)) {
-      accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentTemperature)
-      .on('set', function (value, callback) {
-         platform.setTemperatureState(accessory, value, callback);
-      });
-      accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentRelativeHumidity)
-      .on('set', function (value, callback) {
-         platform.setHumidityState(accessory, value, callback);
-      });
-   }
-   if (accessory.getService(Service.TemperatureSensor)) {
-      accessory.getService(Service.TemperatureSensor).getCharacteristic(Characteristic.CurrentTemperature)
-      .on('set', function (value, callback) {
-         platform.setTemperatureState(accessory, value, callback);
-      });
-   }
-   if (accessory.getService(Service.HumiditySensor)) {
-      accessory.getService(Service.HumiditySensor).getCharacteristic(Characteristic.CurrentRelativeHumidity)
-      .on('set', function (value, callback) {
-         platform.setHumidityState(accessory, value, callback);
-      });
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentHeatingCoolingState);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetHeatingCoolingState);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentTemperature);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetTemperature);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TemperatureDisplayUnits);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CoolingThresholdTemperature);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentRelativeHumidity);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.HeatingThresholdTemperature);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetRelativeHumidity);
    }
    
    if (accessory.getService(Service.WindowCovering)) {
@@ -1532,44 +1512,6 @@ WebSocketClient.prototype.onclose = function (e) {
 };
 
 
-
-
-eWeLink.prototype.updateTempAndHumidity = function (deviceId, state) {
-   
-   // Used when we receive an update from an external source
-   
-   let platform = this;
-   if (!platform.log) {
-      return;
-   }
-   let accessory = platform.devicesInHB.get(deviceId);
-   if (!accessory) {
-      platform.log.error("Error updating device with ID [%s] as it is not in Homebridge.", deviceId);
-      return;
-   }
-   
-   let currentTemperature = state.currentTemperature;
-   let currentHumidity = state.currentHumidity;
-   
-   if (platform.debug) platform.log("Updating 'Characteristic.CurrentTemperature' for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, currentTemperature);
-   if (platform.debug) platform.log("Updating 'Characteristic.CurrentRelativeHumiditgy' for [%s] to [%s]. No request will be sent to the device.", accessory.displayName, currentHumidity);
-   
-   if (accessory.getService(Service.Thermostat)) {
-      accessory.getService(Service.Thermostat)
-      .setCharacteristic(Characteristic.CurrentTemperature, currentTemperature);
-      accessory.getService(Service.Thermostat)
-      .setCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumidity);
-   }
-   if (accessory.getService(Service.TemperatureSensor)) {
-      accessory.getService(Service.TemperatureSensor)
-      .setCharacteristic(Characteristic.CurrentTemperature, currentTemperature);
-   }
-   if (accessory.getService(Service.HumiditySensor)) {
-      accessory.getService(Service.HumiditySensor)
-      .setCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumidity);
-   }
-};
-
 eWeLink.prototype.updateBlindTargetPosition = function (deviceId, switches) {
    
    // Used when we receive an update from an external source
@@ -1646,200 +1588,6 @@ eWeLink.prototype.updateBlindTargetPosition = function (deviceId, switches) {
       platform.log("Error with 'positionState' type for [%s].", accessory.displayName);
       break;
    }
-};
-
-
-
-eWeLink.prototype.getTemperatureState = function (accessory, callback) {
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   
-   if (!platform.webClient) {
-      callback("this.webClient not yet ready while obtaining temperature for your device.");
-      accessory.reachable = false;
-      return;
-   }
-   
-   platform.log("Requesting temperature for [%s]...", accessory.displayName);
-   platform.webClient.get('/api/user/device?' + platform.getArguments(platform.apiKey), function (err, res, body) {
-      
-      if (err) {
-         if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
-            platform.log('Sonoff API 503 error. Will try again.');
-            setTimeout(function () {
-               platform.getTemperatureState(accessory, callback);
-            }, 1000);
-         } else {
-            platform.log("An error occurred while requesting temperature for [%s]. Error [%s].", accessory.displayName, err);
-         }
-         return;
-      } else if (!body) {
-         platform.log("An error occurred while requesting temperature for [%s]. Error [No data in response].", accessory.displayName);
-         return;
-      } else if (body.hasOwnProperty('error') && body.error != 0) {
-         platform.log("An error occurred while requesting temperature for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
-         if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
-            platform.relogin();
-         }
-         callback('An error occurred while requesting temperature for your device');
-         return;
-      }
-      
-      body = body.devicelist;
-      
-      let size = Object.keys(body)
-      .length;
-      
-      if (body.length < 1) {
-         callback('An error occurred while requesting temperature for your device');
-         accessory.reachable = false;
-         return;
-      }
-      
-      let deviceId = accessory.context.hbDeviceId;
-      let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-      
-      if (filteredResponse.length === 1) {
-         
-         let device = filteredResponse[0];
-         
-         if (device.deviceid === deviceId) {
-            
-            if (device.online !== true) {
-               accessory.reachable = false;
-               platform.log("Device [%s] was reported to be offline by the API.", accessory.displayName);
-               callback("API reported that [%s] is not online", device.name);
-               return;
-            }
-            
-            let currentTemperature = device.params.currentTemperature;
-            
-            if (accessory.getService(Service.Thermostat)) {
-               accessory.getService(Service.Thermostat)
-               .setCharacteristic(Characteristic.CurrentTemperature, currentTemperature);
-            }
-            if (accessory.getService(Service.TemperatureSensor)) {
-               accessory.getService(Service.TemperatureSensor)
-               .setCharacteristic(Characteristic.CurrentTemperature, currentTemperature);
-            }
-            platform.log("API reported that [%s] temperature is [%s].", device.name, currentTemperature);
-            accessory.reachable = true;
-            callback(null, currentTemperature);
-            
-         }
-         
-      } else if (filteredResponse.length > 1) {
-         // More than one device matches our Device ID. This should not happen.
-         platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
-         platform.log(filteredResponse);
-         callback("The response contained more than one device with ID " + device.deviceid);
-      } else if (filteredResponse.length < 1) {
-         // The device is no longer registered
-         platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
-         platform.removeAccessory(accessory);
-      } else {
-         callback('An error occurred while requesting temperature for your device');
-      }
-   });
-   
-};
-
-eWeLink.prototype.getHumidityState = function (accessory, callback) {
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   
-   if (!platform.webClient) {
-      callback("this.webClient not yet ready while obtaining humidity for your device.");
-      accessory.reachable = false;
-      return;
-   }
-   
-   platform.log("Requesting humidity for [%s]...", accessory.displayName);
-   platform.webClient.get('/api/user/device?' + platform.getArguments(platform.apiKey), function (err, res, body) {
-      
-      if (err) {
-         if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
-            platform.log('Sonoff API 503 error. Will try again.');
-            setTimeout(function () {
-               platform.getHumidityState(accessory, callback);
-            }, 1000);
-         } else {
-            platform.log("An error occurred while requesting humidity for [%s]. Error [%s].", accessory.displayName, err);
-         }
-         return;
-      } else if (!body) {
-         platform.log("An error occurred while requesting humidity for [%s]. Error [No data in response].", accessory.displayName);
-         return;
-      } else if (body.hasOwnProperty('error') && body.error != 0) {
-         platform.log("An error occurred while requesting humidity for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
-         if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
-            platform.relogin();
-         }
-         callback('An error occurred while requesting humidity for your device');
-         return;
-      }
-      
-      body = body.devicelist;
-      
-      let size = Object.keys(body)
-      .length;
-      
-      if (body.length < 1) {
-         callback('An error occurred while requesting humidity for your device');
-         accessory.reachable = false;
-         return;
-      }
-      
-      let deviceId = accessory.context.hbDeviceId;
-      let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-      
-      if (filteredResponse.length === 1) {
-         
-         let device = filteredResponse[0];
-         
-         if (device.deviceid === deviceId) {
-            
-            if (device.online !== true) {
-               accessory.reachable = false;
-               platform.log("Device [%s] was reported to be offline by the API.", accessory.displayName);
-               callback("API reported that [%s] is not online", device.name);
-               return;
-            }
-            
-            let currentHumidity = device.params.currentHumidity;
-            
-            if (accessory.getService(Service.Thermostat)) {
-               accessory.getService(Service.Thermostat)
-               .setCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumidity);
-            }
-            if (accessory.getService(Service.HumiditySensor)) {
-               accessory.getService(Service.Thermostat)
-               .setCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumidity);
-            }
-            accessory.reachable = true;
-            platform.log("API reported that [%s] humidity is [%s].", device.name, currentHumidity);
-            callback(null, currentHumidity);
-         }
-         
-      } else if (filteredResponse.length > 1) {
-         // More than one device matches our Device ID. This should not happen.
-         platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
-         platform.log(filteredResponse);
-         callback("The response contained more than one device with ID " + device.deviceid);
-      } else if (filteredResponse.length < 1) {
-         // The device is no longer registered
-         platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
-         platform.removeAccessory(accessory);
-      } else {
-         callback('An error occurred while requesting humidity for your device');
-      }
-   });
 };
 
 eWeLink.prototype.getBlindPosition = function (accessory, callback) {
@@ -1962,49 +1710,6 @@ eWeLink.prototype.getBlindTargetPosition = function (accessory, callback) {
    let currentTargetPosition = accessory.context.currentTargetPosition;
    platform.log("[%s] 'getTargetPosition' is [%s].", accessory.displayName, currentTargetPosition);
    callback(null, currentTargetPosition);
-};
-
-
-eWeLink.prototype.setTemperatureState = function (accessory, value, callback) {
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   
-   let deviceId = accessory.context.hbDeviceId;
-   let deviceFromApi = platform.devicesInEwe.get(deviceId);
-   platform.log("Setting [%s] temperature to [%s].", accessory.displayName, value);
-   /*
-   deviceFromApi.params.currentHumidity = value;
-   if(accessory.getService(Service.Thermostat)) {
-      accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.CurrentTemperature, value);
-   } else if(accesory.getService(Service.TemperatureSensor)) {
-      accessory.getService(Service.TemperatureSensor).setCharacteristic(Characteristic.CurrentTemperature, value);
-   }
-   */
-   callback();
-};
-
-eWeLink.prototype.setHumidityState = function (accessory, value, callback) {
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   let deviceId = accessory.context.hbDeviceId;
-   let deviceFromApi = platform.devicesInEwe.get(deviceId);
-   
-   platform.log("Setting [%s] humidity to [%s].", accessory.displayName, value);
-   /*
-   deviceFromApi.params.currentHumidity = value;
-   if(accessory.getService(Service.Thermostat)) {
-      accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.CurrentRelativeHumidity, value);
-   } else if(accesory.getService(Service.HumiditySensor)) {
-      accessory.getService(Service.HumiditySensor).setCharacteristic(Characteristic.CurrentRelativeHumidity, value);
-   }
-   */
-   callback();
 };
 
 eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
