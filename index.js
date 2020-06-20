@@ -146,15 +146,6 @@ function eWeLink(log, config, api) {
                               platform.removeAccessory(accessory);
                            }
                         }
-                        
-                        //*******************//
-                        // HIDE FAN CHANNELS //
-                        //*******************//                                    
-                        else if (platform.devicesInEwe.get(idToCheck).uiid === 34) {
-                           if (platform.debug) platform.log('[%s] is part of a fan so hiding from Homebridge.', accessory.displayName);
-                           platform.removeAccessory(accessory);
-                           return;
-                        }
                      } else {
                         // The cached device wasn't found in the eWeLink response so remove.
                         if (platform.debug) platform.log('[%s] was not present in the API response so removing from Homebridge.', accessory.displayName);
@@ -275,7 +266,21 @@ function eWeLink(log, config, api) {
                         // FANS //
                         //******//                                          
                         else if (platform.devicesFan.includes(accessory.context.eweUIID)) {
-                           platform.updateFanDevice(idToCheck + "SWX", device.params.switches);
+                           accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[0].switch === 'on');
+                           let status = false;
+                           let speed = 0;
+                           if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'off' && device.params.switches[3].switch == 'off') {
+                              status = true;
+                              speed = 33;
+                           } else if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'on' && device.params.switches[3].switch == 'off') {
+                              status = true;
+                              speed = 66;
+                           } else if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'off' && device.params.switches[3].switch == 'on') {
+                              status = true;
+                              speed = 100;
+                           }
+                           accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, status);
+                           accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, speed);
                         }
                         
                         //*************//
@@ -392,7 +397,21 @@ function eWeLink(log, config, api) {
                            // FANS //
                            //******//                                          
                            else if (platform.devicesFan.includes(accessory.context.eweUIID)) {
-                              platform.updateFanDevice(idToCheck + "SWX", device.params.switches);
+                              accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[0].switch === 'on');
+                              let status = false;
+                              let speed = 0;
+                              if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'off' && device.params.switches[3].switch == 'off') {
+                                 status = true;
+                                 speed = 33;
+                              } else if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'on' && device.params.switches[3].switch == 'off') {
+                                 status = true;
+                                 speed = 66;
+                              } else if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'off' && device.params.switches[3].switch == 'on') {
+                                 status = true;
+                                 speed = 100;
+                              }
+                              accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, status);
+                              accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, speed);
                            }
                            
                            //*************//
@@ -567,6 +586,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    accessory.context.switchNumber = switchNumber;
    accessory.context.isDimmable = false;
    accessory.context.isColourable = false;
+   accessory.context.isFan = false;
    accessory.context.channelCount = channelCount;
    accessory.reachable = device.online === 'true';
    
@@ -612,20 +632,21 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       });
    }
    if (services.fan) {
+      accessory.context.isFan = true;
       accessory.addService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
-         platform.setFanState(accessory, value, callback);
+         platform.internalFanUpdate(accessory, 'power', value, callback);
       });
       accessory.addService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.RotationSpeed)
       .setProps({
          minStep: 3
       })
       .on("set", function (value, callback) {
-         platform.setFanSpeed(accessory, value, callback);
+         platform.internalFanUpdate(accessory, 'speed', value, callback);
       });
       accessory.addService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.On)
       .on('set', function (value, callback) {
-         platform.setFanLightState(accessory, value, callback);
+         platform.internalFanUpdate(accessory, 'light', value, callback);
       });
    }
    if (services.thermostat) {
@@ -711,7 +732,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
          platform.internalSwitchUpdate(accessory, value, callback);
       });
    }
-   if (accessory.getService(Service.Lightbulb)) {
+   if (accessory.getService(Service.Lightbulb) && !accessory.context.isFan) {
       accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
       .on('set', function (value, callback) {
          platform.internalLightbulbUpdate(accessory, value, callback);
@@ -740,12 +761,18 @@ eWeLink.prototype.configureAccessory = function (accessory) {
    if (accessory.getService(Service.Fanv2)) {
       accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
-         platform.setFanState(accessory, value, callback);
+         platform.internalFanUpdate(accessory, 'power', value, callback);
       });
       accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed)
       .setProps({minStep: 3})
       .on("set", function (value, callback) {
-         platform.setFanSpeed(accessory, value, callback);
+         platform.internalFanUpdate(accessory, 'speed', value, callback);
+      });
+   }
+   if (accessory.getService(Service.Lightbulb) && accessory.context.isFan) {
+      accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
+      .on('set', function (value, callback) {
+         platform.internalFanUpdate(accessory, 'light', value, callback);
       });
    }
    if (accessory.getService(Service.Thermostat)) {
@@ -965,7 +992,6 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
    
    switch (accessory.context.switchNumber) {
       case "X":
-      if (platform.debug) platform.log("[%s] requesting to turn brightness to [%s%].", accessory.displayName, targetBrightness);
       payload.params.bright = targetBrightness;
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetBrightness);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, targetBrightness != 0);
@@ -973,7 +999,7 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
    }
    let string = JSON.stringify(payload);
    platform.sendWebSocketMessage(string, callback);
-   
+   if (platform.debug) platform.log("[%s] requesting to turn brightness to [%s%].", accessory.displayName, targetBrightness);
 };
 
 eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, callback) {
@@ -1013,7 +1039,6 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    
    switch (accessory.context.switchNumber) {
       case "X":
-      if (platform.debug) platform.log("[%s] requesting to turn HSL to [%s %s %s].", accessory.displayName, newHue, newSaturation, newBrightness);
       payload.params.colorR = newColour[0];
       payload.params.colorG = newColour[1];
       payload.params.colorB = newColour[2];
@@ -1025,7 +1050,61 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    }
    let string = JSON.stringify(payload);
    platform.sendWebSocketMessage(string, callback);
+   if (platform.debug) platform.log("[%s] requesting to turn HSL to [%s %s %s].", accessory.displayName, newHue, newSaturation, newBrightness);
+};
+
+eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, callback) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
    
+   let newPower;
+   let newSpeed;
+   let newLight;
+   
+   switch (type) {
+      case "power":
+      newPower = targetState;
+      newSpeed = targetState ? 33 : 0;
+      newLight = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
+      break;
+      case "speed":
+      newPower = targetState >= 33;
+      newSpeed = targetState;
+      newLight = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
+      break;
+      case "light":
+      newPower = accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On).value;
+      newSpeed = accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed).value;
+      newLight = targetState;
+      break;
+   }
+   
+   switch (accessory.context.switchNumber) {
+      case "X":
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newLight);
+      accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, newPower);
+      accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, newSpeed);
+      break;
+   }
+   
+   let payload = {};
+   payload.params = {};
+   payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
+   payload.params.switches[0].switch = newLight ? "on" : "off";
+   payload.params.switches[1].switch = newSpeed >= 33 ? "on" : "off";
+   payload.params.switches[2].switch = newSpeed >= 66 && newSpeed < 99  ? "on" : "off";
+   payload.params.switches[3].switch = newSpeed >= 99 ? "on" : "off";
+   payload.action = 'update';
+   payload.userAgent = 'app';
+   payload.apikey = accessory.context.eweApiKey;
+   payload.deviceid = accessory.context.eweDeviceId;
+   payload.sequence = platform.getSequence();
+   
+   let string = JSON.stringify(payload);
+   platform.sendWebSocketMessage(string, callback);
+   if (platform.debug) platform.log("[%s] requesting to change fan %s.", accessory.displayName, type);
 };
 
 eWeLink.prototype.getSequence = function () {
@@ -1276,13 +1355,13 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
    }
    
    const UIID_MAPPING = {
-      1: "SOCKET",
+      1: "SOCKET",      // S20
       2: "SOCKET_2",
       3: "SOCKET_3",
       4: "SOCKET_4",
       5: "SOCKET_POWER",
-      6: "SWITCH",
-      7: "SWITCH_2",
+      6: "SWITCH",     // T1 1C
+      7: "SWITCH_2",   // T1 2C
       8: "SWITCH_3",
       9: "SWITCH_4",
       10: "OSPF",
@@ -1325,7 +1404,7 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       55: "SWEEPING_ROBOT",
       56: "RGB_BALL_LIGHT_4",
       57: "MONOCHROMATIC_BALL_LIGHT",
-      59: "MEARICAMERA",
+      59: "MEARICAMERA",      // L1
       77: "MICRO",
       1001: "BLADELESS_FAN",
       1002: "NEW_HUMIDIFIER",
@@ -1455,7 +1534,6 @@ WebSocketClient.prototype.onclose = function (e) {
 
 
 
-
 eWeLink.prototype.updateTempAndHumidity = function (deviceId, state) {
    
    // Used when we receive an update from an external source
@@ -1570,141 +1648,7 @@ eWeLink.prototype.updateBlindTargetPosition = function (deviceId, switches) {
    }
 };
 
-eWeLink.prototype.updateFanDevice = function (deviceId, switches) {
-   
-   // Used when we receive an update from an external source
-   let platform = this;
-   if (!platform.log) {
-      return;
-   }
-   let accessory = platform.devicesInHB.get(deviceId);
-   if (!accessory) {
-      platform.log("Error updating device with ID [%s] as it is not in Homebridge.", deviceId);
-      return;
-   }
-   
-   let fanIsOn = false;
-   let fanSpeed = 0;
-   let fanLightIsOn = false;
-   
-   if (switches[0].switch === 'on') {
-      fanLightIsOn = true;
-   }
-   if (switches[1].switch === 'on' && switches[2].switch === 'off' && switches[3].switch === 'off') {
-      fanIsOn = true;
-      fanSpeed = 33.0;
-   } else if (switches[1].switch === 'on' && switches[2].switch === 'on' && switches[3].switch === 'off') {
-      fanIsOn = true;
-      fanSpeed = 66.0;
-   } else if (switches[1].switch === 'on' && switches[2].switch === 'off' && switches[3].switch === 'on') {
-      fanIsOn = true;
-      fanSpeed = 100.0;
-   }
-   if (platform.debug) platform.log("Updating characteristics for [%s]. No request will be sent to the device.", accessory.displayName);
-   
-   accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.On, fanLightIsOn);
-   accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.RotationSpeed, fanSpeed);
-   accessory.getService(Service.Lightbulb).setCharacteristic(Characteristic.On, fanLightIsOn);
-};
 
-eWeLink.prototype.getFanLightState = function (accessory, callback) {
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   
-   if (!platform.webClient) {
-      callback("this.webClient not yet ready while obtaining fan light status for your device.");
-      accessory.reachable = false;
-      return;
-   }
-   
-   platform.log("Requesting fan light status for [%s]...", accessory.displayName);
-   
-   platform.webClient.get('/api/user/device?' + platform.getArguments(platform.apiKey), function (err, res, body) {
-      
-      if (err) {
-         if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
-            platform.log('Sonoff API 503 error. Will try again.');
-            setTimeout(function () {
-               platform.getFanLightState(accessory, callback);
-            }, 1000);
-         } else {
-            platform.log("An error occurred while requesting fan light status for [%s]. Error [%s].", accessory.displayName, err);
-         }
-         return;
-      } else if (!body) {
-         platform.log("An error occurred while requesting fan light status for [%s]. Error [No data in response].", accessory.displayName);
-         return;
-      } else if (body.hasOwnProperty('error') && body.error != 0) {
-         platform.log("An error occurred while requesting fan light status for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
-         if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
-            platform.relogin();
-         }
-         callback('An error occurred while requesting fan light status for your device');
-         return;
-      }
-      
-      body = body.devicelist;
-      
-      let size = Object.keys(body)
-      .length;
-      
-      if (body.length < 1) {
-         callback('An error occurred while requesting fan light status for your device');
-         accessory.reachable = false;
-         return;
-      }
-      
-      let deviceId = accessory.context.hbDeviceId;
-      
-      let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-      
-      if (filteredResponse.length === 1) {
-         
-         let device = filteredResponse[0];
-         
-         if (device.deviceid === deviceId) {
-            if (device.online !== true) {
-               accessory.reachable = false;
-               platform.log("Device [%s] was reported to be offline by the API.", accessory.displayName);
-               callback("API reported that [%s] is not online", device.name);
-               return;
-            }
-            
-            if (device.params.switches[0].switch === 'on') {
-               accessory.reachable = true;
-               platform.log("API reported that [%s] is [on].", device.name);
-               callback(null, 1);
-               return;
-            } else if (device.params.switches[0].switch === 'off') {
-               accessory.reachable = true;
-               platform.log("API reported that [%s] is [off].", device.name);
-               callback(null, 0);
-               return;
-            } else {
-               accessory.reachable = false;
-               platform.log("API reported an unknown status for [%s].", accessory.displayName);
-               callback("API returned an unknown status for " + accessory.displayName);
-               return;
-            }
-         }
-         
-      } else if (filteredResponse.length > 1) {
-         // More than one device matches our Device ID. This should not happen.
-         platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
-         platform.log(filteredResponse);
-         callback("The response contained more than one device with ID " + device.deviceid);
-      } else if (filteredResponse.length < 1) {
-         // The device is no longer registered
-         platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
-         platform.removeAccessory(accessory);
-      } else {
-         callback('An error occurred while requesting fan light status for your device');
-      }
-   });
-};
 
 eWeLink.prototype.getTemperatureState = function (accessory, callback) {
    let platform = this;
@@ -1801,205 +1745,6 @@ eWeLink.prototype.getTemperatureState = function (accessory, callback) {
       }
    });
    
-};
-
-eWeLink.prototype.getFanState = function (accessory, callback) {
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   
-   if (!platform.webClient) {
-      callback("this.webClient not yet ready while obtaining fan status for your device.");
-      accessory.reachable = false;
-      return;
-   }
-   
-   platform.log("Requesting fan status for [%s]...", accessory.displayName);
-   platform.webClient.get('/api/user/device?' + platform.getArguments(platform.apiKey), function (err, res, body) {
-      
-      if (err) {
-         if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
-            platform.log('Sonoff API 503 error. Will try again.');
-            setTimeout(function () {
-               platform.getFanState(accessory, callback);
-            }, 1000);
-         } else {
-            platform.log("An error occurred while requesting fan status for [%s]. Error [%s].", accessory.displayName, err);
-         }
-         return;
-      } else if (!body) {
-         platform.log("An error occurred while requesting fan status for [%s]. Error [No data in response].", accessory.displayName);
-         return;
-      } else if (body.hasOwnProperty('error') && body.error != 0) {
-         platform.log("An error occurred while requesting fan status for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
-         if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
-            platform.relogin();
-         }
-         callback('An error occurred while requesting fan status for your device');
-         return;
-      }
-      
-      body = body.devicelist;
-      
-      let size = Object.keys(body)
-      .length;
-      
-      if (body.length < 1) {
-         callback('An error occurred while requesting fan status for your device');
-         accessory.reachable = false;
-         return;
-      }
-      
-      let deviceId = accessory.context.hbDeviceId;
-      let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-      
-      if (filteredResponse.length === 1) {
-         
-         let device = filteredResponse[0];
-         
-         if (device.deviceid === deviceId) {
-            if (device.online !== true) {
-               accessory.reachable = false;
-               platform.log("Device [%s] was reported to be offline by the API.", accessory.displayName);
-               callback("API reported that [%s] is not online", device.name);
-               return;
-            }
-            
-            if (device.params.switches[1].switch === 'on') {
-               accessory.reachable = true;
-               platform.log("API reported that [%s] is [on].", device.name);
-               callback(null, 1);
-               return;
-            } else if (device.params.switches[1].switch === 'off') {
-               accessory.reachable = true;
-               platform.log("API reported that [%s] is [off].", device.name);
-               callback(null, 0);
-               return;
-            } else {
-               accessory.reachable = false;
-               platform.log("API reported an unknown status for [%s - %s].", accessory.displayName, device.params.switches[1].switch);
-               callback("API returned an unknown status for device " + accessory.displayName);
-               return;
-            }
-         }
-         
-      } else if (filteredResponse.length > 1) {
-         // More than one device matches our Device ID. This should not happen.
-         platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
-         platform.log(filteredResponse);
-         callback("The response contained more than one device with ID " + device.deviceid);
-      } else if (filteredResponse.length < 1) {
-         // The device is no longer registered
-         platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
-         platform.removeAccessory(accessory);
-      } else {
-         callback('An error occurred while requesting fan status for your device');
-      }
-   });
-};
-
-eWeLink.prototype.getFanSpeed = function (accessory, callback) {
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   
-   if (!platform.webClient) {
-      callback("this.webClient not yet ready while obtaining fan speed for your device.");
-      accessory.reachable = false;
-      return;
-   }
-   
-   platform.log("Requesting fan speed for [%s]...", accessory.displayName);
-   platform.webClient.get('/api/user/device?' + platform.getArguments(platform.apiKey), function (err, res, body) {
-      
-      if (err) {
-         if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
-            platform.log('Sonoff API 503 error. Will try again.');
-            setTimeout(function () {
-               platform.getFanSpeed(accessory, callback);
-            }, 1000);
-         } else {
-            platform.log("An error occurred while requesting fan speed for [%s]. Error [%s].", accessory.displayName, err);
-         }
-         return;
-      } else if (!body) {
-         platform.log("An error occurred while requesting fan speed for [%s]. Error [No data in response].", accessory.displayName);
-         return;
-      } else if (body.hasOwnProperty('error') && body.error != 0) {
-         platform.log("An error occurred while requesting fan speed for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
-         if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
-            platform.relogin();
-         }
-         callback('An error occurred while requesting fan speed for your device');
-         return;
-      }
-      
-      body = body.devicelist;
-      
-      let size = Object.keys(body)
-      .length;
-      
-      if (body.length < 1) {
-         callback('An error occurred while requesting fan speed for your device');
-         accessory.reachable = false;
-         return;
-      }
-      
-      let deviceId = accessory.context.hbDeviceId;
-      let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-      
-      if (filteredResponse.length === 1) {
-         
-         let device = filteredResponse[0];
-         
-         if (device.deviceid === deviceId) {
-            if (device.online !== true) {
-               accessory.reachable = false;
-               platform.log("Device [%s] was reported to be offline by the API.", accessory.displayName);
-               callback("API reported that [%s] is not online", device.name);
-               return;
-            }
-            
-            if (device.params.switches[1].switch === 'on' && device.params.switches[2].switch === 'off' && device.params.switches[3].switch === 'off') {
-               accessory.reachable = true;
-               platform.log("API reported that [%s] speed is [33].", device.name);
-               callback(null, 33);
-               return;
-            } else if (device.params.switches[1].switch === 'on' && device.params.switches[2].switch === 'on' && device.params.switches[3].switch === 'off') {
-               accessory.reachable = true;
-               platform.log("API reported that [%s] speed is [66].", device.name);
-               callback(null, 66);
-               return;
-            } else if (device.params.switches[1].switch === 'on' && device.params.switches[2].switch === 'off' && device.params.switches[3].switch === 'on') {
-               accessory.reachable = true;
-               platform.log("API reported that [%s] speed is [100].", device.name);
-               callback(null, 100);
-               return;
-            } else {
-               accessory.reachable = false;
-               platform.log("API reported an unknown status for [%s].", accessory.displayName);
-               callback('API returned an unknown status for device ' + accessory.displayName);
-               return;
-            }
-         }
-         
-      } else if (filteredResponse.length > 1) {
-         // More than one device matches our Device ID. This should not happen.
-         platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
-         platform.log(filteredResponse);
-         callback("The response contained more than one device with ID " + device.deviceid);
-      } else if (filteredResponse.length < 1) {
-         // The device is no longer registered
-         platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
-         platform.removeAccessory(accessory);
-      } else {
-         callback('An error occurred while requesting fan speed for your device');
-      }
-   });
 };
 
 eWeLink.prototype.getHumidityState = function (accessory, callback) {
@@ -2260,122 +2005,6 @@ eWeLink.prototype.setHumidityState = function (accessory, value, callback) {
    }
    */
    callback();
-};
-
-eWeLink.prototype.setFanState = function (accessory, isOn, callback) {
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   let deviceId = accessory.context.hbDeviceId;
-   
-   let targetState = 'off';
-   
-   if (isOn) {
-      targetState = 'on';
-   }
-   
-   platform.log("Setting [%s] fan to [%s].", accessory.displayName, targetState);
-   
-   let payload = {};
-   payload.action = 'update';
-   payload.userAgent = 'app';
-   payload.params = {};
-   let deviceFromApi = platform.devicesInEwe.get(deviceId);
-   payload.params.switches = deviceFromApi.params.switches;
-   payload.params.switches[1].switch = targetState;
-   payload.apikey = accessory.context.eweApiKey;
-   payload.deviceid = deviceId;
-   
-   payload.sequence = platform.getSequence();
-   
-   let string = JSON.stringify(payload);
-   if (platform.debugReqRes) platform.log.warn(payload);
-   
-   platform.sendWebSocketMessage(string, callback);
-   
-};
-
-eWeLink.prototype.setFanSpeed = function (accessory, value, callback) {
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   let deviceId = accessory.context.hbDeviceId;
-   
-   platform.log("Setting [%s] fan speed to [%s].", accessory.displayName, value);
-   
-   let payload = {};
-   payload.action = 'update';
-   payload.userAgent = 'app';
-   payload.params = {};
-   let deviceFromApi = platform.devicesInEwe.get(deviceId);
-   payload.params.switches = deviceFromApi.params.switches;
-   
-   if (value < 33) {
-      payload.params.switches[1].switch = 'off';
-      payload.params.switches[2].switch = 'off';
-      payload.params.switches[3].switch = 'off';
-   } else if (value >= 33 && value < 66) {
-      payload.params.switches[1].switch = 'on';
-      payload.params.switches[2].switch = 'off';
-      payload.params.switches[3].switch = 'off';
-   } else if (value >= 66 && value < 99) {
-      payload.params.switches[1].switch = 'on';
-      payload.params.switches[2].switch = 'on';
-      payload.params.switches[3].switch = 'off';
-   } else if (value >= 99) {
-      payload.params.switches[1].switch = 'on';
-      payload.params.switches[2].switch = 'off';
-      payload.params.switches[3].switch = 'on';
-   }
-   
-   payload.apikey = accessory.context.eweApiKey;
-   payload.deviceid = deviceId;
-   
-   payload.sequence = platform.getSequence();
-   
-   let string = JSON.stringify(payload);
-   if (platform.debugReqRes) platform.log.warn(payload);
-   
-   platform.sendWebSocketMessage(string, callback);
-};
-
-eWeLink.prototype.setFanLightState = function (accessory, isOn, callback) {
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   let deviceId = accessory.context.hbDeviceId;
-   
-   let targetState = 'off';
-   
-   if (isOn) {
-      targetState = 'on';
-   }
-   
-   platform.log("Setting [%s] fan light to [%s].", accessory.displayName, targetState);
-   
-   let payload = {};
-   payload.action = 'update';
-   payload.userAgent = 'app';
-   payload.params = {};
-   let deviceFromApi = platform.devicesInEwe.get(deviceId);
-   payload.params.switches = deviceFromApi.params.switches;
-   payload.params.switches[0].switch = targetState;
-   
-   payload.apikey = accessory.context.eweApiKey;
-   payload.deviceid = deviceId;
-   
-   payload.sequence = platform.getSequence();
-   
-   let string = JSON.stringify(payload);
-   if (platform.debugReqRes) platform.log.warn(payload);
-   platform.sendWebSocketMessage(string, callback);
-   
 };
 
 eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
