@@ -1020,7 +1020,7 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, targetHSB);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, targetHSB);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetHSB);
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newcolour[] + newcolour[1] + newcolour[2] != 0);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newcolour[0] + newcolour[1] + newcolour[2] != 0);
       break;
    }
    let string = JSON.stringify(payload);
