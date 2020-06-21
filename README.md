@@ -43,6 +43,7 @@ And voila your eWeLink devices *should* be added to your Homebridge instance.
 - Certain devices are no longer removed and re-added upon Homebridge (re)start ([see here](https://github.com/howanghk/homebridge-ewelink/issues/105)).
 #### Current issues that need addressing
 - I have no idea if this plugin works correctly with devices apart from what I own (see below).
+- Definitely won't work for thermostats/blinds as I need to make some changes.
 #### My future plans/ideas
 - Add/remove devices upon web socket message if possible?
 - Add config option to disable master devices showing.
