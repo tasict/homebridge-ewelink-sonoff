@@ -197,18 +197,23 @@ function eWeLink(log, config, api) {
                         // LIGHTS [MULTI SWITCH] //
                         //***********************//
                         else if (platform.devicesMultiSwitch.includes(accessory.context.eweUIID) || platform.devicesMultiSwitchLight.includes(accessory.context.eweModel)) {  
-                           let i;
-                           let primaryState = false;
-                           let otherAccessory;
-                           for (i = 1; i <= accessory.context.channelCount; i++) {
-                              if (platform.devicesInHB.has(idToCheck + "SW" + i)) {
-                                 otherAccessory = platform.devicesInHB.get(idToCheck + "SW" + i);
-                                 if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
-                                 otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                                 otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on');
-                                 if (device.params.switches[i - 1].switch == 'on') primaryState = true;
+                           if (Array.isArray(device.params.switches) {
+                              let i;
+                              let primaryState = false;
+                              let otherAccessory;
+                              for (i = 1; i <= accessory.context.channelCount; i++) {
+                                 if (platform.devicesInHB.has(idToCheck + "SW" + i)) {
+                                    otherAccessory = platform.devicesInHB.get(idToCheck + "SW" + i);
+                                    if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
+                                    otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                                    otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on');
+                                    if (device.params.switches[i - 1].switch == 'on') primaryState = true;
+                                 }
+                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, primaryState);
                               }
-                              accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, primaryState);
+                           } else {
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");
+                              return;
                            }
                         }
                         
