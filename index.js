@@ -39,7 +39,7 @@ function eWeLink(log, config, api) {
    this.devicesInEwe = new Map();
    this.devicesUnsupported = [28];
    this.devicesSingleSwitch = [1, 5, 6, 14, 15, 22, 24, 27, 32, 36, 59];
-   this.devicesSingleSwitchLight = ['T1 1C', 'L1', 'B1'];
+   this.devicesSingleSwitchLight = ['T1 1C', 'L1', 'B1', 'TX1C'];
    this.devicesMultiSwitch = [2, 3, 4, 7, 8, 9, 29, 30, 31, 34, 41, 77];
    this.devicesMultiSwitchLight = ['T1 2C', 'T1 3C', 'TX2C', 'TX3C'];
    this.devicesLightbulb = [36, 59];
