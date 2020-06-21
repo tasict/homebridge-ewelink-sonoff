@@ -1221,843 +1221,843 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
       
       let payload = platform.prepareBlindPayload(accessory);
       let string = JSON.stringify(payload);
-      platform.sendWebSocketMessage(string, function () {
-         return;
-      });
+      platform.sendWebSocketMessage(string, callback);
+   } else {
       return;
-   };
+   }
+};
+
+
+eWeLink.prototype.getSequence = function () {
+   let time_stamp = new Date() / 1000;
+   this.sequence = Math.floor(time_stamp * 1000);
+   return this.sequence;
+};
+
+eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
+   platform.delaySend = 0;
+   const delayOffset = 280;
    
-   
-   eWeLink.prototype.getSequence = function () {
-      let time_stamp = new Date() / 1000;
-      this.sequence = Math.floor(time_stamp * 1000);
-      return this.sequence;
-   };
-   
-   eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
-      let platform = this;
-      if (!platform.log) {
+   let sendOperation = function (string) {
+      if (!platform.webSocketOpen) {
+         setTimeout(function () {
+            sendOperation(string);
+         }, delayOffset);
          return;
       }
-      platform.delaySend = 0;
-      const delayOffset = 280;
       
-      let sendOperation = function (string) {
-         if (!platform.webSocketOpen) {
-            setTimeout(function () {
-               sendOperation(string);
-            }, delayOffset);
-            return;
-         }
-         
-         if (platform.ws) {
-            platform.ws.send(string);
-            if (platform.debugReqRes && string !== "ping") platform.log.warn("Web socket message sent.\n" + JSON.stringify(JSON.parse(string), null, 2));
-            else if (platform.debug && string !== "ping") platform.log("Web socket message sent.");
-            callback();
-         }
-         
-         if (platform.delaySend <= 0) {
-            platform.delaySend = 0;
-         } else {
-            platform.delaySend -= delayOffset;
+      if (platform.ws) {
+         platform.ws.send(string);
+         if (platform.debugReqRes && string !== "ping") platform.log.warn("Web socket message sent.\n" + JSON.stringify(JSON.parse(string), null, 2));
+         else if (platform.debug && string !== "ping") platform.log("Web socket message sent.");
+         callback();
+      }
+      
+      if (platform.delaySend <= 0) {
+         platform.delaySend = 0;
+      } else {
+         platform.delaySend -= delayOffset;
+      }
+   };
+   
+   if (!platform.webSocketOpen) {
+      if (platform.debug) platform.log('Socket was closed. It will reconnect automatically.');
+      let interval;
+      let waitToSend = function (string) {
+         if (platform.webSocketOpen) {
+            clearInterval(interval);
+            sendOperation(string);
          }
       };
-      
-      if (!platform.webSocketOpen) {
-         if (platform.debug) platform.log('Socket was closed. It will reconnect automatically.');
-         let interval;
-         let waitToSend = function (string) {
-            if (platform.webSocketOpen) {
-               clearInterval(interval);
-               sendOperation(string);
-            }
-         };
-         interval = setInterval(waitToSend, 750, string);
-      } else {
-         setTimeout(sendOperation, platform.delaySend, string);
-         platform.delaySend += delayOffset;
-      }
-   };
+      interval = setInterval(waitToSend, 750, string);
+   } else {
+      setTimeout(sendOperation, platform.delaySend, string);
+      platform.delaySend += delayOffset;
+   }
+};
+
+eWeLink.prototype.login = function (callback) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
    
-   eWeLink.prototype.login = function (callback) {
-      let platform = this;
-      if (!platform.log) {
+   var data = {};
+   if (platform.emailLogin) {
+      data.email = platform.config.username;
+   } else {
+      data.phoneNumber = platform.config.username;
+   }
+   data.password = platform.config.password;
+   data.version = 8;
+   data.ts = Math.floor(new Date().getTime() / 1000);
+   data.nonce = nonce();
+   data.appid = platform.appid;
+   
+   if (platform.debugReqRes) platform.log.warn("Sending HTTPS login request.\n" + JSON.stringify(data, null, 2));
+   else if (platform.debug) platform.log("Sending HTTPS login request.");
+   
+   let json = JSON.stringify(data);
+   let sign = platform.getSignature(json);
+   if (platform.debug) platform.log("Login signature [%s].", sign);
+   let webClient = request.createClient('https://' + platform.apiHost);
+   webClient.headers['Authorization'] = 'Sign ' + sign;
+   webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
+   webClient.post('/api/user/login', data, function (err, res, body) {
+      if (err) {
+         platform.log.error("An error occurred while logging in. [%s].", err);
+         callback();
          return;
       }
-      
-      var data = {};
-      if (platform.emailLogin) {
-         data.email = platform.config.username;
-      } else {
-         data.phoneNumber = platform.config.username;
-      }
-      data.password = platform.config.password;
-      data.version = 8;
-      data.ts = Math.floor(new Date().getTime() / 1000);
-      data.nonce = nonce();
-      data.appid = platform.appid;
-      
-      if (platform.debugReqRes) platform.log.warn("Sending HTTPS login request.\n" + JSON.stringify(data, null, 2));
-      else if (platform.debug) platform.log("Sending HTTPS login request.");
-      
-      let json = JSON.stringify(data);
-      let sign = platform.getSignature(json);
-      if (platform.debug) platform.log("Login signature [%s].", sign);
-      let webClient = request.createClient('https://' + platform.apiHost);
-      webClient.headers['Authorization'] = 'Sign ' + sign;
-      webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
-      webClient.post('/api/user/login', data, function (err, res, body) {
-         if (err) {
-            platform.log.error("An error occurred while logging in. [%s].", err);
-            callback();
-            return;
-         }
-         if (body.hasOwnProperty('error') && body.error == 301 && body.hasOwnProperty('region')) {
-            let idx = platform.apiHost.indexOf('-');
-            if (idx == -1) {
-               platform.log.error("Received new region [%s]. However we cannot construct the new API host url.", body.region);
-               callback();
-               return;
-            }
-            let newApiHost = body.region + platform.apiHost.substring(idx);
-            if (platform.apiHost != newApiHost) {
-               if (platform.debug) platform.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
-               platform.apiHost = newApiHost;
-               platform.login(callback);
-               return;
-            }
-         }
-         
-         if (!body.at) {
-            platform.log.error("Server did not response with an authentication token.");
-            platform.log.warn("\n" + JSON.stringify(body, null, 2));
-            callback();
-            return;
-         }
-         platform.authenticationToken = body.at;
-         platform.apiKey = body.user.apikey;
-         platform.webClient = request.createClient('https://' + platform.apiHost);
-         platform.webClient.headers['Authorization'] = 'Bearer ' + body.at;
-         
-         platform.getWebSocketHost(function () {
-            callback(body.at);
-         }.bind(this));
-      }.bind(this));
-   };
-   
-   eWeLink.prototype.getRegion = function (countryCode, callback) {
-      let platform = this;
-      if (!platform.log) {
-         return;
-      }
-      var data = {};
-      data.country_code = countryCode;
-      data.version = 8;
-      data.ts = Math.floor(new Date().getTime() / 1000);
-      data.nonce = nonce();
-      data.appid = platform.appid;
-      
-      let query = querystring.stringify(data);
-      if (platform.debug) platform.log("Info: getRegion query [%s].", query);
-      
-      let dataToSign = [];
-      Object.keys(data).forEach(function (key) {
-         dataToSign.push({
-            key: key,
-            value: data[key]
-         });
-      });
-      dataToSign.sort(function (a, b) {
-         return a.key < b.key ? -1 : 1;
-      });
-      dataToSign = dataToSign.map(function (kv) {
-         return kv.key + "=" + kv.value;
-      }).join('&');
-      
-      let sign = platform.getSignature(dataToSign);
-      if (platform.debug) platform.log("Info: getRegion signature [%s].", sign);
-      
-      let webClient = request.createClient('https://api.coolkit.cc:8080');
-      webClient.headers['Authorization'] = 'Sign ' + sign;
-      webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
-      webClient.get('/api/user/region?' + query, function (err, res, body) {
-         if (err) {
-            platform.log.error("An error occurred while getting region [%s].", err);
-            callback();
-            return;
-         }
-         if (!body.region) {
-            platform.log.error("Server did not response with a region [%s]", response);
-            platform.log.warn("\n" + JSON.stringify(body, null, 2));
-            callback();
-            return;
-         }
+      if (body.hasOwnProperty('error') && body.error == 301 && body.hasOwnProperty('region')) {
          let idx = platform.apiHost.indexOf('-');
          if (idx == -1) {
-            platform.log.error("Received region [%s]. However we cannot construct the new API host url.", body.region);
+            platform.log.error("Received new region [%s]. However we cannot construct the new API host url.", body.region);
             callback();
             return;
          }
          let newApiHost = body.region + platform.apiHost.substring(idx);
          if (platform.apiHost != newApiHost) {
-            if (platform.debug) platform.log("Received region [%s], updating API host to [%s].", body.region, newApiHost);
+            if (platform.debug) platform.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
             platform.apiHost = newApiHost;
+            platform.login(callback);
+            return;
          }
-         callback(body.region);
-      }.bind(this));
-   };
-   
-   eWeLink.prototype.getWebSocketHost = function (callback) {
-      let platform = this;
-      if (!platform.log) {
-         return;
       }
-      var data = {};
-      data.accept = 'mqtt,ws';
-      data.version = 8;
-      data.ts = Math.floor(new Date().getTime() / 1000);
-      data.nonce = nonce();
-      data.appid = platform.appid;
       
-      let webClient = request.createClient('https://' + platform.apiHost.replace('-api', '-disp'));
-      webClient.headers['Authorization'] = 'Bearer ' + platform.authenticationToken;
-      webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
-      webClient.post('/dispatch/app', data, function (err, res, body) {
-         if (err) {
-            platform.log.error("An error occurred while getting web socket host [%s].", err);
-            callback();
-            return;
-         }
-         
-         if (!body.domain) {
-            platform.log.error("Server did not response with a web socket host [%s].", response)
-            platform.log.warn("\n" + JSON.stringify(body, null, 2));
-            callback();
-            return;
-         }
-         
-         if (platform.debug) platform.log('Web socket host received [%s].', body.domain);
-         platform.wsHost = body.domain;
-         if (platform.ws) {
-            platform.ws.url = 'wss://' + body.domain + ':8080/api/ws';
-         }
-         callback(body.domain);
-      }.bind(this));
-   };
-   
-   eWeLink.prototype.relogin = function (callback) {
-      let platform = this;
-      if (!platform.log) {
+      if (!body.at) {
+         platform.log.error("Server did not response with an authentication token.");
+         platform.log.warn("\n" + JSON.stringify(body, null, 2));
+         callback();
          return;
       }
-      platform.login(function () {
-         if (platform.webSocketOpen) {
-            platform.ws.instance.terminate();
-            platform.ws.onclose();
-            platform.ws.reconnect();
-         }
-         callback && callback();
+      platform.authenticationToken = body.at;
+      platform.apiKey = body.user.apikey;
+      platform.webClient = request.createClient('https://' + platform.apiHost);
+      platform.webClient.headers['Authorization'] = 'Bearer ' + body.at;
+      
+      platform.getWebSocketHost(function () {
+         callback(body.at);
+      }.bind(this));
+   }.bind(this));
+};
+
+eWeLink.prototype.getRegion = function (countryCode, callback) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
+   var data = {};
+   data.country_code = countryCode;
+   data.version = 8;
+   data.ts = Math.floor(new Date().getTime() / 1000);
+   data.nonce = nonce();
+   data.appid = platform.appid;
+   
+   let query = querystring.stringify(data);
+   if (platform.debug) platform.log("Info: getRegion query [%s].", query);
+   
+   let dataToSign = [];
+   Object.keys(data).forEach(function (key) {
+      dataToSign.push({
+         key: key,
+         value: data[key]
       });
-   };
+   });
+   dataToSign.sort(function (a, b) {
+      return a.key < b.key ? -1 : 1;
+   });
+   dataToSign = dataToSign.map(function (kv) {
+      return kv.key + "=" + kv.value;
+   }).join('&');
    
-   eWeLink.prototype.getChannelsByUIID = function (uiid) {
-      let platform = this;
-      if (!platform.log) {
+   let sign = platform.getSignature(dataToSign);
+   if (platform.debug) platform.log("Info: getRegion signature [%s].", sign);
+   
+   let webClient = request.createClient('https://api.coolkit.cc:8080');
+   webClient.headers['Authorization'] = 'Sign ' + sign;
+   webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
+   webClient.get('/api/user/region?' + query, function (err, res, body) {
+      if (err) {
+         platform.log.error("An error occurred while getting region [%s].", err);
+         callback();
+         return;
+      }
+      if (!body.region) {
+         platform.log.error("Server did not response with a region [%s]", response);
+         platform.log.warn("\n" + JSON.stringify(body, null, 2));
+         callback();
+         return;
+      }
+      let idx = platform.apiHost.indexOf('-');
+      if (idx == -1) {
+         platform.log.error("Received region [%s]. However we cannot construct the new API host url.", body.region);
+         callback();
+         return;
+      }
+      let newApiHost = body.region + platform.apiHost.substring(idx);
+      if (platform.apiHost != newApiHost) {
+         if (platform.debug) platform.log("Received region [%s], updating API host to [%s].", body.region, newApiHost);
+         platform.apiHost = newApiHost;
+      }
+      callback(body.region);
+   }.bind(this));
+};
+
+eWeLink.prototype.getWebSocketHost = function (callback) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
+   var data = {};
+   data.accept = 'mqtt,ws';
+   data.version = 8;
+   data.ts = Math.floor(new Date().getTime() / 1000);
+   data.nonce = nonce();
+   data.appid = platform.appid;
+   
+   let webClient = request.createClient('https://' + platform.apiHost.replace('-api', '-disp'));
+   webClient.headers['Authorization'] = 'Bearer ' + platform.authenticationToken;
+   webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
+   webClient.post('/dispatch/app', data, function (err, res, body) {
+      if (err) {
+         platform.log.error("An error occurred while getting web socket host [%s].", err);
+         callback();
          return;
       }
       
-      const UIID_MAPPING = {
-         1: "SOCKET",      // S20
-         2: "SOCKET_2",
-         3: "SOCKET_3",
-         4: "SOCKET_4",
-         5: "SOCKET_POWER",
-         6: "SWITCH",     // T1 1C
-         7: "SWITCH_2",   // T1 2C
-         8: "SWITCH_3",
-         9: "SWITCH_4",
-         10: "OSPF",
-         11: "CURTAIN",
-         12: "EW-RE",
-         13: "FIREPLACE",
-         14: "SWITCH_CHANGE",
-         15: "THERMOSTAT",
-         16: "COLD_WARM_LED",
-         17: "THREE_GEAR_FAN",
-         18: "SENSORS_CENTER",
-         19: "HUMIDIFIER",
-         22: "RGB_BALL_LIGHT",
-         23: "NEST_THERMOSTAT",
-         24: "GSM_SOCKET",
-         25: "AROMATHERAPY",
-         26: "BJ_THERMOSTAT",
-         27: "GSM_UNLIMIT_SOCKET",
-         28: "RF_BRIDGE",
-         29: "GSM_SOCKET_2",
-         30: "GSM_SOCKET_3",
-         31: "GSM_SOCKET_4",
-         32: "POWER_DETECTION_SOCKET",
-         33: "LIGHT_BELT",
-         34: "FAN_LIGHT",
-         35: "EZVIZ_CAMERA",
-         36: "SINGLE_CHANNEL_DIMMER_SWITCH",
-         38: "HOME_KIT_BRIDGE",
-         40: "FUJIN_OPS",
-         41: "CUN_YOU_DOOR",
-         42: "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT",
-         43: "",
-         44: "",
-         45: "DOWN_CEILING_LIGHT",
-         46: "AIR_CLEANER",
-         49: "MACHINE_BED",
-         51: "COLD_WARM_DESK_LIGHT",
-         52: "DOUBLE_COLOR_DEMO_LIGHT",
-         53: "ELECTRIC_FAN_WITH_LAMP",
-         55: "SWEEPING_ROBOT",
-         56: "RGB_BALL_LIGHT_4",
-         57: "MONOCHROMATIC_BALL_LIGHT",
-         59: "MEARICAMERA",      // L1
-         77: "MICRO",
-         1001: "BLADELESS_FAN",
-         1002: "NEW_HUMIDIFIER",
-         1003: "WARM_AIR_BLOWER"
-      };
-      
-      const CHANNEL_MAPPING = {
-         SOCKET: 1,
-         SWITCH_CHANGE: 1,
-         GSM_UNLIMIT_SOCKET: 1,
-         SWITCH: 1,
-         THERMOSTAT: 1,
-         SOCKET_POWER: 1,
-         GSM_SOCKET: 1,
-         POWER_DETECTION_SOCKET: 1,
-         MEARICAMERA: 1,
-         SINGLE_CHANNEL_DIMMER_SWITCH: 1,
-         RGB_BALL_LIGHT: 1,
-         SOCKET_2: 2,
-         GSM_SOCKET_2: 2,
-         SWITCH_2: 2,
-         SOCKET_3: 3,
-         GSM_SOCKET_3: 3,
-         SWITCH_3: 3,
-         SOCKET_4: 4,
-         GSM_SOCKET_4: 4,
-         SWITCH_4: 4,
-         CUN_YOU_DOOR: 4,
-         FAN_LIGHT: 4,
-         MICRO: 4
-      };
-      
-      let deviceType = UIID_MAPPING[uiid] || "";
-      if (deviceType == "") return 0;
-      else return CHANNEL_MAPPING[deviceType] || 0;
-   };
-   
-   eWeLink.prototype.getArguments = function (apiKey) {
-      let platform = this;
-      if (!platform.log) {
+      if (!body.domain) {
+         platform.log.error("Server did not response with a web socket host [%s].", response)
+         platform.log.warn("\n" + JSON.stringify(body, null, 2));
+         callback();
          return;
       }
-      let args = {};
-      args.apiKey = apiKey;
-      args.version = 8;
-      args.ts = Math.floor(new Date().getTime() / 1000);
-      args.nonce = nonce();
-      args.appid = platform.appid;
-      return querystring.stringify(args);
-   };
-   
-   eWeLink.prototype.getSignature = function (string) {
-      return crypto.createHmac('sha256', '6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM').update(string).digest('base64');
-   };
-   
-   function WebSocketClient() {
-      this.number = 0; // Message number
-      this.autoReconnectInterval = 5 * 1000; // ms
-      this.pendingReconnect = false;
+      
+      if (platform.debug) platform.log('Web socket host received [%s].', body.domain);
+      platform.wsHost = body.domain;
+      if (platform.ws) {
+         platform.ws.url = 'wss://' + body.domain + ':8080/api/ws';
+      }
+      callback(body.domain);
+   }.bind(this));
+};
+
+eWeLink.prototype.relogin = function (callback) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
+   platform.login(function () {
+      if (platform.webSocketOpen) {
+         platform.ws.instance.terminate();
+         platform.ws.onclose();
+         platform.ws.reconnect();
+      }
+      callback && callback();
+   });
+};
+
+eWeLink.prototype.getChannelsByUIID = function (uiid) {
+   let platform = this;
+   if (!platform.log) {
+      return;
    }
    
-   WebSocketClient.prototype.open = function (url) {
-      this.url = url;
-      this.instance = new WebSocket(this.url);
-      this.instance.on('open', () => {
-         this.onopen();
-      });
-      this.instance.on('message', (data, flags) => {
-         this.number++;
-         this.onmessage(data, flags, this.number);
-      });
-      this.instance.on('close', (e) => {
-         switch (e) {
-            case 1005: // CLOSE_NORMAL
-            // console.log("WebSocketClient: Web socket closed [1005].");
-            break;
-            default: // Abnormal closure
-            this.reconnect(e);
-            break;
-         }
-         this.onclose(e);
-      });
-      this.instance.on('error', (e) => {
-         switch (e.code) {
-            case 'ECONNREFUSED':
-            this.reconnect(e);
-            break;
-            default:
-            this.onerror(e);
-            break;
-         }
-      });
+   const UIID_MAPPING = {
+      1: "SOCKET",      // S20
+      2: "SOCKET_2",
+      3: "SOCKET_3",
+      4: "SOCKET_4",
+      5: "SOCKET_POWER",
+      6: "SWITCH",     // T1 1C
+      7: "SWITCH_2",   // T1 2C
+      8: "SWITCH_3",
+      9: "SWITCH_4",
+      10: "OSPF",
+      11: "CURTAIN",
+      12: "EW-RE",
+      13: "FIREPLACE",
+      14: "SWITCH_CHANGE",
+      15: "THERMOSTAT",
+      16: "COLD_WARM_LED",
+      17: "THREE_GEAR_FAN",
+      18: "SENSORS_CENTER",
+      19: "HUMIDIFIER",
+      22: "RGB_BALL_LIGHT",
+      23: "NEST_THERMOSTAT",
+      24: "GSM_SOCKET",
+      25: "AROMATHERAPY",
+      26: "BJ_THERMOSTAT",
+      27: "GSM_UNLIMIT_SOCKET",
+      28: "RF_BRIDGE",
+      29: "GSM_SOCKET_2",
+      30: "GSM_SOCKET_3",
+      31: "GSM_SOCKET_4",
+      32: "POWER_DETECTION_SOCKET",
+      33: "LIGHT_BELT",
+      34: "FAN_LIGHT",
+      35: "EZVIZ_CAMERA",
+      36: "SINGLE_CHANNEL_DIMMER_SWITCH",
+      38: "HOME_KIT_BRIDGE",
+      40: "FUJIN_OPS",
+      41: "CUN_YOU_DOOR",
+      42: "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT",
+      43: "",
+      44: "",
+      45: "DOWN_CEILING_LIGHT",
+      46: "AIR_CLEANER",
+      49: "MACHINE_BED",
+      51: "COLD_WARM_DESK_LIGHT",
+      52: "DOUBLE_COLOR_DEMO_LIGHT",
+      53: "ELECTRIC_FAN_WITH_LAMP",
+      55: "SWEEPING_ROBOT",
+      56: "RGB_BALL_LIGHT_4",
+      57: "MONOCHROMATIC_BALL_LIGHT",
+      59: "MEARICAMERA",      // L1
+      77: "MICRO",
+      1001: "BLADELESS_FAN",
+      1002: "NEW_HUMIDIFIER",
+      1003: "WARM_AIR_BLOWER"
    };
-   WebSocketClient.prototype.send = function (data, option) {
-      try {
-         this.instance.send(data, option);
-      } catch (e) {
-         this.instance.emit('error', e);
+   
+   const CHANNEL_MAPPING = {
+      SOCKET: 1,
+      SWITCH_CHANGE: 1,
+      GSM_UNLIMIT_SOCKET: 1,
+      SWITCH: 1,
+      THERMOSTAT: 1,
+      SOCKET_POWER: 1,
+      GSM_SOCKET: 1,
+      POWER_DETECTION_SOCKET: 1,
+      MEARICAMERA: 1,
+      SINGLE_CHANNEL_DIMMER_SWITCH: 1,
+      RGB_BALL_LIGHT: 1,
+      SOCKET_2: 2,
+      GSM_SOCKET_2: 2,
+      SWITCH_2: 2,
+      SOCKET_3: 3,
+      GSM_SOCKET_3: 3,
+      SWITCH_3: 3,
+      SOCKET_4: 4,
+      GSM_SOCKET_4: 4,
+      SWITCH_4: 4,
+      CUN_YOU_DOOR: 4,
+      FAN_LIGHT: 4,
+      MICRO: 4
+   };
+   
+   let deviceType = UIID_MAPPING[uiid] || "";
+   if (deviceType == "") return 0;
+   else return CHANNEL_MAPPING[deviceType] || 0;
+};
+
+eWeLink.prototype.getArguments = function (apiKey) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
+   let args = {};
+   args.apiKey = apiKey;
+   args.version = 8;
+   args.ts = Math.floor(new Date().getTime() / 1000);
+   args.nonce = nonce();
+   args.appid = platform.appid;
+   return querystring.stringify(args);
+};
+
+eWeLink.prototype.getSignature = function (string) {
+   return crypto.createHmac('sha256', '6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM').update(string).digest('base64');
+};
+
+function WebSocketClient() {
+   this.number = 0; // Message number
+   this.autoReconnectInterval = 5 * 1000; // ms
+   this.pendingReconnect = false;
+}
+
+WebSocketClient.prototype.open = function (url) {
+   this.url = url;
+   this.instance = new WebSocket(this.url);
+   this.instance.on('open', () => {
+      this.onopen();
+   });
+   this.instance.on('message', (data, flags) => {
+      this.number++;
+      this.onmessage(data, flags, this.number);
+   });
+   this.instance.on('close', (e) => {
+      switch (e) {
+         case 1005: // CLOSE_NORMAL
+         // console.log("WebSocketClient: Web socket closed [1005].");
+         break;
+         default: // Abnormal closure
+         this.reconnect(e);
+         break;
       }
-   };
-   WebSocketClient.prototype.reconnect = function (e) {
-      if (this.pendingReconnect) return;
-      this.pendingReconnect = true;
-      this.instance.removeAllListeners();
-      setTimeout(function () {
-         this.pendingReconnect = false;
-         console.log("WebSocketClient: Reconnecting...");
-         this.open(this.url);
-      }, this.autoReconnectInterval);
-   };
-   WebSocketClient.prototype.onopen = function (e) {
-      // console.log("WebSocketClient: Web socket opened.", arguments);
-   };
-   WebSocketClient.prototype.onmessage = function (data, flags, number) {
-      // console.log("WebSocketClient: Message received.", arguments);
-   };
-   WebSocketClient.prototype.onerror = function (e) {
-      console.log("WebSocketClient: Error", arguments);
-   };
-   WebSocketClient.prototype.onclose = function (e) {
-      // console.log("WebSocketClient: Web socket closed.", arguments);
-   };
+      this.onclose(e);
+   });
+   this.instance.on('error', (e) => {
+      switch (e.code) {
+         case 'ECONNREFUSED':
+         this.reconnect(e);
+         break;
+         default:
+         this.onerror(e);
+         break;
+      }
+   });
+};
+WebSocketClient.prototype.send = function (data, option) {
+   try {
+      this.instance.send(data, option);
+   } catch (e) {
+      this.instance.emit('error', e);
+   }
+};
+WebSocketClient.prototype.reconnect = function (e) {
+   if (this.pendingReconnect) return;
+   this.pendingReconnect = true;
+   this.instance.removeAllListeners();
+   setTimeout(function () {
+      this.pendingReconnect = false;
+      console.log("WebSocketClient: Reconnecting...");
+      this.open(this.url);
+   }, this.autoReconnectInterval);
+};
+WebSocketClient.prototype.onopen = function (e) {
+   // console.log("WebSocketClient: Web socket opened.", arguments);
+};
+WebSocketClient.prototype.onmessage = function (data, flags, number) {
+   // console.log("WebSocketClient: Message received.", arguments);
+};
+WebSocketClient.prototype.onerror = function (e) {
+   console.log("WebSocketClient: Error", arguments);
+};
+WebSocketClient.prototype.onclose = function (e) {
+   // console.log("WebSocketClient: Web socket closed.", arguments);
+};
+
+
+
+eWeLink.prototype.getBlindPosition = function (accessory, callback) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
    
+   let lastPosition = accessory.context.lastPosition;
+   if (lastPosition === undefined) {
+      lastPosition = 0;
+   }
    
+   platform.log("[%s] 'getCurrentPosition' is [%s].", accessory.displayName, lastPosition);
+   callback(null, lastPosition);
+};
+
+eWeLink.prototype.getBlindMovementState = function (accessory, callback) {
    
-   eWeLink.prototype.getBlindPosition = function (accessory, callback) {
-      let platform = this;
-      if (!platform.log) {
+   let platform = this;
+   
+   if (!platform.log) {
+      return;
+   }
+   
+   if (!platform.webClient) {
+      callback("this.webClient not yet ready while obtaining blind position for your device.");
+      accessory.reachable = false;
+      return;
+   }
+   
+   platform.log("Requesting blind position for [%s]", accessory.displayName);
+   
+   platform.webClient.get('/api/user/device?' + platform.getArguments(platform.apiKey), function (err, res, body) {
+      
+      if (err) {
+         if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
+            platform.log('Sonoff API 503 error. Will try again.');
+            setTimeout(function () {
+               platform.getHumidityState(accessory, callback);
+            }, 1000);
+         } else {
+            platform.log("An error occurred while requesting blind position for [%s]. Error [%s].", accessory.displayName, err);
+         }
+         return;
+      } else if (!body) {
+         platform.log("An error occurred while requesting blind position for [%s]. Error [No data in response].", accessory.displayName);
+         return;
+      } else if (body.hasOwnProperty('error') && body.error != 0) {
+         platform.log("An error occurred while requesting blind position for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
+         if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
+            platform.relogin();
+         }
+         callback('An error occurred while requesting blind position for your device');
          return;
       }
       
-      let lastPosition = accessory.context.lastPosition;
-      if (lastPosition === undefined) {
-         lastPosition = 0;
-      }
+      body = body.devicelist;
       
-      platform.log("[%s] 'getCurrentPosition' is [%s].", accessory.displayName, lastPosition);
-      callback(null, lastPosition);
-   };
-   
-   eWeLink.prototype.getBlindMovementState = function (accessory, callback) {
-      
-      let platform = this;
-      
-      if (!platform.log) {
-         return;
-      }
-      
-      if (!platform.webClient) {
-         callback("this.webClient not yet ready while obtaining blind position for your device.");
+      let size = Object.keys(body)
+      .length;
+      if (body.length < 1) {
+         callback('An error occurred while requesting blind position for your device');
          accessory.reachable = false;
          return;
       }
-      
-      platform.log("Requesting blind position for [%s]", accessory.displayName);
-      
-      platform.webClient.get('/api/user/device?' + platform.getArguments(platform.apiKey), function (err, res, body) {
-         
-         if (err) {
-            if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
-               platform.log('Sonoff API 503 error. Will try again.');
-               setTimeout(function () {
-                  platform.getHumidityState(accessory, callback);
-               }, 1000);
-            } else {
-               platform.log("An error occurred while requesting blind position for [%s]. Error [%s].", accessory.displayName, err);
-            }
-            return;
-         } else if (!body) {
-            platform.log("An error occurred while requesting blind position for [%s]. Error [No data in response].", accessory.displayName);
-            return;
-         } else if (body.hasOwnProperty('error') && body.error != 0) {
-            platform.log("An error occurred while requesting blind position for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
-            if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
-               platform.relogin();
-            }
-            callback('An error occurred while requesting blind position for your device');
-            return;
-         }
-         
-         body = body.devicelist;
-         
-         let size = Object.keys(body)
-         .length;
-         if (body.length < 1) {
-            callback('An error occurred while requesting blind position for your device');
-            accessory.reachable = false;
-            return;
-         }
-         let deviceId = accessory.context.hbDeviceId;
-         if (accessory.context.switches > 1) {
-            deviceId = deviceId.replace("CH" + accessory.context.channel, "");
-         }
-         let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-         
-         if (filteredResponse.length === 1) {
-            let device = filteredResponse[0];
-            if (device.deviceid === deviceId) {
-               if (device.online !== true) {
-                  accessory.reachable = false;
-                  platform.log("Device [%s] was reported to be offline by the API", accessory.displayName);
-                  callback('API reported that [%s] is not online', device.name);
-                  return;
-               }
-               let switchCount = platform.getChannelsByUIID(device);
-               for (let i = 0; i !== switchCount; i++) {
-                  if (device.params.switches[i].switch === 'on') {
-                     accessory.reachable = true;
-                     platform.log("API reported that [%s CH-%s] is [on].", device.name, i);
-                  }
-               }
-               let currentBlindState = platform.prepareCurrentBlindState(device.params.switches, accessory);
-               platform.log("[%s] 'CurrentPositionState' is [%s].", accessory.displayName, currentBlindState);
-               // Handling error;
-               if (currentBlindState > 2) {
-                  platform.log("Error with requesting [%s] position. Stopping.", accessory.displayName);
-                  currentBlindState = 2;
-                  accessory.context.currentPositionState = 2;
-                  platform.prepareBlindFinalState(accessory);
-               }
-               callback(null, currentBlindState);
-            }
-         } else if (filteredResponse.length > 1) {
-            // More than one device matches our Device ID. This should not happen.
-            platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
-            platform.log(filteredResponse);
-            callback("The response contained more than one device with ID " + device.deviceid);
-         } else if (filteredResponse.length < 1) {
-            // The device is no longer registered
-            platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
-            platform.removeAccessory(accessory);
-         } else {
-            callback('An error occurred while requesting blind position for your device');
-         }
-      });
-   };
-   
-   eWeLink.prototype.getBlindTargetPosition = function (accessory, callback) {
-      let platform = this;
-      if (!platform.log) {
-         return;
+      let deviceId = accessory.context.hbDeviceId;
+      if (accessory.context.switches > 1) {
+         deviceId = deviceId.replace("CH" + accessory.context.channel, "");
       }
-      let currentTargetPosition = accessory.context.currentTargetPosition;
-      platform.log("[%s] 'getTargetPosition' is [%s].", accessory.displayName, currentTargetPosition);
-      callback(null, currentTargetPosition);
-   };
-   
-   eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
+      let filteredResponse = body.filter(device => (device.deviceid === deviceId));
       
-      let platform = this;
-      
-      if (!platform.log) {
-         return;
-      }
-      platform.log("Setting [%s] new target position from [%s] to [%s].", accessory.displayName, accessory.context.currentTargetPosition, pos, );
-      
-      let timestamp = Date.now();
-      
-      if (accessory.context.currentPositionState != 2) {
-         
-         var diffPosition = Math.abs(pos - accessory.context.currentTargetPosition);
-         var actualPosition;
-         var diffTime;
-         var diff;
-         
-         if (diffPosition == 0) {
-            actualPosition = pos;
-            diffTime = 0;
-            diff = 0;
-         } else {
-            if (accessory.context.currentPositionState == 1) {
-               diffPosition = accessory.context.currentTargetPosition - pos;
-               diffTime = Math.round(accessory.context.percentDurationDown * diffPosition);
-            } else {
-               diffPosition = pos - accessory.context.currentTargetPosition;
-               diffTime = Math.round(accessory.context.percentDurationUp * diffPosition);
+      if (filteredResponse.length === 1) {
+         let device = filteredResponse[0];
+         if (device.deviceid === deviceId) {
+            if (device.online !== true) {
+               accessory.reachable = false;
+               platform.log("Device [%s] was reported to be offline by the API", accessory.displayName);
+               callback('API reported that [%s] is not online', device.name);
+               return;
             }
-            diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
-            actualPosition = platform.prepareBlindPosition(accessory);
-            
-            // platform.log("diffPosition:", diffPosition);
-            // platform.log("diffTime:", diffTime);
-            // platform.log("actualPosition:", actualPosition);
-            // platform.log("diff:", diff);
-            
-            if (diff > 0) {
-               accessory.context.targetTimestamp += diffTime;
-               // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-               accessory.context.currentTargetPosition = pos;
-               platform.log("[%s] Blinds are moving. Current position: %s, new targuet: %s, adjusting target milliseconds: %s", accessory.displayName, actualPosition, pos, diffTime);
-               callback();
-               return false;
-            }
-            if (diff < 0) {
-               platform.log("[%s] ==> Revert Blinds moving. Current pos: %s, new targuet: %s, new duration: %s", accessory.displayName, actualPosition, pos, Math.abs(diff));
-               accessory.context.startTimestamp = timestamp;
-               accessory.context.targetTimestamp = timestamp + Math.abs(diff);
-               // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-               accessory.context.lastPosition = actualPosition;
-               accessory.context.currentTargetPosition = pos;
-               accessory.context.currentPositionState = accessory.context.currentPositionState == 0 ? 1 : 0;
-               
-               let payload = platform.prepareBlindPayload(accessory);
-               let string = JSON.stringify(payload);
-               if (platform.debugReqRes) platform.log.warn(payload);
-               
-               if (platform.webSocketOpen) {
-                  platform.sendWebSocketMessage(string, function () {
-                     return;
-                  });
-                  platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.currentPositionState == 1 ? "moving up" : "moving down");
-                  let service = accessory.getService(Service.WindowCovering);
-                  service.getCharacteristic(Characteristic.CurrentPosition)
-                  .updateValue(accessory.context.lastPosition);
-                  service.getCharacteristic(Characteristic.TargetPosition)
-                  .updateValue(accessory.context.currentTargetPosition);
-                  service.getCharacteristic(Characteristic.PositionState)
-                  .updateValue(accessory.context.currentPositionState);
-               } else {
-                  platform.log('Socket was closed. It will reconnect automatically; please retry your command');
-                  callback('Socket was closed. It will reconnect automatically; please retry your command');
-                  return false;
+            let switchCount = platform.getChannelsByUIID(device);
+            for (let i = 0; i !== switchCount; i++) {
+               if (device.params.switches[i].switch === 'on') {
+                  accessory.reachable = true;
+                  platform.log("API reported that [%s CH-%s] is [on].", device.name, i);
                }
             }
+            let currentBlindState = platform.prepareCurrentBlindState(device.params.switches, accessory);
+            platform.log("[%s] 'CurrentPositionState' is [%s].", accessory.displayName, currentBlindState);
+            // Handling error;
+            if (currentBlindState > 2) {
+               platform.log("Error with requesting [%s] position. Stopping.", accessory.displayName);
+               currentBlindState = 2;
+               accessory.context.currentPositionState = 2;
+               platform.prepareBlindFinalState(accessory);
+            }
+            callback(null, currentBlindState);
+         }
+      } else if (filteredResponse.length > 1) {
+         // More than one device matches our Device ID. This should not happen.
+         platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
+         platform.log(filteredResponse);
+         callback("The response contained more than one device with ID " + device.deviceid);
+      } else if (filteredResponse.length < 1) {
+         // The device is no longer registered
+         platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
+         platform.removeAccessory(accessory);
+      } else {
+         callback('An error occurred while requesting blind position for your device');
+      }
+   });
+};
+
+eWeLink.prototype.getBlindTargetPosition = function (accessory, callback) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
+   let currentTargetPosition = accessory.context.currentTargetPosition;
+   platform.log("[%s] 'getTargetPosition' is [%s].", accessory.displayName, currentTargetPosition);
+   callback(null, currentTargetPosition);
+};
+
+eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
+   
+   let platform = this;
+   
+   if (!platform.log) {
+      return;
+   }
+   platform.log("Setting [%s] new target position from [%s] to [%s].", accessory.displayName, accessory.context.currentTargetPosition, pos, );
+   
+   let timestamp = Date.now();
+   
+   if (accessory.context.currentPositionState != 2) {
+      
+      var diffPosition = Math.abs(pos - accessory.context.currentTargetPosition);
+      var actualPosition;
+      var diffTime;
+      var diff;
+      
+      if (diffPosition == 0) {
+         actualPosition = pos;
+         diffTime = 0;
+         diff = 0;
+      } else {
+         if (accessory.context.currentPositionState == 1) {
+            diffPosition = accessory.context.currentTargetPosition - pos;
+            diffTime = Math.round(accessory.context.percentDurationDown * diffPosition);
+         } else {
+            diffPosition = pos - accessory.context.currentTargetPosition;
+            diffTime = Math.round(accessory.context.percentDurationUp * diffPosition);
+         }
+         diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
+         actualPosition = platform.prepareBlindPosition(accessory);
+         
+         // platform.log("diffPosition:", diffPosition);
+         // platform.log("diffTime:", diffTime);
+         // platform.log("actualPosition:", actualPosition);
+         // platform.log("diff:", diff);
+         
+         if (diff > 0) {
+            accessory.context.targetTimestamp += diffTime;
+            // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+            accessory.context.currentTargetPosition = pos;
+            platform.log("[%s] Blinds are moving. Current position: %s, new targuet: %s, adjusting target milliseconds: %s", accessory.displayName, actualPosition, pos, diffTime);
             callback();
             return false;
          }
+         if (diff < 0) {
+            platform.log("[%s] ==> Revert Blinds moving. Current pos: %s, new targuet: %s, new duration: %s", accessory.displayName, actualPosition, pos, Math.abs(diff));
+            accessory.context.startTimestamp = timestamp;
+            accessory.context.targetTimestamp = timestamp + Math.abs(diff);
+            // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+            accessory.context.lastPosition = actualPosition;
+            accessory.context.currentTargetPosition = pos;
+            accessory.context.currentPositionState = accessory.context.currentPositionState == 0 ? 1 : 0;
+            
+            let payload = platform.prepareBlindPayload(accessory);
+            let string = JSON.stringify(payload);
+            if (platform.debugReqRes) platform.log.warn(payload);
+            
+            if (platform.webSocketOpen) {
+               platform.sendWebSocketMessage(string, function () {
+                  return;
+               });
+               platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.currentPositionState == 1 ? "moving up" : "moving down");
+               let service = accessory.getService(Service.WindowCovering);
+               service.getCharacteristic(Characteristic.CurrentPosition)
+               .updateValue(accessory.context.lastPosition);
+               service.getCharacteristic(Characteristic.TargetPosition)
+               .updateValue(accessory.context.currentTargetPosition);
+               service.getCharacteristic(Characteristic.PositionState)
+               .updateValue(accessory.context.currentPositionState);
+            } else {
+               platform.log('Socket was closed. It will reconnect automatically; please retry your command');
+               callback('Socket was closed. It will reconnect automatically; please retry your command');
+               return false;
+            }
+         }
          callback();
          return false;
       }
+      callback();
+      return false;
+   }
+   
+   if (accessory.context.lastPosition == pos) {
+      platform.log("[%s] Current position already matches target position. There is nothing to do.", accessory.displayName);
+      callback();
+      return true;
+   }
+   
+   accessory.context.currentTargetPosition = pos;
+   moveUp = (pos > accessory.context.lastPosition);
+   
+   var withoutmarginetimeUP;
+   var withoutmarginetimeDOWN;
+   var duration;
+   withoutmarginetimeUP = accessory.context.durationUp - accessory.context.durationBMU;
+   withoutmarginetimeDOWN = accessory.context.durationDown - accessory.context.durationBMD;
+   
+   if (moveUp) {
+      if (accessory.context.lastPosition == 0) {
+         duration = ((pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP) + accessory.context.durationBMU;
+      } else {
+         duration = (pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP;
+      }
+   } else {
+      if (pos == 0) {
+         duration = ((accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN) + accessory.context.durationBMD;
+      } else {
+         duration = (accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN;
+      }
+   }
+   if (pos == 0 || pos == 100) duration += accessory.context.fullOverdrive;
+   if (pos == 0 || pos == 100) platform.log("[%s] add overdive: %s", accessory.displayName, accessory.context.fullOverdrive);
+   
+   duration = Math.round(duration * 100) / 100;
+   
+   platform.log("[%s] %s, Duration: %s", accessory.displayName, moveUp ? "Moving up" : "Moving down", duration);
+   
+   accessory.context.startTimestamp = timestamp;
+   accessory.context.targetTimestamp = timestamp + (duration * 1000);
+   // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+   accessory.context.currentPositionState = (moveUp ? 0 : 1);
+   accessory.getService(Service.WindowCovering)
+   .setCharacteristic(Characteristic.PositionState, (moveUp ? 0 : 1));
+   
+   let payload = platform.prepareBlindPayload(accessory);
+   let string = JSON.stringify(payload);
+   if (platform.debugReqRes) platform.log.warn(payload);
+   
+   if (platform.webSocketOpen) {
       
-      if (accessory.context.lastPosition == pos) {
-         platform.log("[%s] Current position already matches target position. There is nothing to do.", accessory.displayName);
+      setTimeout(function () {
+         platform.sendWebSocketMessage(string, function () {
+            return;
+         });
+         platform.log("[%s] Request sent for %s", accessory.displayName, moveUp ? "moving up" : "moving down");
+         
+         var interval = setInterval(function () {
+            if (Date.now() >= accessory.context.targetTimestamp) {
+               platform.prepareBlindFinalState(accessory);
+               clearInterval(interval);
+               return true;
+            }
+         }, 100);
          callback();
+      }, 1);
+   } else {
+      platform.log('Socket was closed. It will reconnect automatically; please retry your command');
+      callback('Socket was closed. It will reconnect automatically; please retry your command');
+      return false;
+   }
+};
+
+eWeLink.prototype.prepareCurrentBlindState = function (switches, accessory) {
+   
+   let platform = this;
+   
+   if (!platform.log) {
+      return;
+   }
+   
+   // platform.log("Switches: %s", switches);
+   var switch0 = 0;
+   if (switches[accessory.context.switchUp].switch === 'on') {
+      switch0 = 1;
+   }
+   
+   var switch1 = 0;
+   if (switches[accessory.context.switchDown].switch === 'on') {
+      switch1 = 1;
+   }
+   
+   let sum = (switch0 * 2) + switch1;
+   
+   // this.log("Sum: ", sum);
+   // [0,0] = 0 => 2 Stopped
+   // [0,1] = 1 => 1 Moving down
+   // [1,0] = 2 => 0 Moving up
+   // [1,1] = 3 => Error
+   
+   const MAPPING = {
+      0: 2,
+      1: 1,
+      2: 0,
+      3: 3
+   };
+   // this.log("Sum: %s => Blind State: %s", sum, MAPPING[sum]);
+   return MAPPING[sum];
+};
+
+eWeLink.prototype.prepareBlindFinalState = function (accessory) {
+   
+   let platform = this;
+   
+   if (!platform.log) {
+      return;
+   }
+   accessory.context.currentPositionState = 2;
+   let payload = platform.prepareBlindPayload(accessory);
+   let string = JSON.stringify(payload);
+   if (platform.debugReqRes) platform.log.warn(payload);
+   
+   if (platform.webSocketOpen) {
+      
+      setTimeout(function () {
+         platform.sendWebSocketMessage(string, function () {
+            return;
+         });
+         platform.log("[%s] Request sent to stop moving", accessory.displayName);
+         accessory.context.currentPositionState = 2;
+         
+         let currentTargetPosition = accessory.context.currentTargetPosition;
+         accessory.context.lastPosition = currentTargetPosition;
+         let service = accessory.getService(Service.WindowCovering);
+         // Using updateValue to avoid loop
+         service.getCharacteristic(Characteristic.CurrentPosition)
+         .updateValue(currentTargetPosition);
+         service.getCharacteristic(Characteristic.TargetPosition)
+         .updateValue(currentTargetPosition);
+         service.setCharacteristic(Characteristic.PositionState, Characteristic.PositionState.STOPPED);
+         
+         platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, currentTargetPosition);
          return true;
-      }
+         // TODO Here we need to wait for the response to the socket
+      }, 1);
       
-      accessory.context.currentTargetPosition = pos;
-      moveUp = (pos > accessory.context.lastPosition);
-      
-      var withoutmarginetimeUP;
-      var withoutmarginetimeDOWN;
-      var duration;
-      withoutmarginetimeUP = accessory.context.durationUp - accessory.context.durationBMU;
-      withoutmarginetimeDOWN = accessory.context.durationDown - accessory.context.durationBMD;
-      
-      if (moveUp) {
-         if (accessory.context.lastPosition == 0) {
-            duration = ((pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP) + accessory.context.durationBMU;
-         } else {
-            duration = (pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP;
-         }
-      } else {
-         if (pos == 0) {
-            duration = ((accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN) + accessory.context.durationBMD;
-         } else {
-            duration = (accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN;
-         }
-      }
-      if (pos == 0 || pos == 100) duration += accessory.context.fullOverdrive;
-      if (pos == 0 || pos == 100) platform.log("[%s] add overdive: %s", accessory.displayName, accessory.context.fullOverdrive);
-      
-      duration = Math.round(duration * 100) / 100;
-      
-      platform.log("[%s] %s, Duration: %s", accessory.displayName, moveUp ? "Moving up" : "Moving down", duration);
-      
-      accessory.context.startTimestamp = timestamp;
-      accessory.context.targetTimestamp = timestamp + (duration * 1000);
-      // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-      accessory.context.currentPositionState = (moveUp ? 0 : 1);
-      accessory.getService(Service.WindowCovering)
-      .setCharacteristic(Characteristic.PositionState, (moveUp ? 0 : 1));
-      
-      let payload = platform.prepareBlindPayload(accessory);
-      let string = JSON.stringify(payload);
-      if (platform.debugReqRes) platform.log.warn(payload);
-      
-      if (platform.webSocketOpen) {
-         
-         setTimeout(function () {
-            platform.sendWebSocketMessage(string, function () {
-               return;
-            });
-            platform.log("[%s] Request sent for %s", accessory.displayName, moveUp ? "moving up" : "moving down");
-            
-            var interval = setInterval(function () {
-               if (Date.now() >= accessory.context.targetTimestamp) {
-                  platform.prepareBlindFinalState(accessory);
-                  clearInterval(interval);
-                  return true;
-               }
-            }, 100);
-            callback();
-         }, 1);
-      } else {
-         platform.log('Socket was closed. It will reconnect automatically; please retry your command');
-         callback('Socket was closed. It will reconnect automatically; please retry your command');
-         return false;
-      }
-   };
+   } else {
+      platform.log('Socket was closed. It will reconnect automatically; please retry your command');
+      return false;
+   }
+};
+
+eWeLink.prototype.prepareBlindPayload = function (accessory) {
    
-   eWeLink.prototype.prepareCurrentBlindState = function (switches, accessory) {
-      
-      let platform = this;
-      
-      if (!platform.log) {
-         return;
-      }
-      
-      // platform.log("Switches: %s", switches);
-      var switch0 = 0;
-      if (switches[accessory.context.switchUp].switch === 'on') {
-         switch0 = 1;
-      }
-      
-      var switch1 = 0;
-      if (switches[accessory.context.switchDown].switch === 'on') {
-         switch1 = 1;
-      }
-      
-      let sum = (switch0 * 2) + switch1;
-      
-      // this.log("Sum: ", sum);
-      // [0,0] = 0 => 2 Stopped
-      // [0,1] = 1 => 1 Moving down
-      // [1,0] = 2 => 0 Moving up
-      // [1,1] = 3 => Error
-      
-      const MAPPING = {
-         0: 2,
-         1: 1,
-         2: 0,
-         3: 3
-      };
-      // this.log("Sum: %s => Blind State: %s", sum, MAPPING[sum]);
-      return MAPPING[sum];
-   };
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
+   let payload = {};
+   payload.action = 'update';
+   payload.userAgent = 'app';
+   payload.params = {};
+   let deviceFromApi = platform.devicesInEwe.get(accessory.context.hbDeviceId);
    
-   eWeLink.prototype.prepareBlindFinalState = function (accessory) {
-      
-      let platform = this;
-      
-      if (!platform.log) {
-         return;
-      }
-      accessory.context.currentPositionState = 2;
-      let payload = platform.prepareBlindPayload(accessory);
-      let string = JSON.stringify(payload);
-      if (platform.debugReqRes) platform.log.warn(payload);
-      
-      if (platform.webSocketOpen) {
-         
-         setTimeout(function () {
-            platform.sendWebSocketMessage(string, function () {
-               return;
-            });
-            platform.log("[%s] Request sent to stop moving", accessory.displayName);
-            accessory.context.currentPositionState = 2;
-            
-            let currentTargetPosition = accessory.context.currentTargetPosition;
-            accessory.context.lastPosition = currentTargetPosition;
-            let service = accessory.getService(Service.WindowCovering);
-            // Using updateValue to avoid loop
-            service.getCharacteristic(Characteristic.CurrentPosition)
-            .updateValue(currentTargetPosition);
-            service.getCharacteristic(Characteristic.TargetPosition)
-            .updateValue(currentTargetPosition);
-            service.setCharacteristic(Characteristic.PositionState, Characteristic.PositionState.STOPPED);
-            
-            platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, currentTargetPosition);
-            return true;
-            // TODO Here we need to wait for the response to the socket
-         }, 1);
-         
-      } else {
-         platform.log('Socket was closed. It will reconnect automatically; please retry your command');
-         return false;
-      }
-   };
+   payload.params.switches = deviceFromApi.params.switches;
    
-   eWeLink.prototype.prepareBlindPayload = function (accessory) {
-      
-      let platform = this;
-      if (!platform.log) {
-         return;
-      }
-      let payload = {};
-      payload.action = 'update';
-      payload.userAgent = 'app';
-      payload.params = {};
-      let deviceFromApi = platform.devicesInEwe.get(accessory.context.hbDeviceId);
-      
-      payload.params.switches = deviceFromApi.params.switches;
-      
-      // [0,0] = 0 => 2 Stopped
-      // [0,1] = 1 => 1 Moving down
-      // [1,0] = 2 => 0 Moving up
-      // [1,1] = 3 => should not happen...
-      
-      var switch0 = 'off';
-      var switch1 = 'off';
-      
-      let state = accessory.context.currentPositionState;
-      
-      switch (state) {
-         case 2:
-         switch0 = 'off';
-         switch1 = 'off';
-         break;
-         case 1:
-         switch0 = 'off';
-         switch1 = 'on';
-         break;
-         case 0:
-         switch0 = 'on';
-         switch1 = 'off';
-         break;
-         default:
-         platform.log('[%s] PositionState type error !', accessory.displayName);
-         break;
-      }
-      
-      payload.params.switches[accessory.context.switchUp].switch = switch0;
-      payload.params.switches[accessory.context.switchDown].switch = switch1;
-      payload.apikey = accessory.context.eweApiKey;
-      payload.deviceid = accessory.context.hbDeviceId;
-      payload.sequence = platform.getSequence();
-      // platform.log("Payload genretad:", JSON.stringify(payload))
-      return payload;
-   };
+   // [0,0] = 0 => 2 Stopped
+   // [0,1] = 1 => 1 Moving down
+   // [1,0] = 2 => 0 Moving up
+   // [1,1] = 3 => should not happen...
    
-   eWeLink.prototype.prepareBlindPosition = function (accessory) {
-      let timestamp = Date.now();
-      if (accessory.context.currentPositionState == 1) {
-         return Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
-      } else if (accessory.context.currentPositionState == 0) {
-         return Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
-      } else {
-         return accessory.context.lastPosition;
-      }
-   };
+   var switch0 = 'off';
+   var switch1 = 'off';
    
+   let state = accessory.context.currentPositionState;
    
+   switch (state) {
+      case 2:
+      switch0 = 'off';
+      switch1 = 'off';
+      break;
+      case 1:
+      switch0 = 'off';
+      switch1 = 'on';
+      break;
+      case 0:
+      switch0 = 'on';
+      switch1 = 'off';
+      break;
+      default:
+      platform.log('[%s] PositionState type error !', accessory.displayName);
+      break;
+   }
+   
+   payload.params.switches[accessory.context.switchUp].switch = switch0;
+   payload.params.switches[accessory.context.switchDown].switch = switch1;
+   payload.apikey = accessory.context.eweApiKey;
+   payload.deviceid = accessory.context.hbDeviceId;
+   payload.sequence = platform.getSequence();
+   // platform.log("Payload genretad:", JSON.stringify(payload))
+   return payload;
+};
+
+eWeLink.prototype.prepareBlindPosition = function (accessory) {
+   let timestamp = Date.now();
+   if (accessory.context.currentPositionState == 1) {
+      return Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
+   } else if (accessory.context.currentPositionState == 0) {
+      return Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
+   } else {
+      return accessory.context.lastPosition;
+   }
+};
+
+
