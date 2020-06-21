@@ -221,8 +221,12 @@ function eWeLink(log, config, api) {
                         //***********************//
                         // OTHER SINGLE SWITCHES //
                         //***********************//       
-                        else if (platform.devicesSingleSwitch.includes(accessory.context.eweUIID)) {  
-                           accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switch === 'on');
+                        else if (platform.devicesSingleSwitch.includes(accessory.context.eweUIID)) {
+                           if (device.params.switch !== undefined) {
+                              accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switch === 'on');
+                           } else {
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");                              
+                           }
                         }
                         
                         //**********************//
@@ -552,7 +556,11 @@ function eWeLink(log, config, api) {
                         // OTHER SINGLE SWITCHES //
                         //***********************//       
                         else if (platform.devicesSingleSwitch.includes(accessory.context.eweUIID)) {  
-                           accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switch === 'on');
+                           if (device.params.switch !== undefined) {
+                              accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switch === 'on');
+                           } else {
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");                              
+                           }
                         }
                         
                         //**********************//
