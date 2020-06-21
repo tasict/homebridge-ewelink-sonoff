@@ -12,7 +12,15 @@ If you're looking for a stable version then I would recommend the project I fork
 More information about this package and how it's evolved from [homebridge-ewelink-max](https://github.com/howanghk/homebridge-ewelink) can be found at the end of this file.
 
 Thanks :)
+## Supported Devices
+#### Switches/Outlets
+The plugin **should** work with Sonoff switches (single and multi channel) and outlets.
+#### Lights
+The plugin **should** work with Sonoff light wall switches. Sonoff bulbs and LED strips are a work in progress.
+#### Blinds/Fans/Thermostats
+Most likely aren't working, mainly because I don't own the devices so it's difficult to test.
 ## Installation
+> Please note if you are currently using a different Sonoff plugin, then you will need to reset your Homebridge accessory cache and take note of the changed configuration options.
 ### Through Homebridge Config UI X
 Simply go to the "Plugins" page, search `homebridge-ewelink-beta` and click "Install". You will be guided through the configuration.
 ### Manually
