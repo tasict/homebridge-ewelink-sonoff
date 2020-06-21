@@ -110,16 +110,23 @@ function eWeLink(log, config, api) {
                      if (platform.devicesInHB.has(idToCheck + "SW0") || platform.devicesInHB.has(idToCheck + "SWX")) {
                         if (platform.devicesInHB.has(idToCheck + "SWX")) accessory = platform.devicesInHB.get(idToCheck + "SWX");
                         else accessory = platform.devicesInHB.get(idToCheck + "SW0");
+                        if (!device.online) {
+                           platform.log.warn("[%s] has been reported offline so cannot refresh.", accessory.displayName);
+                           return;
+                        }
                         if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
                         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
                         
                         //********//
                         // BLINDS //
                         //********//       
-                        if (platform.deviceGroups.has(idToCheck + "SWX")) { // BLINDS //
+                        if (platform.deviceGroups.has(idToCheck + "SWX")) {
                            group = platform.deviceGroups.get(idToCheck + "SWX");
-                           if (group.type === "blind") {
+                           if (group.type === "blind" && Array.isArray(device.params)) {
                               platform.externalBlindUpdate(idToCheck + "SWX", device.params);
+                           } else {
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");
+                              return;
                            }
                         }
                         
@@ -127,21 +134,27 @@ function eWeLink(log, config, api) {
                         // FANS //
                         //******//                                          
                         else if (platform.devicesFan.includes(accessory.context.eweUIID)) {
-                           accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[0].switch === 'on');
-                           let status = false;
-                           let speed = 0;
-                           if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'off' && device.params.switches[3].switch == 'off') {
-                              status = true;
-                              speed = 33;
-                           } else if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'on' && device.params.switches[3].switch == 'off') {
-                              status = true;
-                              speed = 66;
-                           } else if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'off' && device.params.switches[3].switch == 'on') {
-                              status = true;
-                              speed = 100;
+                           if (Array.isArray(device.params))
+                           {
+                              accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[0].switch === 'on');
+                              let status = false;
+                              let speed = 0;
+                              if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'off' && device.params.switches[3].switch == 'off') {
+                                 status = true;
+                                 speed = 33;
+                              } else if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'on' && device.params.switches[3].switch == 'off') {
+                                 status = true;
+                                 speed = 66;
+                              } else if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'off' && device.params.switches[3].switch == 'on') {
+                                 status = true;
+                                 speed = 100;
+                              }
+                              accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, status);
+                              accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, speed);
+                           } else {
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");
+                              return;
                            }
-                           accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, status);
-                           accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, speed);
                         }
                         
                         //*************//
@@ -156,22 +169,27 @@ function eWeLink(log, config, api) {
                         // LIGHTS [SINGLE SWITCH] //
                         //************************//       
                         else if (platform.devicesLightbulb.includes(accessory.context.eweUIID) || platform.devicesSingleSwitchLight.includes(accessory.context.eweModel)) {
-                           accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switch === 'on');
-                           if (platform.devicesDimmable.includes(accessory.context.eweUIID)) {
-                              accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, device.params.bright);
-                           }
-                           if (platform.devicesColourable.includes(accessory.context.eweUIID)) {
-                              if (device.params.hasOwnProperty("colorR"))
-                              {
-                                 let newColour = convert.rgb.hsl(device.params.colorR, device.params.colorG, device.params.colorB);
-                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
-                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation,  newColour[1]);
-                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness,  newColour[2]);
-                              }
-                              else if (device.params.hasOwnProperty("bright"))
-                              {
+                           if (device.params.switch !== undefined) {
+                              accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switch === 'on');
+                              if (platform.devicesDimmable.includes(accessory.context.eweUIID)) {
                                  accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, device.params.bright);
                               }
+                              if (platform.devicesColourable.includes(accessory.context.eweUIID)) {
+                                 if (device.params.hasOwnProperty("colorR"))
+                                 {
+                                    let newColour = convert.rgb.hsl(device.params.colorR, device.params.colorG, device.params.colorB);
+                                    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
+                                    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation,  newColour[1]);
+                                    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness,  newColour[2]);
+                                 }
+                                 else if (device.params.hasOwnProperty("bright"))
+                                 {
+                                    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, device.params.bright);
+                                 }
+                              }
+                           } else {
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");
+                              return;
                            }
                         }
                         
@@ -341,10 +359,13 @@ function eWeLink(log, config, api) {
                         //********//
                         if (platform.deviceGroups.has(idToCheck)) {
                            group = platform.deviceGroups.get(idToCheck);
-                           if (group.type == 'blind') {
+                           if (group.type == 'blind' && Array.isArray(device.params)) {
                               services.blind = true;
                               services.group = group;
                               platform.addAccessory(device, idToCheck + "SWX", services);
+                           } else {
+                              platform.log.error("[%s] Problem adding this device.", idToCheck + "SWX");
+                              return;
                            }
                         }
                         
@@ -352,8 +373,13 @@ function eWeLink(log, config, api) {
                         // FANS //
                         //******//                                  
                         else if (platform.devicesFan.includes(device.uiid)) {
-                           services.fan = true;
-                           platform.addAccessory(device, idToCheck + "SWX", services);
+                           if (Array.isArray(device.params)) {
+                              services.fan = true;
+                              platform.addAccessory(device, idToCheck + "SWX", services);
+                           } else {
+                              platform.log.error("[%s] Problem adding this device.", idToCheck + "SWX");
+                              return;
+                           }
                         }
                         
                         //*************//
@@ -367,11 +393,16 @@ function eWeLink(log, config, api) {
                         //************************//
                         // LIGHTS [SINGLE SWITCH] //
                         //************************//
-                        else if (platform.devicesLightbulb.includes(device.uiid) || platform.devicesSingleSwitchLight.includes(device.productModel)) {   
-                           services.lightbulb = true;
-                           if (platform.devicesDimmable.includes(device.uiid)) services.dimmable = true;
-                           if (platform.devicesColourable.includes(device.uiid)) services.colourable = true;
-                           platform.addAccessory(device, idToCheck + "SWX", services);
+                        else if (platform.devicesLightbulb.includes(device.uiid) || platform.devicesSingleSwitchLight.includes(device.productModel)) {
+                           if (device.params.switch !== undefined) {
+                              services.lightbulb = true;
+                              if (platform.devicesDimmable.includes(device.uiid)) services.dimmable = true;
+                              if (platform.devicesColourable.includes(device.uiid)) services.colourable = true;
+                              platform.addAccessory(device, idToCheck + "SWX", services);
+                           } else {
+                              platform.log.error("[%s] Problem adding this device.", idToCheck + "SWX");
+                              return;
+                           }
                         }
                         
                         //***********************//
@@ -411,20 +442,27 @@ function eWeLink(log, config, api) {
                      // REFRESH EXISTING AND JUST ADDED DEVICES //
                      //*****************************************//
                      if (platform.devicesInHB.has(idToCheck + "SWX") || platform.devicesInHB.has(idToCheck + "SW0")) {
-                        
                         if (platform.devicesInHB.has(idToCheck + "SWX")) accessory = platform.devicesInHB.get(idToCheck + "SWX");
                         else accessory = platform.devicesInHB.get(idToCheck + "SW0");
+                        if (!device.online) {
+                           platform.log.warn("[%s] has been reported offline so cannot refresh.", accessory.displayName);
+                           return;
+                        }
                         if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
+                        
                         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                        accessory.reachable = device.online;
+                        accessory.reachable = true;
                         
                         //********//
                         // BLINDS //
                         //********//       
-                        if (platform.deviceGroups.has(idToCheck + "SWX")) { // BLINDS //
+                        if (platform.deviceGroups.has(idToCheck + "SWX")) {
                            group = platform.deviceGroups.get(idToCheck + "SWX");
-                           if (group.type === "blind") {
+                           if (group.type === "blind" && Array.isArray(device.params)) {
                               platform.externalBlindUpdate(idToCheck + "SWX", device.params);
+                           } else {
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");
+                              return;
                            }
                         }
                         
@@ -432,21 +470,26 @@ function eWeLink(log, config, api) {
                         // FANS //
                         //******//                                          
                         else if (platform.devicesFan.includes(accessory.context.eweUIID)) {
-                           accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[0].switch === 'on');
-                           let status = false;
-                           let speed = 0;
-                           if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'off' && device.params.switches[3].switch == 'off') {
-                              status = true;
-                              speed = 33;
-                           } else if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'on' && device.params.switches[3].switch == 'off') {
-                              status = true;
-                              speed = 66;
-                           } else if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'off' && device.params.switches[3].switch == 'on') {
-                              status = true;
-                              speed = 100;
+                           if (Array.isArray(devices.params)) {
+                              accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[0].switch === 'on');
+                              let status = false;
+                              let speed = 0;
+                              if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'off' && device.params.switches[3].switch == 'off') {
+                                 status = true;
+                                 speed = 33;
+                              } else if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'on' && device.params.switches[3].switch == 'off') {
+                                 status = true;
+                                 speed = 66;
+                              } else if (device.params.switches[1].switch == 'on' && device.params.switches[2].switch == 'off' && device.params.switches[3].switch == 'on') {
+                                 status = true;
+                                 speed = 100;
+                              }
+                              accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, status);
+                              accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, speed);
+                           } else {
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");
+                              return;
                            }
-                           accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, status);
-                           accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, speed);
                         }
                         
                         //*************//
@@ -461,15 +504,20 @@ function eWeLink(log, config, api) {
                         // LIGHTS [SINGLE SWITCH] //
                         //************************//       
                         else if (platform.devicesLightbulb.includes(accessory.context.eweUIID) || platform.devicesSingleSwitchLight.includes(accessory.context.eweModel)) {
-                           accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switch === 'on');
-                           if (platform.devicesDimmable.includes(accessory.context.eweUIID)) {
-                              accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, device.params.bright);
-                           }
-                           if (platform.devicesColourable.includes(accessory.context.eweUIID)) {
-                              let newColour = convert.rgb.hsl(device.params.colorR, device.params.colorG, device.params.colorB);
-                              accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
-                              accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation,  newColour[1]);
-                              accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness,  newColour[2]);
+                           if (device.params.switch !== undefined) {
+                              accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switch === 'on');
+                              if (platform.devicesDimmable.includes(accessory.context.eweUIID)) {
+                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, device.params.bright);
+                              }
+                              if (platform.devicesColourable.includes(accessory.context.eweUIID)) {
+                                 let newColour = convert.rgb.hsl(device.params.colorR, device.params.colorG, device.params.colorB);
+                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
+                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation,  newColour[1]);
+                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness,  newColour[2]);
+                              }
+                           } else {
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");
+                              return;
                            }
                         }
                         
@@ -485,7 +533,7 @@ function eWeLink(log, config, api) {
                                  otherAccessory = platform.devicesInHB.get(idToCheck + "SW" + i);
                                  if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
                                  otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                                 otherAccessory.reachable = device.online;
+                                 otherAccessory.reachable = true;
                                  otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on');
                                  if (device.params.switches[i - 1].switch == 'on') primaryState = true;
                               }
@@ -512,7 +560,7 @@ function eWeLink(log, config, api) {
                                  otherAccessory = platform.devicesInHB.get(idToCheck + "SW" + i);
                                  if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
                                  otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                                 otherAccessory.reachable = device.online;
+                                 otherAccessory.reachable = true;
                                  otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on');
                                  if (device.params.switches[i - 1].switch == 'on') primaryState = true;
                               }
@@ -538,11 +586,11 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       return;
    }
    if (platform.devicesInHB.get(hbDeviceId)) {
-      if (platform.debug) platform.log("[%s] has not been added as it already exists in Homebridge.", hbDeviceId);
+      platform.log("[%s] has not been added as it already exists in Homebridge.", hbDeviceId);
       return;
    }
    if (device.type != 10) {
-      if (platform.debug) platform.log("[%s] is not currently compatible with this plugin.", hbDeviceId);
+      platform.log.warn("[%s] is not currently compatible with this plugin.", hbDeviceId);
       return;
    }
    
@@ -550,7 +598,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    let switchNumber = hbDeviceId.substr(-1);
    
    if (switchNumber > channelCount) {
-      if (platform.debug) platform.log("[%s] has not been added as the [%s] only has [%s] switches.", newDeviceName, device.productModel, channelCount);
+      platform.log.warn("[%s] has not been added as the [%s] only has [%s] switches.", newDeviceName, device.productModel, channelCount);
       return;
    }
    
