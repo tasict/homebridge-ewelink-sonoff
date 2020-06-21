@@ -1147,9 +1147,9 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       payload.params.colorR = newColour[0];
       payload.params.colorG = newColour[1];
       payload.params.colorB = newColour[2];
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, targetHSL);
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, targetHSL);
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetHSL);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHue);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newSaturation);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newColour[0] + newColour[1] + newColour[2] != 0);
       break;
    }
