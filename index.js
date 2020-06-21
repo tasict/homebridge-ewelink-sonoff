@@ -225,7 +225,7 @@ function eWeLink(log, config, api) {
                   } else if (device.action === 'sysmsg') {
                      
                      accessory = platform.devicesInHB.get(device.deviceid + "SWX");
-                     accessory.reachable = device.params.online;
+                     accessory.reachable = device.params.online == "true";
                      if (accessory.reachable) platform.log("[%s] has been reported online", accessory.displayName);
                      else platform.log.error("[%s] has been reported offline", accessory.displayName);
                      
@@ -416,6 +416,7 @@ function eWeLink(log, config, api) {
                         else accessory = platform.devicesInHB.get(idToCheck + "SW0");
                         if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
                         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                        accessory.reachable = device.params.online == "true";
                         
                         //********//
                         // BLINDS //
@@ -484,6 +485,7 @@ function eWeLink(log, config, api) {
                                  otherAccessory = platform.devicesInHB.get(idToCheck + "SW" + i);
                                  if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
                                  otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                                 otherAccessory.reachable = device.params.online == "true";
                                  otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on');
                                  if (device.params.switches[i - 1].switch == 'on') primaryState = true;
                               }
@@ -510,6 +512,7 @@ function eWeLink(log, config, api) {
                                  otherAccessory = platform.devicesInHB.get(idToCheck + "SW" + i);
                                  if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
                                  otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                                 otherAccessory.reachable = device.params.online == "true";
                                  otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on');
                                  if (device.params.switches[i - 1].switch == 'on') primaryState = true;
                               }
@@ -711,7 +714,6 @@ eWeLink.prototype.configureAccessory = function (accessory) {
    if (!platform.log) {
       return;
    }
-   accessory.reachable = 'true';
    
    if (accessory.getService(Service.Switch)) {
       accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
