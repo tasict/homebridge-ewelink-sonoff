@@ -41,7 +41,7 @@ function eWeLink(log, config, api) {
    this.devicesSingleSwitch = [1, 5, 6, 14, 15, 22, 24, 27, 32, 36, 59];
    this.devicesSingleSwitchLight = ['T1 1C', 'L1', 'B1'];
    this.devicesMultiSwitch = [2, 3, 4, 7, 8, 9, 29, 30, 31, 34, 41, 77];
-   this.devicesMultiSwitchLight = ['T1 2C', 'T1 3C'];
+   this.devicesMultiSwitchLight = ['T1 2C', 'T1 3C', 'TX2C', 'TX3C'];
    this.devicesLightbulb = [36, 59];
    this.devicesDimmable = [36];
    this.devicesColourable = [59];
@@ -1525,14 +1525,14 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
    }
    
    const UIID_MAPPING = {
-      1: "SOCKET",      // S20
+      1: "SOCKET",      // S20, MINI
       2: "SOCKET_2",
       3: "SOCKET_3",
       4: "SOCKET_4",
       5: "SOCKET_POWER",
       6: "SWITCH",     // T1 1C
-      7: "SWITCH_2",   // T1 2C
-      8: "SWITCH_3",
+      7: "SWITCH_2",   // T1 2C, TX2C
+      8: "SWITCH_3", // TX3C
       9: "SWITCH_4",
       10: "OSPF",
       11: "CURTAIN",
@@ -1550,7 +1550,7 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       25: "AROMATHERAPY",
       26: "BJ_THERMOSTAT",
       27: "GSM_UNLIMIT_SOCKET",
-      28: "RF_BRIDGE",
+      28: "RF_BRIDGE", //RFBridge
       29: "GSM_SOCKET_2",
       30: "GSM_SOCKET_3",
       31: "GSM_SOCKET_4",
