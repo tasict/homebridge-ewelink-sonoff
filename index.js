@@ -123,7 +123,7 @@ function eWeLink(log, config, api) {
                         //********//       
                         if (platform.deviceGroups.has(idToCheck + "SWX")) {
                            group = platform.deviceGroups.get(idToCheck + "SWX");
-                           if (group.type === "blind" && Array.isArray(device.params)) {
+                           if (group.type === "blind" && Array.isArray(device.params.switches)) {
                               platform.externalBlindUpdate(idToCheck + "SWX", device.params);
                            } else {
                               platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");
@@ -135,7 +135,7 @@ function eWeLink(log, config, api) {
                         // FANS //
                         //******//                                          
                         else if (platform.devicesFan.includes(accessory.context.eweUIID)) {
-                           if (Array.isArray(device.params))
+                           if (Array.isArray(device.params.switches))
                            {
                               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[0].switch === 'on');
                               let status = false;
@@ -197,7 +197,7 @@ function eWeLink(log, config, api) {
                         //***********************//
                         // LIGHTS [MULTI SWITCH] //
                         //***********************//
-                        else if (platform.devicesMultiSwitch.includes(accessory.context.eweUIID) || platform.devicesMultiSwitchLight.includes(accessory.context.eweModel)) {  
+                        else if (platform.devicesMultiSwitch.includes(accessory.context.eweUIID) || platform.devicesMultiSwitchLight.includes(accessory.context.eweModel)) {
                            if (Array.isArray(device.params.switches)) {
                               let i;
                               let primaryState = false;
@@ -213,7 +213,7 @@ function eWeLink(log, config, api) {
                                  accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, primaryState);
                               }
                            } else {
-                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SW0");
                               return;
                            }
                         }
@@ -232,19 +232,23 @@ function eWeLink(log, config, api) {
                         //**********************//
                         // OTHER MULTI SWITCHES //
                         //**********************//
-                        else if (platform.devicesMultiSwitch.includes(accessory.context.eweUIID)) {  
-                           let i;
-                           let primaryState = false;
-                           let otherAccessory;
-                           for (i = 1; i <= accessory.context.channelCount; i++) {
-                              if (platform.devicesInHB.has(idToCheck + "SW" + i)) {
-                                 otherAccessory = platform.devicesInHB.get(idToCheck + "SW" + i);
-                                 if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
-                                 otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                                 otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on');
-                                 if (device.params.switches[i - 1].switch == 'on') primaryState = true;
+                        else if (platform.devicesMultiSwitch.includes(accessory.context.eweUIID)) { 
+                           if (Array.isArray(device.params.switches)) {
+                              let i;
+                              let primaryState = false;
+                              let otherAccessory;
+                              for (i = 1; i <= accessory.context.channelCount; i++) {
+                                 if (platform.devicesInHB.has(idToCheck + "SW" + i)) {
+                                    otherAccessory = platform.devicesInHB.get(idToCheck + "SW" + i);
+                                    if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
+                                    otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                                    otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on');
+                                    if (device.params.switches[i - 1].switch == 'on') primaryState = true;
+                                 }
+                                 accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, primaryState);
                               }
-                              accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, primaryState);
+                           } else {
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SW0");
                            }
                         }
                      } else {
@@ -370,7 +374,7 @@ function eWeLink(log, config, api) {
                         //********//
                         if (platform.deviceGroups.has(idToCheck)) {
                            group = platform.deviceGroups.get(idToCheck);
-                           if (group.type == 'blind' && Array.isArray(device.params)) {
+                           if (group.type == 'blind' && Array.isArray(device.params.switches)) {
                               services.blind = true;
                               services.group = group;
                               platform.addAccessory(device, idToCheck + "SWX", services);
@@ -384,7 +388,7 @@ function eWeLink(log, config, api) {
                         // FANS //
                         //******//                                  
                         else if (platform.devicesFan.includes(device.uiid)) {
-                           if (Array.isArray(device.params)) {
+                           if (Array.isArray(device.params.switches)) {
                               services.fan = true;
                               platform.addAccessory(device, idToCheck + "SWX", services);
                            } else {
@@ -420,32 +424,44 @@ function eWeLink(log, config, api) {
                         // LIGHTS [MULTI SWITCH] //
                         //***********************//
                         else if (platform.devicesLightbulb.includes(device.uiid) || platform.devicesMultiSwitchLight.includes(device.productModel)) {   
-                           services.lightbulb = true;
-                           channelCount = platform.getChannelsByUIID(device.uiid);
-                           for (i = 0; i <= channelCount; i++) {
-                              platform.addAccessory(device, idToCheck + "SW" + i, services);
+                           if (Array.isArray(device.params.switches)) {
+                              services.lightbulb = true;
+                              channelCount = platform.getChannelsByUIID(device.uiid);
+                              for (i = 0; i <= channelCount; i++) {
+                                 platform.addAccessory(device, idToCheck + "SW" + i, services);
+                              }
+                           } else {
+                              platform.log.error("[%s] Problem adding this device.", idToCheck + "SW0");
+                              return;
                            }
                         }
                         
                         //***********************//
                         // OTHER SINGLE SWITCHES //
                         //***********************//          
-                        else if (platform.devicesSingleSwitch.includes(device.uiid)) {  
-                           services.switch = true;
-                           platform.addAccessory(device, idToCheck + "SWX", services);
+                        else if (platform.devicesSingleSwitch.includes(device.uiid)) { 
+                           if (device.params.switch !== undefined) {
+                              services.switch = true;
+                              platform.addAccessory(device, idToCheck + "SWX", services);
+                           } else {
+                              platform.log.error("[%s] Problem adding this device.", idToCheck + "SWX");
+                           }
                         }
                         
                         //**********************//
                         // OTHER MULTI SWITCHES //
                         //**********************//
                         else if (platform.devicesMultiSwitch.includes(device.uiid)) { 
-                           services.switch = true;
-                           channelCount = platform.getChannelsByUIID(device.uiid);
-                           for (i = 0; i <= channelCount; i++) {
-                              platform.addAccessory(device, idToCheck + "SW" + i, services);
+                           if (Array.isArray(device.params.switches)) {
+                              services.switch = true;
+                              channelCount = platform.getChannelsByUIID(device.uiid);
+                              for (i = 0; i <= channelCount; i++) {
+                                 platform.addAccessory(device, idToCheck + "SW" + i, services);
+                              }
+                           } else {
+                              platform.log.error("[%s] Problem adding this device.", idToCheck + "SW0");
                            }
                         }
-                        
                         else platform.log("[%s] is not currently compatible with this plugin.", device.name);
                      }
                      
@@ -481,7 +497,7 @@ function eWeLink(log, config, api) {
                         // FANS //
                         //******//                                          
                         else if (platform.devicesFan.includes(accessory.context.eweUIID)) {
-                           if (Array.isArray(devices.params)) {
+                           if (Array.isArray(device.params.switches)) {
                               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[0].switch === 'on');
                               let status = false;
                               let speed = 0;
@@ -536,19 +552,23 @@ function eWeLink(log, config, api) {
                         // LIGHTS [MULTI SWITCH] //
                         //***********************//
                         else if (platform.devicesMultiSwitch.includes(accessory.context.eweUIID) || platform.devicesMultiSwitchLight.includes(accessory.context.eweModel)) {  
-                           let i;
-                           let primaryState = false;
-                           let otherAccessory;
-                           for (i = 1; i <= accessory.context.channelCount; i++) {
-                              if (platform.devicesInHB.has(idToCheck + "SW" + i)) {
-                                 otherAccessory = platform.devicesInHB.get(idToCheck + "SW" + i);
-                                 if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
-                                 otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                                 otherAccessory.reachable = true;
-                                 otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on');
-                                 if (device.params.switches[i - 1].switch == 'on') primaryState = true;
+                           if (Array.isArray(device.params.switches)) {
+                              let i;
+                              let primaryState = false;
+                              let otherAccessory;
+                              for (i = 1; i <= accessory.context.channelCount; i++) {
+                                 if (platform.devicesInHB.has(idToCheck + "SW" + i)) {
+                                    otherAccessory = platform.devicesInHB.get(idToCheck + "SW" + i);
+                                    if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
+                                    otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                                    otherAccessory.reachable = true;
+                                    otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on');
+                                    if (device.params.switches[i - 1].switch == 'on') primaryState = true;
+                                 }
+                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, primaryState);
                               }
-                              accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, primaryState);
+                           } else {
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SW0");
                            }
                         }
                         
@@ -567,19 +587,23 @@ function eWeLink(log, config, api) {
                         // OTHER MULTI SWITCHES //
                         //**********************//
                         else if (platform.devicesMultiSwitch.includes(accessory.context.eweUIID)) {  
-                           let i;
-                           let primaryState = false;
-                           let otherAccessory;
-                           for (i = 1; i <= accessory.context.channelCount; i++) {
-                              if (platform.devicesInHB.has(idToCheck + "SW" + i)) {
-                                 otherAccessory = platform.devicesInHB.get(idToCheck + "SW" + i);
-                                 if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
-                                 otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                                 otherAccessory.reachable = true;
-                                 otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on');
-                                 if (device.params.switches[i - 1].switch == 'on') primaryState = true;
+                           if (Array.isArray(device.params.switches)) {
+                              let i;
+                              let primaryState = false;
+                              let otherAccessory;
+                              for (i = 1; i <= accessory.context.channelCount; i++) {
+                                 if (platform.devicesInHB.has(idToCheck + "SW" + i)) {
+                                    otherAccessory = platform.devicesInHB.get(idToCheck + "SW" + i);
+                                    if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
+                                    otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                                    otherAccessory.reachable = true;
+                                    otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switches[i - 1].switch === 'on');
+                                    if (device.params.switches[i - 1].switch == 'on') primaryState = true;
+                                 }
+                                 accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, primaryState);
                               }
-                              accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, primaryState);
+                           } else {
+                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SW0");    
                            }
                         }
                      }
