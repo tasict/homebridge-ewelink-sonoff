@@ -38,7 +38,7 @@ function eWeLink(log, config, api) {
    this.devicesInEwe = new Map();
    this.devicesUnsupported = [28];
    this.devicesSingleSwitch = [1, 5, 6, 14, 15, 22, 24, 27, 32, 36, 59];
-   this.devicesSingleSwitchLight = ['T1 1C'];
+   this.devicesSingleSwitchLight = ['T1 1C', 'L1'];
    this.devicesMultiSwitch = [2, 3, 4, 7, 8, 9, 29, 30, 31, 34, 41, 77];
    this.devicesMultiSwitchLight = ['T1 2C', 'T1 3C'];
    this.devicesLightbulb = [36, 59];
@@ -107,7 +107,7 @@ function eWeLink(log, config, api) {
                }
                
                // The eWeLink devices are stored in the "platform.devicesInEwe" map with the device ID as the key (without the SW*) part.
-               if (platform.debugReqRes) platform.log.warn(JSON.stringify(eWeLinkDevices, null, 2));
+               //if (platform.debugReqRes) platform.log.warn(JSON.stringify(eWeLinkDevices, null, 2));
                eWeLinkDevices.forEach((device) => {
                   if (!platform.devicesUnsupported.includes(device.uiid)) {
                      platform.devicesInEwe.set(device.deviceid, device);
@@ -430,10 +430,17 @@ function eWeLink(log, config, api) {
                                  accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, device.params.bright);
                               }
                               if (platform.devicesColourable.includes(accessory.context.eweUIID)) {
-                                 let newColour = convert.rgb.hsl(device.params.colorR, device.params.colorG, device.params.colorB);
-                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
-                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation,  newColour[1]);
-                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness,  newColour[2]);
+                                 if (device.params.hasOwnProperty("colorR"))
+                                 {
+                                    let newColour = convert.rgb.hsl(device.params.colorR, device.params.colorG, device.params.colorB);
+                                    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
+                                    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation,  newColour[1]);
+                                    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness,  newColour[2]);
+                                 }
+                                 else if (device.params.hasOwnProperty("bright"))
+                                 {
+                                    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, device.params.bright);
+                                 }
                               }
                            }
                            
@@ -484,6 +491,13 @@ function eWeLink(log, config, api) {
                         } else {
                            if (platform.debug) platform.log.error("Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.");
                         }
+                     } else if (device.action === 'sysmsg') {
+                        
+                        accessory = platform.devicesInHB.get(device.deviceid + "SWX");
+                        accessory.reachable = device.params.online;
+                        if (accessory.reachable) platform.log("[%s] has been reported online", accessory.displayName);
+                        else platform.log.error("[%s] has been reported offline", accessory.displayName);
+                        
                      } else {
                         if (platform.debug) platform.log.error("Unknown action property or no params received via web socket.");
                      }
@@ -590,13 +604,14 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    accessory.context.channelCount = channelCount;
    accessory.reachable = device.online === 'true';
    
+   
+   
    accessory.on('identify', function (paired, callback) {
       platform.log("[%s] identified. Identification on device not supported.", accessory.displayName);
       try {
          callback();
       } catch (e) {}
    });
-   
    if (services.switch) {
       accessory.addService(Service.Switch, newDeviceName).getCharacteristic(Characteristic.On)
       .on('set', function (value, callback) {
@@ -609,36 +624,39 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
          platform.internalLightbulbUpdate(accessory, value, callback);
       });
    }
+   
    if (services.dimmable) {
       accessory.context.isDimmable = true;
-      accessory.addService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.Brightness)
+      accessory.getService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.Brightness)
       .on('set', function (value, callback) {
          platform.internalBrightnessUpdate(accessory, value, callback);
       });
    }
+   
    if (services.colourable) {
-      accessory.context.devicesColourable = true;
-      accessory.addService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.Hue)
+      accessory.context.isColourable = true;
+      accessory.getService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.Hue)
       .on('set', function (value, callback) {
          platform.internalHSLUpdate(accessory, 'hue', value, callback);
       });
-      accessory.addService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.Saturation)
+      accessory.getService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.Saturation)
       .on('set', function (value, callback) {
          platform.internalHSLUpdate(accessory, 'saturaton', value, callback);
       });
-      accessory.addService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.Brightness)
+      accessory.getService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.Brightness)
       .on('set', function (value, callback) {
          platform.internalHSLUpdate(accessory, 'brightness', value, callback);
       });
    }
+   
    if (services.fan) {
       accessory.context.isFan = true;
       accessory.addService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.Active);
-      accessory.addService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.On)
+      accessory.getService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
          platform.internalFanUpdate(accessory, 'power', value, callback);
       });
-      accessory.addService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.RotationSpeed)
+      accessory.getService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.RotationSpeed)
       .setProps({
          minStep: 3
       })
@@ -652,15 +670,16 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    }
    if (services.thermostat) {
       accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentHeatingCoolingState);
-      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetHeatingCoolingState);
-      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentTemperature);
-      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetTemperature);
-      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TemperatureDisplayUnits);
-      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CoolingThresholdTemperature);
-      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentRelativeHumidity);
-      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.HeatingThresholdTemperature);
-      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetRelativeHumidity);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetHeatingCoolingState);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentTemperature);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetTemperature);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TemperatureDisplayUnits);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CoolingThresholdTemperature);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentRelativeHumidity);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.HeatingThresholdTemperature);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetRelativeHumidity);
    }
+   
    if (services.blind) {
       accessory.context.switchUp = (services.group.switchUp || platform.groupDefaults['switchUp']) - 1;
       accessory.context.switchDown = (services.group.switchDown || platform.groupDefaults['switchDown']) - 1;
@@ -682,11 +701,11 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       .on('get', function (callback) {
          platform.getBlindPosition(accessory, callback);
       });
-      accessory.addService(Service.WindowCovering, newDeviceName).getCharacteristic(Characteristic.PositionState)
+      accessory.getService(Service.WindowCovering, newDeviceName).getCharacteristic(Characteristic.PositionState)
       .on('get', function (callback) {
          platform.getBlindMovementState(accessory, callback);
       });
-      accessory.addService(Service.WindowCovering, newDeviceName).getCharacteristic(Characteristic.TargetPosition)
+      accessory.getService(Service.WindowCovering, newDeviceName).getCharacteristic(Characteristic.TargetPosition)
       .on('get', function (callback) {
          platform.getBlindTargetPosition(accessory, callback);
       })
@@ -715,6 +734,8 @@ eWeLink.prototype.configureAccessory = function (accessory) {
    if (!platform.log) {
       return;
    }
+   accessory.reachable = 'true';
+   
    
    if (accessory.getService(Service.Switch)) {
       accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
@@ -822,6 +843,10 @@ eWeLink.prototype.internalSwitchUpdate = function (accessory, isOn, callback) {
    if (!platform.log) {
       return;
    }
+   if (!accessory.reachable) {
+      platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
+      return;
+   }
    
    let targetState = isOn ? 'on' : 'off';
    let otherAccessory;
@@ -888,6 +913,10 @@ eWeLink.prototype.internalSwitchUpdate = function (accessory, isOn, callback) {
 eWeLink.prototype.internalLightbulbUpdate = function (accessory, isOn, callback) {
    let platform = this;
    if (!platform.log) {
+      return;
+   }
+   if (!accessory.reachable) {
+      platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
       return;
    }
    
@@ -958,6 +987,10 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
    if (!platform.log) {
       return;
    }
+   if (!accessory.reachable) {
+      platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
+      return;
+   }
    
    let otherAccessory;
    let i;
@@ -987,6 +1020,11 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    if (!platform.log) {
       return;
    }
+   if (!accessory.reachable) {
+      platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
+      return;
+   }
+   
    let newHue;
    let newSaturation;
    let newBrightness;
@@ -1022,10 +1060,10 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       payload.params.colorR = newColour[0];
       payload.params.colorG = newColour[1];
       payload.params.colorB = newColour[2];
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, targetHSB);
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, targetHSB);
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetHSB);
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newcolour[0] + newcolour[1] + newcolour[2] != 0);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, targetHSL);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, targetHSL);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetHSL);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newColour[0] + newColour[1] + newColour[2] != 0);
       break;
    }
    let string = JSON.stringify(payload);
@@ -1036,6 +1074,10 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
 eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, callback) {
    let platform = this;
    if (!platform.log) {
+      return;
+   }
+   if (!accessory.reachable) {
+      platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
       return;
    }
    
