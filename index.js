@@ -450,10 +450,10 @@ function eWeLink(log, config, api) {
                platform.log("Plugin initialisation has been successful.");
             });
          };
-         this.getRegion(this.config.countryCode, function () {
-            this.login(afterLogin.bind(this));
-         }.bind(this));
-      }.bind(this));
+         platform.getRegion(platform.config.countryCode, function () {
+            platform.login(afterLogin.bind(platform));
+         }.bind(platform));
+      }.bind(platform));
    }
 }
 
