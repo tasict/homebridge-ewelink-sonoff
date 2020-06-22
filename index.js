@@ -32,11 +32,13 @@ function eWeLink(log, config, api) {
    platform.authenticationToken = "UNCONFIGURED";
    platform.appid = "oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq";
    platform.debug = platform.config.debug || false;
-   platform.debugReqRes = platform.config.debugReqRes || false;
-   platform.debugInitial = platform.config.debugInitial || false;
    platform.emailLogin = platform.config.username.includes("@") ? true : false;
    platform.apiHost = (platform.config.apiHost || "eu-api.coolkit.cc") + ":8080";
    platform.wsHost = platform.config.wsHost || "eu-pconnect3.coolkit.cc";
+   platform.debugReqRes = platform.config.debugReqRes || false;
+   platform.debugInitial = platform.config.debugInitial || false;
+   platform.sensorTimeLength = platform.config.sensorTimeLength || 2;
+   platform.sensorTimeDifference = platform.config.sensorTimeDifference || 120;
    platform.webSocketOpen = false;
    platform.devicesInHB = new Map();
    platform.devicesInEwe = new Map();
@@ -1385,7 +1387,7 @@ eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
          {
             timeOfMotion = new Date(device.params["rfTrig" + i]);
             timeDifference = (timeNow.getTime() - timeOfMotion.getTime()) / 1000;
-            if (timeDifference < 120)  {
+            if (timeDifference < platform.sensorTimeDifference)  {
                otherAccessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, true);
                master = true;
                if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
@@ -1401,7 +1403,7 @@ eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
             otherAccessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, false);
          }
       }
-   }, 2000);
+   }, platform.sensorTimeLength * 1000);
    return;
 }
 

@@ -110,6 +110,20 @@
           }
         ]
       },
+      "sensorTimeLength":{
+        "type":"integer",
+        "title":"Motion Sensor Length",
+        "description":"The number of seconds which the sensor tile in the Home app will light up for if motion is detected by that sensor.",
+        "default":"2",
+        "maximum":999
+      },
+      "sensorTimeDifference":{
+        "type":"integer",
+        "title":"Motion Sensor Lag",
+        "description":"An offset in seconds to cancel any motion detection notifications if they is a delay between the sensor detecting the motion and Homebridge receiving the notification.",
+        "default":"120",
+        "maximum":999
+      },
       "groups":{
         "type":"array",
         "title":"Groups",
@@ -260,7 +274,7 @@
       "description": "Only adjust these settings if you know what you are doing.",
       "expandable": true,
       "items": [
-        "debug", "debugReqRes", "apiHost", "wsHost"
+        "debug", "debugReqRes", "apiHost", "wsHost", "sensorTimeLength", "sensorTimeDifference"
       ]
     }
   ]
