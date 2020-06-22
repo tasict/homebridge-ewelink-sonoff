@@ -111,7 +111,7 @@ function eWeLink(log, config, api) {
                      if (platform.devicesInHB.has(idToCheck + "SW0") || platform.devicesInHB.has(idToCheck + "SWX")) {
                         if (platform.devicesInHB.has(idToCheck + "SWX")) accessory = platform.devicesInHB.get(idToCheck + "SWX");
                         else accessory = platform.devicesInHB.get(idToCheck + "SW0");
-                        if (!device.online) {
+                        if (!accessory.reachable) {
                            platform.log.warn("[%s] has been reported offline so cannot refresh.", accessory.displayName);
                            return;
                         }
@@ -125,8 +125,6 @@ function eWeLink(log, config, api) {
                            group = platform.deviceGroups.get(idToCheck + "SWX");
                            if (group.type === "blind" && Array.isArray(device.params.switches)) {
                               platform.externalBlindUpdate(idToCheck + "SWX", device.params);
-                           } else {
-                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");
                               return;
                            }
                         }
@@ -152,8 +150,6 @@ function eWeLink(log, config, api) {
                               }
                               accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, status);
                               accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, speed);
-                           } else {
-                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");
                               return;
                            }
                         }
@@ -164,32 +160,26 @@ function eWeLink(log, config, api) {
                         else if (platform.devicesThermostat.includes(accessory.context.eweUIID)) {
                            //platform.updateTempAndHumidity(idToCheck + "SWX", device.params);
                            platform.log("Thermostats coming soon");
+                           return;
                         }
                         
                         //************************//
                         // LIGHTS [SINGLE SWITCH] //
                         //************************//       
                         else if (platform.devicesLightbulb.includes(accessory.context.eweUIID) || platform.devicesSingleSwitchLight.includes(accessory.context.eweModel)) {
-                           if (device.params.switch !== undefined) {
+                           if (device.params.hasOwnProperty("switch")) {
                               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switch === 'on');
-                              if (platform.devicesDimmable.includes(accessory.context.eweUIID)) {
+                              if (platform.devicesDimmable.includes(accessory.context.eweUIID) && device.params.hasOwnProperty("bright")) {
                                  accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, device.params.bright);
                               }
-                              if (platform.devicesColourable.includes(accessory.context.eweUIID)) {
-                                 if (device.params.hasOwnProperty("colorR"))
-                                 {
-                                    let newColour = convert.rgb.hsl(device.params.colorR, device.params.colorG, device.params.colorB);
-                                    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
-                                    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation,  newColour[1]);
-                                    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness,  newColour[2]);
-                                 }
-                                 else if (device.params.hasOwnProperty("bright"))
-                                 {
-                                    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, device.params.bright);
-                                 }
+                              if (platform.devicesColourable.includes(accessory.context.eweUIID) && device.params.hasOwnProperty("colorR")) {
+                                 let newColour = convert.rgb.hsl(device.params.colorR, device.params.colorG, device.params.colorB);
+                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
+                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
+                                 accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newColour[2]);
+                                 // @thepotterfamily
+                                 // Here i don't know whether to set the Characteristic.Brightness to the newColour[2] or the device.params.bright
                               }
-                           } else {
-                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");
                               return;
                            }
                         }
@@ -212,8 +202,6 @@ function eWeLink(log, config, api) {
                                  }
                                  accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, primaryState);
                               }
-                           } else {
-                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SW0");
                               return;
                            }
                         }
@@ -222,10 +210,9 @@ function eWeLink(log, config, api) {
                         // OTHER SINGLE SWITCHES //
                         //***********************//       
                         else if (platform.devicesSingleSwitch.includes(accessory.context.eweUIID)) {
-                           if (device.params.switch !== undefined) {
+                           if (device.params.hasOwnProperty("switch")) {
                               accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switch === 'on');
-                           } else {
-                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");                              
+                              return;
                            }
                         }
                         
@@ -246,11 +233,11 @@ function eWeLink(log, config, api) {
                                     if (device.params.switches[i - 1].switch == 'on') primaryState = true;
                                  }
                                  accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, primaryState);
+                                 return;
                               }
-                           } else {
-                              platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SW0");
                            }
                         }
+                        platform.log.error("[%s] could not be refreshed due to a hiccup in the eWeLink message.", accessory.deviceid);
                      } else {
                         if (platform.debug) platform.log.error("Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.");
                      }
@@ -409,7 +396,7 @@ function eWeLink(log, config, api) {
                         // LIGHTS [SINGLE SWITCH] //
                         //************************//
                         else if (platform.devicesLightbulb.includes(device.uiid) || platform.devicesSingleSwitchLight.includes(device.productModel)) {
-                           if (device.params.switch !== undefined) {
+                           if (device.params.hasOwnProperty("switch")) {
                               services.lightbulb = true;
                               if (platform.devicesDimmable.includes(device.uiid)) services.dimmable = true;
                               if (platform.devicesColourable.includes(device.uiid)) services.colourable = true;
@@ -440,7 +427,7 @@ function eWeLink(log, config, api) {
                         // OTHER SINGLE SWITCHES //
                         //***********************//          
                         else if (platform.devicesSingleSwitch.includes(device.uiid)) { 
-                           if (device.params.switch !== undefined) {
+                           if (device.params.hasOwnProperty("switch")) {
                               services.switch = true;
                               platform.addAccessory(device, idToCheck + "SWX", services);
                            } else {
@@ -531,7 +518,7 @@ function eWeLink(log, config, api) {
                         // LIGHTS [SINGLE SWITCH] //
                         //************************//       
                         else if (platform.devicesLightbulb.includes(accessory.context.eweUIID) || platform.devicesSingleSwitchLight.includes(accessory.context.eweModel)) {
-                           if (device.params.switch !== undefined) {
+                           if (device.params.hasOwnProperty("switch")) {
                               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, device.params.switch === 'on');
                               if (platform.devicesDimmable.includes(accessory.context.eweUIID)) {
                                  accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, device.params.bright);
@@ -576,7 +563,7 @@ function eWeLink(log, config, api) {
                         // OTHER SINGLE SWITCHES //
                         //***********************//       
                         else if (platform.devicesSingleSwitch.includes(accessory.context.eweUIID)) {  
-                           if (device.params.switch !== undefined) {
+                           if (device.params.hasOwnProperty("switch")) {
                               accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, device.params.switch === 'on');
                            } else {
                               platform.log.error("[%s] Problem refreshing this device.", idToCheck + "SWX");                              
@@ -1116,7 +1103,7 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       platform.log("    current HSL (no L) > [%s],[%s]",accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value,accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value);
       platform.log("    current brightness > [%s]",accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value);
    }
-
+   
    let newHue;
    let newSaturation;
    let newBrightness;
@@ -1137,15 +1124,15 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       newBrightness = targetHSL;
       break;
    }
-
+   
    let newColour = convert.hsl.rgb(newHue, newSaturation, 50);
-
+   
    if (platform.debug) {
       platform.log("    new HSL (no L) > [%s],[%s],[?]", newHue, newSaturation);
       platform.log("    new brightness > [%s]", newBrightness);
       platform.log("    new RGB > [%s],[%s],[%s]", newColour[0], newColour[1], newColour[2]);
    }
-
+   
    let payload = {};
    payload.action = 'update';
    payload.userAgent = 'app';
@@ -1724,10 +1711,11 @@ WebSocketClient.prototype.reconnect = function (e) {
    if (this.pendingReconnect) return;
    this.pendingReconnect = true;
    this.instance.removeAllListeners();
+   let platform = this;
    setTimeout(function () {
-      this.pendingReconnect = false;
+      platform.pendingReconnect = false;
       console.log("WebSocketClient: Reconnecting...");
-      this.open(this.url);
+      platform.open(platform.url);
    }, this.autoReconnectInterval);
 };
 WebSocketClient.prototype.onopen = function (e) {
