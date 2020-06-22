@@ -1,8 +1,8 @@
-let WebSocket = require('ws');
-let request = require('request-json');
-let nonce = require('nonce')();
-let crypto = require('crypto');
-let convert = require('color-convert');
+let WebSocket = require("ws");
+let request = require("request-json");
+let nonce = require("nonce")();
+let crypto = require("crypto");
+let convert = require("color-convert");
 let ws;
 let sequence;
 let webClient;
@@ -10,7 +10,7 @@ let Accessory;
 let Service;
 let Characteristic;
 let UUIDGen;
-const querystring = require('querystring');
+const querystring = require("querystring");
 
 module.exports = function (homebridge) {
    Accessory = homebridge.platformAccessory;
@@ -42,9 +42,9 @@ function eWeLink(log, config, api) {
    platform.devicesInEwe = new Map();
    platform.devicesUnsupported = [28];
    platform.devicesSingleSwitch = [1, 5, 6, 14, 15, 22, 24, 27, 32, 36, 59]; // Supported single switch uiid models
-   platform.devicesSingleSwitchLight = ['T1 1C', 'L1', 'B1', 'TX1C']; // A subset of above which we can expose as lights
+   platform.devicesSingleSwitchLight = ["T1 1C", "L1", "B1", "TX1C"]; // A subset of above which we can expose as lights
    platform.devicesMultiSwitch = [2, 3, 4, 7, 8, 9, 29, 30, 31, 34, 41, 77]; // Supported multi switch uiid models
-   platform.devicesMultiSwitchLight = ['T1 2C', 'T1 3C', 'TX2C', 'TX3C']; // A subset of above which we can expose as lights
+   platform.devicesMultiSwitchLight = ["T1 2C", "T1 3C", "TX2C", "TX3C"]; // A subset of above which we can expose as lights
    platform.devicesLightsDimmable = [36]; // Supported light with dimmer function uiid models
    platform.devicesColourable = [59]; // Supported light with dimmer and light function uiid models
    platform.devicesThermostat = [15]; // Supported thermostat uiid models
@@ -62,7 +62,7 @@ function eWeLink(log, config, api) {
    
    if (api) {
       platform.api = api;
-      platform.api.on('didFinishLaunching', function () {
+      platform.api.on("didFinishLaunching", function () {
          let afterLogin = function () {
             if (platform.debug) platform.log("Auth token received [%s].", platform.authenticationToken);
             if (platform.debug) platform.log("API key received [%s].", platform.apiKey);
@@ -70,10 +70,11 @@ function eWeLink(log, config, api) {
             // The cached devices are stored in the "platform.devicesInHB" map with the device ID as the key (with the SW*) part
             platform.log("[%s] eWeLink devices were loaded from the Homebridge cache and will be refreshed.", platform.devicesInHB.size);
             
-            // Next we need to open a web socket to the eWeLink server to receive real-time updates about external changes to devices.
+            // Let's open a web socket to the eWeLink server to receive real-time updates about external changes to devices.
+            // Reason for doing it before the initial HTTP request is to give just a little more time to set up.
             if (platform.debug) platform.log("Opening web socket for real time updates.");
             platform.ws = new WebSocketClient();
-            platform.ws.open('wss://' + platform.wsHost + ':8080/api/ws');
+            platform.ws.open("wss://" + platform.wsHost + ":8080/api/ws");
             platform.ws.onopen = function (e) {
                platform.webSocketOpen = true;
                let payload = {};
@@ -83,7 +84,7 @@ function eWeLink(log, config, api) {
                payload.appid = platform.appid;
                payload.nonce = nonce();
                payload.ts = Math.floor(new Date() / 1000);
-               payload.userAgent = 'app';
+               payload.userAgent = "app";
                payload.sequence = platform.getSequence();
                payload.version = 8;
                let string = JSON.stringify(payload);
@@ -102,7 +103,7 @@ function eWeLink(log, config, api) {
                   return;
                }
                if (device.hasOwnProperty("action")) {
-                  if (device.action === 'update' && device.hasOwnProperty("params")) {
+                  if (device.action === "update" && device.hasOwnProperty("params")) {
                      if (platform.debug) platform.log("External update received via web socket.");
                      let accessory;
                      let channelCount;
@@ -118,7 +119,6 @@ function eWeLink(log, config, api) {
                         }
                         if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
                         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                        
                         //********//
                         // BLINDS //
                         //********//       
@@ -129,7 +129,6 @@ function eWeLink(log, config, api) {
                               return;
                            }
                         }
-                        
                         //******//
                         // FANS //
                         //******//                                          
@@ -139,7 +138,6 @@ function eWeLink(log, config, api) {
                               return;
                            }
                         }
-                        
                         //*************//
                         // THERMOSTATS //
                         //*************//                                    
@@ -148,7 +146,6 @@ function eWeLink(log, config, api) {
                            platform.log.warn("Thermostats coming soon!");
                            return;
                         }
-                        
                         //************************//
                         // LIGHTS [SINGLE SWITCH] //
                         //************************//       
@@ -158,7 +155,6 @@ function eWeLink(log, config, api) {
                               return;
                            }
                         }
-                        
                         //***********************//
                         // LIGHTS [MULTI SWITCH] //
                         //***********************//
@@ -168,7 +164,6 @@ function eWeLink(log, config, api) {
                               return;
                            }
                         }
-                        
                         //***********************//
                         // OTHER SINGLE SWITCHES //
                         //***********************//       
@@ -178,7 +173,6 @@ function eWeLink(log, config, api) {
                               return;
                            }
                         }
-                        
                         //**********************//
                         // OTHER MULTI SWITCHES //
                         //**********************//
@@ -192,13 +186,11 @@ function eWeLink(log, config, api) {
                      } else {
                         if (platform.debug) platform.log.error("Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.");
                      }
-                  } else if (device.action === 'sysmsg') {
-                     
+                  } else if (device.action === "sysmsg") {
                      accessory = platform.devicesInHB.get(device.deviceid + "SWX");
                      accessory.reachable = device.online;
                      if (accessory.reachable) platform.log("[%s] has been reported online.", accessory.displayName);
                      else platform.log.error("[%s] has been reported offline.", accessory.displayName);
-                     
                   } else {
                      if (platform.debug) platform.log.error("Unknown action property or no params received via web socket.");
                   }
@@ -223,9 +215,9 @@ function eWeLink(log, config, api) {
             // Get a list of all devices from eWeLink via the HTTP API, and compare it to the list of Homebridge cached devices (and then vice versa).
             // That is: new devices will be added, existing will be refreshed and those in the Homebridge cache but not in the web list will be removed.
             if (platform.debug) platform.log("Requesting a list of devices through the eWeLink HTTP API...");
-            platform.webClient = request.createClient('https://' + platform.apiHost);
-            platform.webClient.headers['Authorization'] = 'Bearer ' + platform.authenticationToken;
-            platform.webClient.get('/api/user/device?' + platform.getArguments(platform.apiKey), function (err, res, body) {
+            platform.webClient = request.createClient("https://" + platform.apiHost);
+            platform.webClient.headers["Authorization"] = "Bearer " + platform.authenticationToken;
+            platform.webClient.get("/api/user/device?" + platform.getArguments(platform.apiKey), function (err, res, body) {
                if (err) {
                   platform.log.error("An error occurred requesting devices through the API...");
                   platform.log.error("[%s].", err);
@@ -234,11 +226,11 @@ function eWeLink(log, config, api) {
                   platform.log.error("An error occurred requesting devices through the API...");
                   platform.log.error("[No data in response].");
                   return;
-               } else if (body.hasOwnProperty('error') && body.error != 0) {
+               } else if (body.hasOwnProperty("error") && body.error != 0) {
                   let response = JSON.stringify(body);
                   if (platform.debugReqRes) platform.log.warn(response);
                   platform.log.error("An error occurred requesting devices through the API...");
-                  if (body.error === '401') {
+                  if (body.error === "401") {
                      platform.log.error("[Authorisation token error].");
                   } else {
                      platform.log.error("[%s].", response);
@@ -246,7 +238,6 @@ function eWeLink(log, config, api) {
                   return;
                }
                let eWeLinkDevices = body.devicelist;
-               
                let primaryDeviceCount = Object.keys(eWeLinkDevices).length;
                if (primaryDeviceCount === 0) {
                   platform.log("[0] primary devices were loaded from your eWeLink account. Devices will be removed from Homebridge.");
@@ -265,9 +256,9 @@ function eWeLink(log, config, api) {
                });
                
                // Blind groupings found in the configuration are set in the "platform.deviceGroups" map.
-               if (platform.config['groups'] && Object.keys(platform.config['groups']).length > 0) {
+               if (platform.config["groups"] && Object.keys(platform.config["groups"]).length > 0) {
                   platform.config.groups.forEach((group) => {
-                     if (typeof group.deviceId !== 'undefined' && platform.devicesInEwe.has(group.deviceId + "SWX")) {
+                     if (typeof group.deviceId !== "undefined" && platform.devicesInEwe.has(group.deviceId + "SWX")) {
                         platform.deviceGroups.set(group.deviceId + "SWX", group);
                      }
                   });
@@ -286,12 +277,11 @@ function eWeLink(log, config, api) {
                      
                      if (!platform.devicesInEwe.has(idToCheck)) {
                         // The cached device wasn't found in the eWeLink response so remove.
-                        if (platform.debug) platform.log('[%s] was not present in the API response so removing from Homebridge.', accessory.displayName);
+                        if (platform.debug) platform.log("[%s] was not present in the API response so removing from Homebridge.", accessory.displayName);
                         platform.removeAccessory(accessory);
                      }
                   });
                }
-               
                if (platform.debug) platform.log("Checking if devices need to be added/refreshed in the Homebridge cache.");
                // Now the reverse. Checking that each device from the API exists in Homebridge, otherwise we will add it to Homebridge.
                // ie each device in "platform.devicesInEwe" exists in "platform.devicesInHB"
@@ -301,24 +291,21 @@ function eWeLink(log, config, api) {
                      let accessory;
                      let idToCheck = device.deviceid;
                      let group;
-                     
                      //**************************//
                      // ADD NON EXISTING DEVICES //
                      //**************************//
                      if (!platform.devicesInHB.has(idToCheck + "SWX") && !platform.devicesInHB.has(idToCheck + "SW0")) {
-                        
                         //********//
                         // BLINDS //
                         //********//
                         if (platform.deviceGroups.has(idToCheck)) {
                            group = platform.deviceGroups.get(idToCheck);
-                           if (group.type === 'blind' && Array.isArray(device.params.switches)) {
+                           if (group.type === "blind" && Array.isArray(device.params.switches)) {
                               services.blind = true;
                               services.group = group;
                               platform.addAccessory(device, idToCheck + "SWX", services);
                            }
                         }
-                        
                         //******//
                         // FANS //
                         //******//                                  
@@ -328,7 +315,6 @@ function eWeLink(log, config, api) {
                               platform.addAccessory(device, idToCheck + "SWX", services);
                            }
                         }
-                        
                         //*************//
                         // THERMOSTATS //
                         //*************//                                                                              
@@ -337,7 +323,6 @@ function eWeLink(log, config, api) {
                            // platform.addAccessory(device, idToCheck + "SWX", services);
                            platform.log.warn("Thermostats coming soon!");
                         }
-                        
                         //************************//
                         // LIGHTS [SINGLE SWITCH] //
                         //************************//
@@ -349,7 +334,6 @@ function eWeLink(log, config, api) {
                               platform.addAccessory(device, idToCheck + "SWX", services);
                            }
                         }
-                        
                         //***********************//
                         // LIGHTS [MULTI SWITCH] //
                         //***********************//
@@ -362,7 +346,6 @@ function eWeLink(log, config, api) {
                               }
                            }
                         }
-                        
                         //***********************//
                         // OTHER SINGLE SWITCHES //
                         //***********************//          
@@ -372,7 +355,6 @@ function eWeLink(log, config, api) {
                               platform.addAccessory(device, idToCheck + "SWX", services);
                            }
                         }
-                        
                         //**********************//
                         // OTHER MULTI SWITCHES //
                         //**********************//
@@ -386,7 +368,6 @@ function eWeLink(log, config, api) {
                            }
                         } else platform.log("[%s] There has been a problem adding this device.", device.name);
                      }
-                     
                      //*****************************************//
                      // REFRESH EXISTING AND JUST ADDED DEVICES //
                      //*****************************************//
@@ -398,10 +379,8 @@ function eWeLink(log, config, api) {
                            return;
                         }
                         if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
-                        
                         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
                         accessory.reachable = true;
-                        
                         //********//
                         // BLINDS //
                         //********//       
@@ -412,7 +391,6 @@ function eWeLink(log, config, api) {
                               return;
                            }
                         }
-                        
                         //******//
                         // FANS //
                         //******//                                          
@@ -422,7 +400,6 @@ function eWeLink(log, config, api) {
                               return;
                            }
                         }
-                        
                         //*************//
                         // THERMOSTATS //
                         //*************//                                    
@@ -431,7 +408,6 @@ function eWeLink(log, config, api) {
                            platform.log.warn("Thermostats coming soon!");
                            return;
                         }
-                        
                         //************************//
                         // LIGHTS [SINGLE SWITCH] //
                         //************************//       
@@ -441,7 +417,6 @@ function eWeLink(log, config, api) {
                               return;
                            }
                         }
-                        
                         //***********************//
                         // LIGHTS [MULTI SWITCH] //
                         //***********************//
@@ -451,7 +426,6 @@ function eWeLink(log, config, api) {
                               return;
                            }
                         }
-                        
                         //***********************//
                         // OTHER SINGLE SWITCHES //
                         //***********************//       
@@ -461,7 +435,6 @@ function eWeLink(log, config, api) {
                               return;
                            }
                         }
-                        
                         //**********************//
                         // OTHER MULTI SWITCHES //
                         //**********************//
@@ -477,7 +450,7 @@ function eWeLink(log, config, api) {
                platform.log("Plugin initialisation has been successful.");
             });
          };
-         this.getRegion(this.config['countryCode'], function () {
+         this.getRegion(this.config.countryCode, function () {
             this.login(afterLogin.bind(this));
          }.bind(this));
       }.bind(this));
@@ -515,7 +488,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       newDeviceName = device.name;
       break;
       case "0":
-      status = (device.params.switches[0].switch === 'on' || device.params.switches[1].switch === 'on' || device.params.switches[2].switch === 'on' || device.params.switches[3].switch === 'on') ? 'on' : 'off';
+      status = (device.params.switches[0].switch === "on" || device.params.switches[1].switch === "on" || device.params.switches[2].switch === "on" || device.params.switches[3].switch === "on") ? "on" : "off";
       newDeviceName = device.name;
       break;
       case "1":
@@ -541,7 +514,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    accessory.context.channelCount = channelCount;
    accessory.reachable = device.online;
    
-   accessory.on('identify', function (paired, callback) {
+   accessory.on("identify", function (paired, callback) {
       platform.log("[%s] identified. Identification on device not supported.", accessory.displayName);
       try {
          callback();
@@ -549,13 +522,13 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    });
    if (services.switch) {
       accessory.addService(Service.Switch, newDeviceName).getCharacteristic(Characteristic.On)
-      .on('set', function (value, callback) {
+      .on("set", function (value, callback) {
          platform.internalSwitchUpdate(accessory, value, callback);
       });
    }
    if (services.lightbulb) {
       accessory.addService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.On)
-      .on('set', function (value, callback) {
+      .on("set", function (value, callback) {
          platform.internalLightbulbUpdate(accessory, value, callback);
       });
    }
@@ -563,7 +536,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    if (services.dimmable) {
       accessory.context.isDimmable = true;
       accessory.getService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.Brightness)
-      .on('set', function (value, callback) {
+      .on("set", function (value, callback) {
          platform.internalBrightnessUpdate(accessory, value, callback);
       });
    }
@@ -571,16 +544,16 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    if (services.colourable) {
       accessory.context.isColourable = true;
       accessory.getService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.Hue)
-      .on('set', function (value, callback) {
-         platform.internalHSLUpdate(accessory, 'hue', value, callback);
+      .on("set", function (value, callback) {
+         platform.internalHSLUpdate(accessory, "hue", value, callback);
       });
       accessory.getService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.Saturation)
-      .on('set', function (value, callback) {
-         platform.internalHSLUpdate(accessory, 'saturaton', value, callback);
+      .on("set", function (value, callback) {
+         platform.internalHSLUpdate(accessory, "saturaton", value, callback);
       });
       accessory.getService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.Brightness)
-      .on('set', function (value, callback) {
-         platform.internalHSLUpdate(accessory, 'brightness', value, callback);
+      .on("set", function (value, callback) {
+         platform.internalHSLUpdate(accessory, "brightness", value, callback);
       });
    }
    
@@ -589,18 +562,18 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       accessory.addService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.Active);
       accessory.getService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
-         platform.internalFanUpdate(accessory, 'power', value, callback);
+         platform.internalFanUpdate(accessory, "power", value, callback);
       });
       accessory.getService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.RotationSpeed)
       .setProps({
          minStep: 3
       })
       .on("set", function (value, callback) {
-         platform.internalFanUpdate(accessory, 'speed', value, callback);
+         platform.internalFanUpdate(accessory, "speed", value, callback);
       });
       accessory.addService(Service.Lightbulb, newDeviceName).getCharacteristic(Characteristic.On)
-      .on('set', function (value, callback) {
-         platform.internalFanUpdate(accessory, 'light', value, callback);
+      .on("set", function (value, callback) {
+         platform.internalFanUpdate(accessory, "light", value, callback);
       });
    }
    if (services.thermostat) {
@@ -616,13 +589,13 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    }
    
    if (services.blind) {
-      accessory.context.switchUp = (services.group.switchUp || platform.groupDefaults['switchUp']) - 1;
-      accessory.context.switchDown = (services.group.switchDown || platform.groupDefaults['switchDown']) - 1;
-      accessory.context.durationUp = services.group.timeUp || platform.groupDefaults['timeUp'];
-      accessory.context.durationDown = services.group.timeDown || platform.groupDefaults['timeDown'];
-      accessory.context.durationBMU = services.group.timeBottomMarginUp || platform.groupDefaults['timeBottomMarginUp'];
-      accessory.context.durationBMD = services.group.timeBottomMarginDown || platform.groupDefaults['timeBottomMarginDown'];
-      accessory.context.fullOverdrive = services.group.fullOverdrive || platform.groupDefaults['fullOverdrive'];
+      accessory.context.switchUp = (services.group.switchUp || platform.groupDefaults["switchUp"]) - 1;
+      accessory.context.switchDown = (services.group.switchDown || platform.groupDefaults["switchDown"]) - 1;
+      accessory.context.durationUp = services.group.timeUp || platform.groupDefaults["timeUp"];
+      accessory.context.durationDown = services.group.timeDown || platform.groupDefaults["timeDown"];
+      accessory.context.durationBMU = services.group.timeBottomMarginUp || platform.groupDefaults["timeBottomMarginUp"];
+      accessory.context.durationBMD = services.group.timeBottomMarginDown || platform.groupDefaults["timeBottomMarginDown"];
+      accessory.context.fullOverdrive = services.group.fullOverdrive || platform.groupDefaults["fullOverdrive"];
       accessory.context.percentDurationDown = accessory.context.durationDown * 10;
       accessory.context.percentDurationUp = accessory.context.durationUp * 10;
       accessory.context.lastPosition = 100; // Last known position (0-100%).
@@ -630,18 +603,18 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       accessory.context.currentTargetPosition = 100; // Target position (0-100%).
       
       accessory.addService(Service.WindowCovering, newDeviceName).getCharacteristic(Characteristic.CurrentPosition)
-      .on('get', function (callback) {
+      .on("get", function (callback) {
          platform.getBlindPosition(accessory, callback);
       });
       accessory.getService(Service.WindowCovering, newDeviceName).getCharacteristic(Characteristic.PositionState)
-      .on('get', function (callback) {
+      .on("get", function (callback) {
          platform.getBlindMovementState(accessory, callback);
       });
       accessory.getService(Service.WindowCovering, newDeviceName).getCharacteristic(Characteristic.TargetPosition)
-      .on('get', function (callback) {
+      .on("get", function (callback) {
          platform.getBlindTargetPosition(accessory, callback);
       })
-      .on('set', function (value, callback) {
+      .on("set", function (value, callback) {
          platform.setBlindTargetPosition(accessory, value, callback);
       });
    }
@@ -649,7 +622,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    try {
       accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.SerialNumber, hbDeviceId);
       accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Manufacturer, device.brandName);
-      accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Model, device.productModel + ' (' + device.extra.extra.model + ')');
+      accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Model, device.productModel + " (" + device.extra.extra.model + ")");
       accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Identify, false);
       accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
    } catch (e) {
@@ -669,33 +642,33 @@ eWeLink.prototype.configureAccessory = function (accessory) {
    
    if (accessory.getService(Service.Switch)) {
       accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
-      .on('set', function (value, callback) {
+      .on("set", function (value, callback) {
          platform.internalSwitchUpdate(accessory, value, callback);
       });
    }
    if (accessory.getService(Service.Lightbulb) && !accessory.context.isFan) {
       accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-      .on('set', function (value, callback) {
+      .on("set", function (value, callback) {
          platform.internalLightbulbUpdate(accessory, value, callback);
       });
       if (accessory.context.isDimmable) {
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
-         .on('set', function (value, callback) {
+         .on("set", function (value, callback) {
             platform.internalBrightnessUpdate(accessory, value, callback);
          });
       }
       if (accessory.context.isColourable) {
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
-         .on('set', function (value, callback) {
-            platform.internalHSLUpdate(accessory, 'hue', value, callback);
+         .on("set", function (value, callback) {
+            platform.internalHSLUpdate(accessory, "hue", value, callback);
          });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation)
-         .on('set', function (value, callback) {
-            platform.internalHSLUpdate(accessory, 'saturation', value, callback);
+         .on("set", function (value, callback) {
+            platform.internalHSLUpdate(accessory, "saturation", value, callback);
          });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
-         .on('set', function (value, callback) {
-            platform.internalHSLUpdate(accessory, 'brightness', value, callback);
+         .on("set", function (value, callback) {
+            platform.internalHSLUpdate(accessory, "brightness", value, callback);
          });
       }
    }
@@ -703,20 +676,20 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       accessory.getService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.Active).updateValue("1");
       accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
-         platform.internalFanUpdate(accessory, 'power', value, callback);
+         platform.internalFanUpdate(accessory, "power", value, callback);
       });
       accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed)
       .setProps({
          minStep: 3
       })
       .on("set", function (value, callback) {
-         platform.internalFanUpdate(accessory, 'speed', value, callback);
+         platform.internalFanUpdate(accessory, "speed", value, callback);
       });
    }
    if (accessory.getService(Service.Lightbulb) && accessory.context.isFan) {
       accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-      .on('set', function (value, callback) {
-         platform.internalFanUpdate(accessory, 'light', value, callback);
+      .on("set", function (value, callback) {
+         platform.internalFanUpdate(accessory, "light", value, callback);
       });
    }
    if (accessory.getService(Service.Thermostat)) {
@@ -733,13 +706,13 @@ eWeLink.prototype.configureAccessory = function (accessory) {
    
    if (accessory.getService(Service.WindowCovering)) {
       accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
-      .on('set', function (value, callback) {
+      .on("set", function (value, callback) {
          platform.setBlindTargetPosition(accessory, value, callback);
       });
       
       let payload = {};
-      payload.action = 'update';
-      payload.userAgent = 'app';
+      payload.action = "update";
+      payload.userAgent = "app";
       payload.params = {
          "lock": 0,
          "zyx_clear_timers": false,
@@ -807,13 +780,13 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       
       let group = platform.deviceGroups.get(accessory.context.hbDeviceId);
       if (group) {
-         accessory.context.switchUp = (group.switchUp || platform.groupDefaults['switchUp']) - 1;
-         accessory.context.switchDown = (group.switchDown || platform.groupDefaults['switchDown']) - 1;
-         accessory.context.durationUp = group.timeUp || platform.groupDefaults['timeUp'];
-         accessory.context.durationDown = group.timeDown || platform.groupDefaults['timeDown'];
-         accessory.context.durationBMU = group.timeBottomMarginUp || platform.groupDefaults['timeBottomMarginUp'];
-         accessory.context.durationBMD = group.timeBottomMarginDown || platform.groupDefaults['timeBottomMarginDown'];
-         accessory.context.fullOverdrive = platform.groupDefaults['fullOverdrive'];
+         accessory.context.switchUp = (group.switchUp || platform.groupDefaults["switchUp"]) - 1;
+         accessory.context.switchDown = (group.switchDown || platform.groupDefaults["switchDown"]) - 1;
+         accessory.context.durationUp = group.timeUp || platform.groupDefaults["timeUp"];
+         accessory.context.durationDown = group.timeDown || platform.groupDefaults["timeDown"];
+         accessory.context.durationBMU = group.timeBottomMarginUp || platform.groupDefaults["timeBottomMarginUp"];
+         accessory.context.durationBMD = group.timeBottomMarginDown || platform.groupDefaults["timeBottomMarginDown"];
+         accessory.context.fullOverdrive = platform.groupDefaults["fullOverdrive"];
          accessory.context.percentDurationDown = accessory.context.durationDown * 10;
          accessory.context.percentDurationUp = accessory.context.durationUp * 10;
       }
@@ -827,7 +800,7 @@ eWeLink.prototype.removeAccessory = function (accessory) {
       return;
    }
    platform.devicesInHB.delete(accessory.context.hbDeviceId);
-   platform.api.unregisterPlatformAccessories('homebridge-eWeLink', 'eWeLink', [accessory]);
+   platform.api.unregisterPlatformAccessories("homebridge-eWeLink", "eWeLink", [accessory]);
    if (platform.debug) platform.log("[%s] has been removed from Homebridge.", accessory.displayName);
 };
 
@@ -841,13 +814,13 @@ eWeLink.prototype.internalSwitchUpdate = function (accessory, isOn, callback) {
       return;
    }
    
-   let targetState = isOn ? 'on' : 'off';
+   let targetState = isOn ? "on" : "off";
    let otherAccessory;
    let i;
    let payload = {};
    
-   payload.action = 'update';
-   payload.userAgent = 'app';
+   payload.action = "update";
+   payload.userAgent = "app";
    payload.params = {};
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
@@ -896,7 +869,7 @@ eWeLink.prototype.internalSwitchUpdate = function (accessory, isOn, callback) {
       
       otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW0");
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", otherAccessory.displayName, masterState);
-      otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, masterState === 'on' ? true : false);
+      otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, masterState === "on" ? true : false);
       break;
    }
    let string = JSON.stringify(payload);
@@ -913,13 +886,13 @@ eWeLink.prototype.internalLightbulbUpdate = function (accessory, isOn, callback)
       return;
    }
    
-   let targetState = isOn ? 'on' : 'off';
+   let targetState = isOn ? "on" : "off";
    let otherAccessory;
    let i;
    let payload = {};
    
-   payload.action = 'update';
-   payload.userAgent = 'app';
+   payload.action = "update";
+   payload.userAgent = "app";
    payload.params = {};
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
@@ -968,7 +941,7 @@ eWeLink.prototype.internalLightbulbUpdate = function (accessory, isOn, callback)
       
       otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW0");
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", otherAccessory.displayName, masterState);
-      otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, masterState === 'on' ? true : false);
+      otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, masterState === "on" ? true : false);
       break;
    }
    let string = JSON.stringify(payload);
@@ -989,8 +962,8 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
    let i;
    let payload = {};
    
-   payload.action = 'update';
-   payload.userAgent = 'app';
+   payload.action = "update";
+   payload.userAgent = "app";
    payload.params = {};
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
@@ -1053,8 +1026,8 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    }
    
    let payload = {};
-   payload.action = 'update';
-   payload.userAgent = 'app';
+   payload.action = "update";
+   payload.userAgent = "app";
    payload.params = {};
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
@@ -1124,8 +1097,8 @@ eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, ca
    payload.params.switches[1].switch = newSpeed >= 33 ? "on" : "off";
    payload.params.switches[2].switch = newSpeed >= 66 && newSpeed < 99 ? "on" : "off";
    payload.params.switches[3].switch = newSpeed >= 99 ? "on" : "off";
-   payload.action = 'update';
-   payload.userAgent = 'app';
+   payload.action = "update";
+   payload.userAgent = "app";
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = platform.getSequence();
@@ -1142,8 +1115,8 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
    }
    
    let accessory = platform.devicesInHB.get(hbDeviceId);
-   let switchUp = params.switches[accessory.context.switchUp].switch === 'on' ? 1 : 0;
-   let switchDown = params.switches[accessory.context.switchDown].switch === 'on' ? 1 : 0;
+   let switchUp = params.switches[accessory.context.switchUp].switch === "on" ? 1 : 0;
+   let switchDown = params.switches[accessory.context.switchDown].switch === "on" ? 1 : 0;
    let sum = (switchUp * 2) + switchDown;
    
    // Sum can be:
@@ -1245,16 +1218,16 @@ eWeLink.prototype.externalFanUpdate = function (hbDeviceId, params) {
    }
    
    let accessory = platform.devicesInHB.get(hbDeviceId);
-   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switches[0].switch === 'on');
+   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switches[0].switch === "on");
    let status = false;
    let speed = 0;
-   if (params.switches[1].switch === 'on' && params.switches[2].switch === 'off' && params.switches[3].switch === 'off') {
+   if (params.switches[1].switch === "on" && params.switches[2].switch === "off" && params.switches[3].switch === "off") {
       status = true;
       speed = 33;
-   } else if (params.switches[1].switch === 'on' && params.switches[2].switch === 'on' && params.switches[3].switch === 'off') {
+   } else if (params.switches[1].switch === "on" && params.switches[2].switch === "on" && params.switches[3].switch === "off") {
       status = true;
       speed = 66;
-   } else if (params.switches[1].switch === 'on' && params.switches[2].switch === 'off' && device.params.switches[3].switch === 'on') {
+   } else if (params.switches[1].switch === "on" && params.switches[2].switch === "off" && device.params.switches[3].switch === "on") {
       status = true;
       speed = 100;
    }
@@ -1271,7 +1244,7 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
    
    let accessory = platform.devicesInHB.get(hbDeviceId);
    if (params.hasOwnProperty("switch")) {
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switch === 'on');
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switch === "on");
    }
    if (params.hasOwnProperty("bright")) {
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.bright);
@@ -1302,8 +1275,8 @@ eWeLink.prototype.externalMultiLightUpdate = function (hbDeviceId, params) {
          if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
          otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, params.fwVersion);
          otherAccessory.reachable = true;
-         otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switches[i - 1].switch === 'on');
-         if (params.switches[i - 1].switch === 'on') primaryState = true;
+         otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switches[i - 1].switch === "on");
+         if (params.switches[i - 1].switch === "on") primaryState = true;
       }
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, primaryState);
    }
@@ -1316,7 +1289,7 @@ eWeLink.prototype.externalSingleSwitchUpdate = function (hbDeviceId, params) {
       return;
    }
    let accessory = platform.devicesInHB.get(hbDeviceId);
-   accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, params.switch === 'on');
+   accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, params.switch === "on");
    return;
 }
 
@@ -1336,8 +1309,8 @@ eWeLink.prototype.externalMultiSwitchUpdate = function (hbDeviceId, params) {
          otherAccessory = platform.devicesInHB.get(idToCheck + i);
          if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
          otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, params.fwVersion);
-         otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, params.switches[i - 1].switch === 'on');
-         if (params.switches[i - 1].switch === 'on') primaryState = true;
+         otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, params.switches[i - 1].switch === "on");
+         if (params.switches[i - 1].switch === "on") primaryState = true;
       }
       accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, primaryState);
       return;
@@ -1380,7 +1353,7 @@ eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
    };
    
    if (!platform.webSocketOpen) {
-      if (platform.debug) platform.log('Socket was closed. It will reconnect automatically.');
+      if (platform.debug) platform.log("Socket was closed. It will reconnect automatically.");
       let interval;
       let waitToSend = function (string) {
          if (platform.webSocketOpen) {
@@ -1419,17 +1392,17 @@ eWeLink.prototype.login = function (callback) {
    let json = JSON.stringify(data);
    let sign = platform.getSignature(json);
    if (platform.debug) platform.log("Login signature [%s].", sign);
-   let webClient = request.createClient('https://' + platform.apiHost);
-   webClient.headers['Authorization'] = 'Sign ' + sign;
-   webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
-   webClient.post('/api/user/login', data, function (err, res, body) {
+   let webClient = request.createClient("https://" + platform.apiHost);
+   webClient.headers["Authorization"] = "Sign " + sign;
+   webClient.headers["Content-Type"] = "application/json;charset=UTF-8";
+   webClient.post("/api/user/login", data, function (err, res, body) {
       if (err) {
          platform.log.error("An error occurred while logging in. [%s].", err);
          callback();
          return;
       }
-      if (body.hasOwnProperty('error') && body.error === 301 && body.hasOwnProperty('region')) {
-         let idx = platform.apiHost.indexOf('-');
+      if (body.hasOwnProperty("error") && body.error === 301 && body.hasOwnProperty("region")) {
+         let idx = platform.apiHost.indexOf("-");
          if (idx === -1) {
             platform.log.error("Received new region [%s]. However we cannot construct the new API host url.", body.region);
             callback();
@@ -1452,8 +1425,8 @@ eWeLink.prototype.login = function (callback) {
       }
       platform.authenticationToken = body.at;
       platform.apiKey = body.user.apikey;
-      platform.webClient = request.createClient('https://' + platform.apiHost);
-      platform.webClient.headers['Authorization'] = 'Bearer ' + body.at;
+      platform.webClient = request.createClient("https://" + platform.apiHost);
+      platform.webClient.headers["Authorization"] = "Bearer " + body.at;
       
       platform.getWebSocketHost(function () {
          callback(body.at);
@@ -1488,15 +1461,15 @@ eWeLink.prototype.getRegion = function (countryCode, callback) {
    });
    dataToSign = dataToSign.map(function (kv) {
       return kv.key + "=" + kv.value;
-   }).join('&');
+   }).join("&");
    
    let sign = platform.getSignature(dataToSign);
    if (platform.debug) platform.log("Info: getRegion signature [%s].", sign);
    
-   let webClient = request.createClient('https://api.coolkit.cc:8080');
-   webClient.headers['Authorization'] = 'Sign ' + sign;
-   webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
-   webClient.get('/api/user/region?' + query, function (err, res, body) {
+   let webClient = request.createClient("https://api.coolkit.cc:8080");
+   webClient.headers["Authorization"] = "Sign " + sign;
+   webClient.headers["Content-Type"] = "application/json;charset=UTF-8";
+   webClient.get("/api/user/region?" + query, function (err, res, body) {
       if (err) {
          platform.log.error("An error occurred while getting region [%s].", err);
          callback();
@@ -1508,7 +1481,7 @@ eWeLink.prototype.getRegion = function (countryCode, callback) {
          callback();
          return;
       }
-      let idx = platform.apiHost.indexOf('-');
+      let idx = platform.apiHost.indexOf("-");
       if (idx === -1) {
          platform.log.error("Received region [%s]. However we cannot construct the new API host url.", body.region);
          callback();
@@ -1529,16 +1502,16 @@ eWeLink.prototype.getWebSocketHost = function (callback) {
       return;
    }
    var data = {};
-   data.accept = 'mqtt,ws';
+   data.accept = "mqtt,ws";
    data.version = 8;
    data.ts = Math.floor(new Date().getTime() / 1000);
    data.nonce = nonce();
    data.appid = platform.appid;
    
-   let webClient = request.createClient('https://' + platform.apiHost.replace('-api', '-disp'));
-   webClient.headers['Authorization'] = 'Bearer ' + platform.authenticationToken;
-   webClient.headers['Content-Type'] = 'application/json;charset=UTF-8';
-   webClient.post('/dispatch/app', data, function (err, res, body) {
+   let webClient = request.createClient("https://" + platform.apiHost.replace("-api", "-disp"));
+   webClient.headers["Authorization"] = "Bearer " + platform.authenticationToken;
+   webClient.headers["Content-Type"] = "application/json;charset=UTF-8";
+   webClient.post("/dispatch/app", data, function (err, res, body) {
       if (err) {
          platform.log.error("An error occurred while getting web socket host [%s].", err);
          callback();
@@ -1552,10 +1525,10 @@ eWeLink.prototype.getWebSocketHost = function (callback) {
          return;
       }
       
-      if (platform.debug) platform.log('Web socket host received [%s].', body.domain);
+      if (platform.debug) platform.log("Web socket host received [%s].", body.domain);
       platform.wsHost = body.domain;
       if (platform.ws) {
-         platform.ws.url = 'wss://' + body.domain + ':8080/api/ws';
+         platform.ws.url = "wss://" + body.domain + ":8080/api/ws";
       }
       callback(body.domain);
    }.bind(this));
@@ -1685,7 +1658,7 @@ eWeLink.prototype.getArguments = function (apiKey) {
 };
 
 eWeLink.prototype.getSignature = function (string) {
-   return crypto.createHmac('sha256', '6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM').update(string).digest('base64');
+   return crypto.createHmac("sha256", "6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM").update(string).digest("base64");
 };
 
 function WebSocketClient() {
@@ -1697,14 +1670,14 @@ function WebSocketClient() {
 WebSocketClient.prototype.open = function (url) {
    this.url = url;
    this.instance = new WebSocket(this.url);
-   this.instance.on('open', () => {
+   this.instance.on("open", () => {
       this.onopen();
    });
-   this.instance.on('message', (data, flags) => {
+   this.instance.on("message", (data, flags) => {
       this.number++;
       this.onmessage(data, flags, this.number);
    });
-   this.instance.on('close', (e) => {
+   this.instance.on("close", (e) => {
       switch (e) {
          case 1005: // CLOSE_NORMAL
          // console.log("WebSocketClient: Web socket closed [1005].");
@@ -1715,9 +1688,9 @@ WebSocketClient.prototype.open = function (url) {
       }
       this.onclose(e);
    });
-   this.instance.on('error', (e) => {
+   this.instance.on("error", (e) => {
       switch (e.code) {
-         case 'ECONNREFUSED':
+         case "ECONNREFUSED":
          this.reconnect(e);
          break;
          default:
@@ -1730,7 +1703,7 @@ WebSocketClient.prototype.send = function (data, option) {
    try {
       this.instance.send(data, option);
    } catch (e) {
-      this.instance.emit('error', e);
+      this.instance.emit("error", e);
    }
 };
 WebSocketClient.prototype.reconnect = function (e) {
@@ -1788,11 +1761,11 @@ eWeLink.prototype.getBlindMovementState = function (accessory, callback) {
    
    platform.log("Requesting blind position for [%s]", accessory.displayName);
    
-   platform.webClient.get('/api/user/device?' + platform.getArguments(platform.apiKey), function (err, res, body) {
+   platform.webClient.get("/api/user/device?" + platform.getArguments(platform.apiKey), function (err, res, body) {
       
       if (err) {
          if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
-            platform.log('Sonoff API 503 error. Will try again.');
+            platform.log("Sonoff API 503 error. Will try again.");
             setTimeout(function () {
                platform.getHumidityState(accessory, callback);
             }, 1000);
@@ -1803,12 +1776,12 @@ eWeLink.prototype.getBlindMovementState = function (accessory, callback) {
       } else if (!body) {
          platform.log("An error occurred while requesting blind position for [%s]. Error [No data in response].", accessory.displayName);
          return;
-      } else if (body.hasOwnProperty('error') && body.error != 0) {
+      } else if (body.hasOwnProperty("error") && body.error != 0) {
          platform.log("An error occurred while requesting blind position for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
          if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
             platform.relogin();
          }
-         callback('An error occurred while requesting blind position for your device');
+         callback("An error occurred while requesting blind position for your device");
          return;
       }
       
@@ -1817,7 +1790,7 @@ eWeLink.prototype.getBlindMovementState = function (accessory, callback) {
       let size = Object.keys(body)
       .length;
       if (body.length < 1) {
-         callback('An error occurred while requesting blind position for your device');
+         callback("An error occurred while requesting blind position for your device");
          accessory.reachable = false;
          return;
       }
@@ -1833,12 +1806,12 @@ eWeLink.prototype.getBlindMovementState = function (accessory, callback) {
             if (device.online !== true) {
                accessory.reachable = false;
                platform.log("Device [%s] was reported to be offline by the API", accessory.displayName);
-               callback('API reported that [%s] is not online', device.name);
+               callback("API reported that [%s] is not online", device.name);
                return;
             }
             let switchCount = platform.getChannelsByUIID(device);
             for (let i = 0; i !== switchCount; i++) {
-               if (device.params.switches[i].switch === 'on') {
+               if (device.params.switches[i].switch === "on") {
                   accessory.reachable = true;
                   platform.log("API reported that [%s CH-%s] is [on].", device.name, i);
                }
@@ -1864,7 +1837,7 @@ eWeLink.prototype.getBlindMovementState = function (accessory, callback) {
          platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
          platform.removeAccessory(accessory);
       } else {
-         callback('An error occurred while requesting blind position for your device');
+         callback("An error occurred while requesting blind position for your device");
       }
    });
 };
@@ -1926,7 +1899,7 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
             return false;
          }
          if (diff < 0) {
-            platform.log("[%s] ==> Revert Blinds moving. Current pos: %s, new targuet: %s, new duration: %s", accessory.displayName, actualPosition, pos, Math.abs(diff));
+            platform.log("[%s] ==> Revert Blinds moving. Current pos: %s, new target: %s, new duration: %s", accessory.displayName, actualPosition, pos, Math.abs(diff));
             accessory.context.startTimestamp = timestamp;
             accessory.context.targetTimestamp = timestamp + Math.abs(diff);
             // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
@@ -1951,8 +1924,8 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
                service.getCharacteristic(Characteristic.PositionState)
                .updateValue(accessory.context.currentPositionState);
             } else {
-               platform.log('Socket was closed. It will reconnect automatically; please retry your command');
-               callback('Socket was closed. It will reconnect automatically; please retry your command');
+               platform.log("Socket was closed. It will reconnect automatically; please retry your command");
+               callback("Socket was closed. It will reconnect automatically; please retry your command");
                return false;
             }
          }
@@ -2027,8 +2000,8 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
          callback();
       }, 1);
    } else {
-      platform.log('Socket was closed. It will reconnect automatically; please retry your command');
-      callback('Socket was closed. It will reconnect automatically; please retry your command');
+      platform.log("Socket was closed. It will reconnect automatically; please retry your command");
+      callback("Socket was closed. It will reconnect automatically; please retry your command");
       return false;
    }
 };
@@ -2043,12 +2016,12 @@ eWeLink.prototype.prepareCurrentBlindState = function (switches, accessory) {
    
    // platform.log("Switches: %s", switches);
    var switch0 = 0;
-   if (switches[accessory.context.switchUp].switch === 'on') {
+   if (switches[accessory.context.switchUp].switch === "on") {
       switch0 = 1;
    }
    
    var switch1 = 0;
-   if (switches[accessory.context.switchDown].switch === 'on') {
+   if (switches[accessory.context.switchDown].switch === "on") {
       switch1 = 1;
    }
    
@@ -2107,7 +2080,7 @@ eWeLink.prototype.prepareBlindFinalState = function (accessory) {
       }, 1);
       
    } else {
-      platform.log('Socket was closed. It will reconnect automatically; please retry your command');
+      platform.log("Socket was closed. It will reconnect automatically; please retry your command");
       return false;
    }
 };
@@ -2119,8 +2092,8 @@ eWeLink.prototype.prepareBlindPayload = function (accessory) {
       return;
    }
    let payload = {};
-   payload.action = 'update';
-   payload.userAgent = 'app';
+   payload.action = "update";
+   payload.userAgent = "app";
    payload.params = {};
    let deviceFromApi = platform.devicesInEwe.get(accessory.context.hbDeviceId);
    
@@ -2131,26 +2104,26 @@ eWeLink.prototype.prepareBlindPayload = function (accessory) {
    // [1,0] = 2 => 0 Moving up
    // [1,1] = 3 => should not happen...
    
-   var switch0 = 'off';
-   var switch1 = 'off';
+   var switch0 = "off";
+   var switch1 = "off";
    
    let state = accessory.context.currentPositionState;
    
    switch (state) {
       case 2:
-      switch0 = 'off';
-      switch1 = 'off';
+      switch0 = "off";
+      switch1 = "off";
       break;
       case 1:
-      switch0 = 'off';
-      switch1 = 'on';
+      switch0 = "off";
+      switch1 = "on";
       break;
       case 0:
-      switch0 = 'on';
-      switch1 = 'off';
+      switch0 = "on";
+      switch1 = "off";
       break;
       default:
-      platform.log('[%s] PositionState type error !', accessory.displayName);
+      platform.log("[%s] PositionState type error !", accessory.displayName);
       break;
    }
    
