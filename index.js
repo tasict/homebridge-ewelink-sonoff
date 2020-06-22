@@ -67,8 +67,8 @@ function eWeLink(log, config, api) {
       platform.api = api;
       platform.api.on("didFinishLaunching", function () {
          let afterLogin = function () {
-            if (platform.debug) platform.log("Auth token received [%s].", platform.authenticationToken);
-            if (platform.debug) platform.log("API key received [%s].", platform.apiKey);
+            if (platform.debug) platform.log("Authorisation token received [%s].", platform.authenticationToken);
+            if (platform.debug) platform.log("User API key received [%s].", platform.apiKey);
             
             // The cached devices are stored in the "platform.devicesInHB" map with the device ID as the key (with the SW*) part
             platform.log("[%s] eWeLink devices were loaded from the Homebridge cache and will be refreshed.", platform.devicesInHB.size);
@@ -234,24 +234,24 @@ function eWeLink(log, config, api) {
                   platform.hbInterval = null;
                }
             };
-            // Get a list of all devices from eWeLink via the HTTP API, and compare it to the list of Homebridge cached devices (and then vice versa).
+            // Get a list of all devices from eWeLink via the HTTPS API, and compare it to the list of Homebridge cached devices (and then vice versa).
             // That is: new devices will be added, existing will be refreshed and those in the Homebridge cache but not in the web list will be removed.
-            if (platform.debug) platform.log("Requesting a list of devices through the eWeLink HTTP API...");
+            if (platform.debug) platform.log("Requesting a list of devices through the eWeLink HTTPS API.");
             platform.webClient = request.createClient("https://" + platform.apiHost);
             platform.webClient.headers["Authorization"] = "Bearer " + platform.authenticationToken;
             platform.webClient.get("/api/user/device?" + platform.getArguments(platform.apiKey), function (err, res, body) {
                if (err) {
-                  platform.log.error("An error occurred requesting devices through the API...");
+                  platform.log.error("An error occurred requesting devices through the API.");
                   platform.log.error("[%s].", err);
                   return;
                } else if (!body) {
-                  platform.log.error("An error occurred requesting devices through the API...");
+                  platform.log.error("An error occurred requesting devices through the API.");
                   platform.log.error("[No data in response].");
                   return;
                } else if (body.hasOwnProperty("error") && body.error != 0) {
                   let response = JSON.stringify(body);
                   if (platform.debugReqRes) platform.log.warn(response);
-                  platform.log.error("An error occurred requesting devices through the API...");
+                  platform.log.error("An error occurred requesting devices through the API.");
                   if (body.error === "401") {
                      platform.log.error("[Authorisation token error].");
                   } else {
@@ -269,8 +269,7 @@ function eWeLink(log, config, api) {
                }
                
                // The eWeLink devices are stored in the "platform.devicesInEwe" map with the device ID as the key (without the SW*) part.
-               // if (platform.debugInitial) platform.log.warn(JSON.stringify(eWeLinkDevices, null, 2));
-               // The above is commented out because it takes up quite a large part of the log if you have a lot of devices.
+               if (platform.debugInitial) platform.log.warn(JSON.stringify(eWeLinkDevices, null, 2));
                eWeLinkDevices.forEach((device) => {
                   if (!platform.devicesUnsupported.includes(device.uiid)) {
                      platform.devicesInEwe.set(device.deviceid, device);
@@ -664,7 +663,6 @@ eWeLink.prototype.configureAccessory = function (accessory) {
    if (!platform.log) {
       return;
    }
-   
    if (accessory.getService(Service.Switch)) {
       accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
@@ -861,12 +859,10 @@ eWeLink.prototype.internalSwitchUpdate = function (accessory, isOn, callback) {
       platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
       return;
    }
-   
    let targetState = isOn ? "on" : "off";
    let otherAccessory;
    let i;
    let payload = {};
-   
    payload.action = "update";
    payload.userAgent = "app";
    payload.params = {};
@@ -933,12 +929,10 @@ eWeLink.prototype.internalLightbulbUpdate = function (accessory, isOn, callback)
       platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
       return;
    }
-   
    let targetState = isOn ? "on" : "off";
    let otherAccessory;
    let i;
    let payload = {};
-   
    payload.action = "update";
    payload.userAgent = "app";
    payload.params = {};
@@ -1005,11 +999,9 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
       platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
       return;
    }
-   
    let otherAccessory;
    let i;
    let payload = {};
-   
    payload.action = "update";
    payload.userAgent = "app";
    payload.params = {};
@@ -1043,7 +1035,6 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       platform.log("    current HSL (no L) > [%s],[%s]", accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value, accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value);
       platform.log("    current brightness > [%s]", accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value);
    }
-   
    let newHue;
    let newSaturation;
    let newBrightness;
@@ -1064,15 +1055,12 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       newBrightness = targetHSL;
       break;
    }
-   
    let newColour = convert.hsl.rgb(newHue, newSaturation, 50);
-   
    if (platform.debug) {
       platform.log("    new HSL (no L) > [%s],[%s],[?]", newHue, newSaturation);
       platform.log("    new brightness > [%s]", newBrightness);
       platform.log("    new RGB > [%s],[%s],[%s]", newColour[0], newColour[1], newColour[2]);
    }
-   
    let payload = {};
    payload.action = "update";
    payload.userAgent = "app";
@@ -1107,11 +1095,9 @@ eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, ca
       platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
       return;
    }
-   
    let newPower;
    let newSpeed;
    let newLight;
-   
    switch (type) {
       case "power":
       newPower = targetState;
@@ -1129,7 +1115,6 @@ eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, ca
       newLight = targetState;
       break;
    }
-   
    switch (accessory.context.switchNumber) {
       case "X":
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newLight);
@@ -1137,7 +1122,6 @@ eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, ca
       accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, newSpeed);
       break;
    }
-   
    let payload = {};
    payload.params = {};
    payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
@@ -1150,7 +1134,6 @@ eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, ca
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = platform.getSequence();
-   
    let string = JSON.stringify(payload);
    platform.sendWebSocketMessage(string, callback);
    if (platform.debug) platform.log("[%s] requesting to change fan %s.", accessory.displayName, type);
@@ -1161,7 +1144,6 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
    if (!platform.log) {
       return;
    }
-   
    let accessory = platform.devicesInHB.get(hbDeviceId);
    let switchUp = params.switches[accessory.context.switchUp].switch === "on" ? 1 : 0;
    let switchDown = params.switches[accessory.context.switchDown].switch === "on" ? 1 : 0;
@@ -1180,10 +1162,7 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
       3: 3
    };
    let state = MAPPING[sum];
-   
-   let stateString = ["Moving up", "Moving down", "Stopped", "Error"];
    let actualPosition;
-   
    if (state === 2 || state === 3) {
       let timestamp = Date.now();
       if (accessory.context.currentPositionState === 1) {
@@ -1194,7 +1173,6 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
          actualPosition = accessory.context.lastPosition;
       }
    }
-   
    switch (state) {
       case 3:
       platform.log("[%s] Error with current movement state so resetting.", accessory.displayName);
@@ -1240,16 +1218,12 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
    }
    if ((state === 0 && accessory.context.currentTargetPosition === 0) || (state === 1 && accessory.context.currentTargetPosition === 100)) {
       accessory.context.currentPositionState = 2;
-      
       platform.log("[%s] Request sent to stop moving.", accessory.displayName);
-      
       let currentTargetPosition = accessory.context.currentTargetPosition;
       accessory.context.lastPosition = currentTargetPosition;
       accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).updateValue(currentTargetPosition);
       accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).updateValue(currentTargetPosition);
-      
       platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, currentTargetPosition);
-      
       let payload = platform.prepareBlindPayload(accessory);
       let string = JSON.stringify(payload);
       platform.sendWebSocketMessage(string, function () {
@@ -1264,7 +1238,6 @@ eWeLink.prototype.externalFanUpdate = function (hbDeviceId, params) {
    if (!platform.log) {
       return;
    }
-   
    let accessory = platform.devicesInHB.get(hbDeviceId);
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switches[0].switch === "on");
    let status = false;
@@ -1289,7 +1262,6 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
    if (!platform.log) {
       return;
    }
-   
    let accessory = platform.devicesInHB.get(hbDeviceId);
    if (params.hasOwnProperty("switch")) {
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switch === "on");
@@ -1311,7 +1283,6 @@ eWeLink.prototype.externalMultiLightUpdate = function (hbDeviceId, params) {
    if (!platform.log) {
       return;
    }
-   
    let accessory = platform.devicesInHB.get(hbDeviceId);
    let idToCheck = hbDeviceId.slice(0, -1);
    let i;
@@ -1346,7 +1317,6 @@ eWeLink.prototype.externalMultiSwitchUpdate = function (hbDeviceId, params) {
    if (!platform.log) {
       return;
    }
-   
    let accessory = platform.devicesInHB.get(hbDeviceId);
    let idToCheck = hbDeviceId.slice(0, -1);
    let i;
@@ -1370,7 +1340,6 @@ eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
    if (!platform.log) {
       return;
    }
-   
    let accessory = platform.devicesInHB.get(hbDeviceId);
    let idToCheck = hbDeviceId.slice(0, -1);
    let timeNow = new Date();
@@ -1379,7 +1348,6 @@ eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
    let i;
    let otherAccessory;
    let master = false;
-   
    for (i = 1; i <= accessory.context.channelCount; i++) {
       if (platform.devicesInHB.has(idToCheck + i)) {
          otherAccessory = platform.devicesInHB.get(idToCheck + i);
@@ -1420,7 +1388,6 @@ eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
    }
    platform.delaySend = 0;
    const delayOffset = 280;
-   
    let sendOperation = function (string) {
       if (!platform.webSocketOpen) {
          setTimeout(function () {
@@ -1428,21 +1395,18 @@ eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
          }, delayOffset);
          return;
       }
-      
       if (platform.ws) {
          platform.ws.send(string);
          if (platform.debugReqRes && string !== "ping") platform.log.warn("Web socket message sent.\n" + JSON.stringify(JSON.parse(string), null, 2));
          else if (platform.debug && string !== "ping") platform.log("Web socket message sent.");
          callback();
       }
-      
       if (platform.delaySend <= 0) {
          platform.delaySend = 0;
       } else {
          platform.delaySend -= delayOffset;
       }
    };
-   
    if (!platform.webSocketOpen) {
       if (platform.debug) platform.log("Socket was closed. It will reconnect automatically.");
       let interval;
@@ -1464,7 +1428,6 @@ eWeLink.prototype.login = function (callback) {
    if (!platform.log) {
       return;
    }
-   
    var data = {};
    if (platform.emailLogin) {
       data.email = platform.config.username;
@@ -1476,10 +1439,8 @@ eWeLink.prototype.login = function (callback) {
    data.ts = Math.floor(new Date().getTime() / 1000);
    data.nonce = nonce();
    data.appid = platform.appid;
-   
    if (platform.debugReqRes) platform.log.warn("Sending HTTPS login request.\n" + JSON.stringify(data, null, 2));
    else if (platform.debug) platform.log("Sending HTTPS login request.");
-   
    let json = JSON.stringify(data);
    let sign = platform.getSignature(json);
    if (platform.debug) platform.log("Login signature [%s].", sign);
@@ -1507,7 +1468,6 @@ eWeLink.prototype.login = function (callback) {
             return;
          }
       }
-      
       if (!body.at) {
          platform.log.error("Server did not response with an authentication token.");
          platform.log.warn("\n" + JSON.stringify(body, null, 2));
@@ -1518,7 +1478,6 @@ eWeLink.prototype.login = function (callback) {
       platform.apiKey = body.user.apikey;
       platform.webClient = request.createClient("https://" + platform.apiHost);
       platform.webClient.headers["Authorization"] = "Bearer " + body.at;
-      
       platform.getWebSocketHost(function () {
          callback(body.at);
       }.bind(this));
@@ -1536,10 +1495,8 @@ eWeLink.prototype.getRegion = function (countryCode, callback) {
    data.ts = Math.floor(new Date().getTime() / 1000);
    data.nonce = nonce();
    data.appid = platform.appid;
-   
    let query = querystring.stringify(data);
    if (platform.debug) platform.log("Info: getRegion query [%s].", query);
-   
    let dataToSign = [];
    Object.keys(data).forEach(function (key) {
       dataToSign.push({
@@ -1553,10 +1510,8 @@ eWeLink.prototype.getRegion = function (countryCode, callback) {
    dataToSign = dataToSign.map(function (kv) {
       return kv.key + "=" + kv.value;
    }).join("&");
-   
    let sign = platform.getSignature(dataToSign);
    if (platform.debug) platform.log("Info: getRegion signature [%s].", sign);
-   
    let webClient = request.createClient("https://api.coolkit.cc:8080");
    webClient.headers["Authorization"] = "Sign " + sign;
    webClient.headers["Content-Type"] = "application/json;charset=UTF-8";
@@ -1598,7 +1553,6 @@ eWeLink.prototype.getWebSocketHost = function (callback) {
    data.ts = Math.floor(new Date().getTime() / 1000);
    data.nonce = nonce();
    data.appid = platform.appid;
-   
    let webClient = request.createClient("https://" + platform.apiHost.replace("-api", "-disp"));
    webClient.headers["Authorization"] = "Bearer " + platform.authenticationToken;
    webClient.headers["Content-Type"] = "application/json;charset=UTF-8";
@@ -1608,14 +1562,12 @@ eWeLink.prototype.getWebSocketHost = function (callback) {
          callback();
          return;
       }
-      
       if (!body.domain) {
          platform.log.error("Server did not response with a web socket host [%s].", response)
          platform.log.warn("\n" + JSON.stringify(body, null, 2));
          callback();
          return;
       }
-      
       if (platform.debug) platform.log("Web socket host received [%s].", body.domain);
       platform.wsHost = body.domain;
       if (platform.ws) {
@@ -1645,7 +1597,6 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
    if (!platform.log) {
       return;
    }
-   
    const UIID_MAPPING = {
       1: "SOCKET", // S20, MINI
       2: "SOCKET_2",
@@ -1702,7 +1653,6 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       1002: "NEW_HUMIDIFIER",
       1003: "WARM_AIR_BLOWER"
    };
-   
    const CHANNEL_MAPPING = {
       SOCKET: 1,
       SWITCH_CHANGE: 1,
@@ -1728,7 +1678,6 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       FAN_LIGHT: 4,
       MICRO: 4
    };
-   
    let deviceType = UIID_MAPPING[uiid] || "";
    if (deviceType === "") return 0;
    else return CHANNEL_MAPPING[deviceType] || 0;
@@ -1826,30 +1775,24 @@ eWeLink.prototype.getBlindPosition = function (accessory, callback) {
    if (!platform.log) {
       return;
    }
-   
    let lastPosition = accessory.context.lastPosition;
    if (lastPosition === undefined) {
       lastPosition = 0;
    }
-   
    platform.log("[%s] 'getCurrentPosition' is [%s].", accessory.displayName, lastPosition);
    callback(null, lastPosition);
 };
 
 eWeLink.prototype.getBlindMovementState = function (accessory, callback) {
-   
    let platform = this;
-   
    if (!platform.log) {
       return;
    }
-   
    if (!platform.webClient) {
       callback("this.webClient not yet ready while obtaining blind position for your device.");
       accessory.reachable = false;
       return;
    }
-   
    platform.log("Requesting blind position for [%s]", accessory.displayName);
    
    platform.webClient.get("/api/user/device?" + platform.getArguments(platform.apiKey), function (err, res, body) {
