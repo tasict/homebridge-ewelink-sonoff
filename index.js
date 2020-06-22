@@ -1140,10 +1140,10 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
 
    let newColour = convert.hsl.rgb(newHue, newSaturation, 50);
 
-   if (platform.debug){
-      platform.log("    new HSL (no L) > [%s],[%s],[?]",newHue,newSaturation);
-      platform.log("    new brightness > [%s]",newBrightness);
-      platform.log("    new RGB > [%s],[%s],[%s]",newColour[0],newColour[1],newColour[2]);
+   if (platform.debug) {
+      platform.log("    new HSL (no L) > [%s],[%s],[?]", newHue, newSaturation);
+      platform.log("    new brightness > [%s]", newBrightness);
+      platform.log("    new RGB > [%s],[%s],[%s]", newColour[0], newColour[1], newColour[2]);
    }
 
    let payload = {};
@@ -1168,7 +1168,7 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    }
    let string = JSON.stringify(payload);
    platform.sendWebSocketMessage(string, callback);
-   if (platform.debug) platform.log("[%s] requesting to turn HSL to [%s %s %s] (RGB %s,%s,%s).", accessory.displayName, newHue, newSaturation, newBrightness, newColour[0],newColour[1],newColour[2]);
+   if (platform.debug) platform.log("[%s] requesting to turn colour to HSL [%s %s %s] RGB [%s %s %s].", accessory.displayName, newHue, newSaturation, newBrightness, newColour[0], newColour[1], newColour[2]);
 };
 
 eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, callback) {
