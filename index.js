@@ -379,10 +379,10 @@ function eWeLink(log, config, api) {
                         //*********//          
                         else if (platform.devicesBridge.includes(device.uiid)) {
                            if (device.params.hasOwnProperty("rfList")) {
-                              if (device.params.rfList.length > 0)
+                              if (device.params.rfList.size > 0)
                               {
                                  services.bridge = true;
-                                 services.bridgeDeviceCount = device.params.rfList.length;
+                                 services.bridgeDeviceCount = device.params.rfList.size;
                                  for (i = 0; i <= device.params.rfList.length; i++) {
                                     platform.addAccessory(device, idToCheck + "SW" + i, services);
                                  }
