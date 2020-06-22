@@ -187,12 +187,12 @@ function eWeLink(log, config, api) {
                         // BRIDGES //
                         //*********//
                         else if (platform.devicesBridge.includes(accessory.context.eweUIID)) {
-                           if (Array.isArray(device.params)) {
+                           if (device.params.hasOwnProperty("cmd") && device.params.cmd === "trigger") {
                               platform.externalBridgeUpdate(idToCheck + "SW0", device.params);
                               return;
                            }                   
                         }
-                        platform.log.warn("[%s] could not be refreshed due to a hiccup in the eWeLink message.", accessory.deviceid);
+                        platform.log.warn("[%s] could not be refreshed due to a hiccup in the eWeLink message.", device.deviceid);
                      } else {
                         platform.log.warn("Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.");
                      }
@@ -338,9 +338,10 @@ function eWeLink(log, config, api) {
                         // THERMOSTATS //
                         //*************//                                                                              
                         else if (platform.devicesThermostat.includes(device.uiid)) {
-                           // services.thermostat = true;
-                           // platform.addAccessory(device, idToCheck + "SWX", services);
-                           platform.log.warn("Thermostats coming soon!");
+                           services.thermostat = true;
+                           services.temperature = true;
+                           services.humidity = true;
+                           platform.addAccessory(device, idToCheck + "SWX", services);
                         }
                         //************************//
                         // LIGHTS [SINGLE SWITCH] //
@@ -602,6 +603,12 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    if (services.thermostat) {
       accessory.addService(Service.Thermostat, newDeviceName);
    }
+   if (services.temperature) {
+      accessory.addService(Service.TemperatureSensor, newDeviceName);
+   }
+   if (services.humidity) {
+      accessory.addService(Service.HumiditySensor, newDeviceName);
+   }
    if (services.bridge) {
       accessory.context.isBridge = true;
       accessory.addService(Service.MotionSensor, newDeviceName);
@@ -712,15 +719,36 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       accessory.getService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);
    }
    if (accessory.getService(Service.Thermostat)) {
-      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentHeatingCoolingState);
-      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetHeatingCoolingState);
-      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentTemperature);
-      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetTemperature);
-      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TemperatureDisplayUnits);
-      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CoolingThresholdTemperature);
-      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentRelativeHumidity);
-      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.HeatingThresholdTemperature);
-      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetRelativeHumidity);
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetHeatingCoolingState)
+      .on("set", () => {
+         platform.log.warn("Thermostat functions coming soon.")
+         return;
+      });
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetTemperature)
+      .on("set", () => {
+         platform.log.warn("Thermostat functions coming soon.")
+         return;
+      });
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TemperatureDisplayUnits)
+      .on("set", () => {
+         platform.log.warn("Thermostat functions coming soon.")
+         return;
+      });
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CoolingThresholdTemperature)
+      .on("set", () => {
+         platform.log.warn("Thermostat functions coming soon.")
+         return;
+      });
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.HeatingThresholdTemperature)
+      .on("set", () => {
+         platform.log.warn("Thermostat functions coming soon.")
+         return;
+      });
+      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetRelativeHumidity)
+      .on("set", () => {
+         platform.log.warn("Thermostat functions coming soon.")
+         return;
+      });
    }
    if (accessory.getService(Service.WindowCovering)) {
       accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
@@ -1331,8 +1359,8 @@ eWeLink.prototype.externalMultiSwitchUpdate = function (hbDeviceId, params) {
          if (params.switches[i - 1].switch === "on") primaryState = true;
       }
       accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, primaryState);
-      return;
    }
+   return;
 }
 
 eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
@@ -1343,9 +1371,27 @@ eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
    
    let accessory = platform.devicesInHB.get(hbDeviceId);
    let idToCheck = hbDeviceId.slice(0, -1);
-   
-   // To do
-   
+   let i;
+   let otherAccessory;
+   for (i = 1; i <= accessory.context.channelCount; i++) {
+      if (platform.devicesInHB.has(idToCheck + i)) {
+         otherAccessory = platform.devicesInHB.get(idToCheck + i);
+         if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
+         if (params.hasOwnProperty("rfTrig" + (i - 1)))
+         {
+            otherAccessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, true);
+         }
+      }
+      accessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, true);
+   }
+   setTimeout(() => {
+      for (i = 0; i <= accessory.context.channelCount; i++) {
+         if (platform.devicesInHB.has(idToCheck + i)) {
+            otherAccessory = platform.devicesInHB.get(idToCheck + i);
+            otherAccessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, false);
+         }
+      }
+   }, 2000);
    return;
 }
 
