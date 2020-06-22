@@ -1390,7 +1390,7 @@ eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
             if (timeDifference < platform.sensorTimeDifference)  {
                otherAccessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, true);
                master = true;
-               if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
+               if (platform.debug) platform.log("[%s] has detected motion.", otherAccessory.displayName);
             }
          }
       }
