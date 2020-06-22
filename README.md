@@ -16,9 +16,9 @@ Thanks :)
 #### Switches/Outlets
 The plugin **should** work with Sonoff switches (single and multi channel) and outlets.
 #### Lights
-The plugin **should** work with Sonoff light wall switches. Sonoff bulbs and LED strips are a work in progress.
-#### Blinds/Fans/Thermostats
-Most likely aren't working, mainly because I don't own the devices so it's difficult to test.
+The plugin **should** work with Sonoff light wall switches (and will be exposed as lights in Homebridge). Sonoff bulbs and LED strips are a now nearly finished work in progress!
+#### Blinds/Fans/Thermostats/Bridges
+Most likely aren't working, mainly because I don't own the devices so it's difficult to test. Bridges definitely not supported yet.
 ## Installation
 > Please note if you are currently using a different Sonoff plugin, then you will need to reset your Homebridge accessory cache and take note of the changed configuration options.
 ### Through Homebridge Config UI X
