@@ -187,17 +187,20 @@ function eWeLink(log, config, api) {
                         // BRIDGES //
                         //*********//
                         else if (platform.devicesBridge.includes(accessory.context.eweUIID)) {
-                           return;                      
+                           if (Array.isArray(device.params)) {
+                              platform.externalBridgeUpdate(idToCheck + "SW0", device.params);
+                              return;
+                           }                   
                         }
-                        platform.log.error("[%s] could not be refreshed due to a hiccup in the eWeLink message.", accessory.deviceid);
+                        platform.log.warn("[%s] could not be refreshed due to a hiccup in the eWeLink message.", accessory.deviceid);
                      } else {
-                        if (platform.debug) platform.log.error("Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.");
+                        platform.log.warn("Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.");
                      }
                   } else if (device.action === "sysmsg") {
                      accessory = platform.devicesInHB.get(device.deviceid + "SWX");
                      accessory.reachable = device.online;
                      if (accessory.reachable) platform.log("[%s] has been reported online.", accessory.displayName);
-                     else platform.log.error("[%s] has been reported offline.", accessory.displayName);
+                     else platform.log.warn("[%s] has been reported offline.", accessory.displayName);
                   } else {
                      if (platform.debug) platform.log.error("Unknown action property or no params received via web socket.");
                   }
@@ -208,7 +211,7 @@ function eWeLink(log, config, api) {
                      }, device.config.hbInterval * 1000);
                   }
                } else {
-                  if (platform.debug) platform.log.error("Unknown command received via web socket.");
+                  if (platform.debug) platform.log.warn("Unknown command received via web socket.");
                }
             };
             platform.ws.onclose = function (e) {
@@ -379,17 +382,14 @@ function eWeLink(log, config, api) {
                         //*********//          
                         else if (platform.devicesBridge.includes(device.uiid)) {
                            if (device.params.hasOwnProperty("rfList")) {
-                              if (device.params.rfList.size > 0)
-                              {
-                                 services.bridge = true;
-                                 services.bridgeDeviceCount = device.params.rfList.size;
-                                 for (i = 0; i <= device.params.rfList.length; i++) {
-                                    platform.addAccessory(device, idToCheck + "SW" + i, services);
-                                 }
+                              services.bridge = true;
+                              services.bridgeDeviceCount = device.params.rfList.length;
+                              for (i = 0; i <= device.params.rfList.length; i++) {
+                                 platform.addAccessory(device, idToCheck + "SW" + i, services);
                               }
                            }
                         } else {
-                           platform.log("[%s] There has been a problem adding this device.", device.name);
+                           platform.log.warn("[%s] There has been a problem adding this device.", device.name);
                         }
                      }
                      //*****************************************//
@@ -472,8 +472,13 @@ function eWeLink(log, config, api) {
                         // BRIDGES //
                         //*********//
                         else if (platform.devicesBridge.includes(accessory.context.eweUIID)) {
-                           return;
+                           if (Array.isArray(device.params)) {
+                              platform.externalBridgeUpdate(idToCheck + "SW0", device.params);
+                              return;
+                           }                   
                         }
+                     } else {
+                        platform.log.warn("[%s] There has been a problem refreshing this device.", device.name);
                      }
                   });
                }
@@ -509,7 +514,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    }
    
    let newDeviceName;
-   if (switchNumber == "X" || switchNumber == "0") {
+   if (switchNumber === "X" || switchNumber === "0") {
       newDeviceName = device.name;
    } else {
       newDeviceName = device.name + " SW" + switchNumber;
@@ -694,7 +699,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       }
    }
    if (accessory.getService(Service.Fanv2)) {
-      accessory.getService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.Active).updateValue("1");
+      accessory.getService(Service.Fanv2, newDeviceName).updateCharacteristic(Characteristic.Active, "1");
       accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
          platform.internalFanUpdate(accessory, "power", value, callback);
@@ -715,7 +720,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
    }
    
    if (accessory.getService(Service.MotionSensor) && accessory.context.isBridge) {
-      accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.MotionDetected).updateValue(false);
+      accessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, false);
    }   
    
    if (accessory.getService(Service.Thermostat)) {
@@ -1342,6 +1347,21 @@ eWeLink.prototype.externalMultiSwitchUpdate = function (hbDeviceId, params) {
       return;
    }
 }
+
+eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
+   
+   let accessory = platform.devicesInHB.get(hbDeviceId);
+   let idToCheck = hbDeviceId.slice(0, -1);
+   
+   // To do
+   
+   return;
+}
+
 eWeLink.prototype.getSequence = function () {
    let time_stamp = new Date() / 1000;
    this.sequence = Math.floor(time_stamp * 1000);
