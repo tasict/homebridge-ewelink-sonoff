@@ -1111,8 +1111,11 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
       return;
    }
-   platform.log(type);
-   platform.log(targetHSL);
+   if (platform.debug){
+      platform.log(">>> type [%s]: targethsl [%s]", type, targetHSL);
+      platform.log("    current HSL (no L) > [%s],[%s]",accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value,accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value);
+      platform.log("    current brightness > [%s]",accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value);
+   }
 
    let newHue;
    let newSaturation;
@@ -1134,10 +1137,16 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       newBrightness = targetHSL;
       break;
    }
-   
+
    let newColour = convert.hsl.rgb(newHue, newSaturation, 50);
-   platform.log (newColour);
-   let payload = {};  
+
+   if (platform.debug){
+      platform.log("    new HSL (no L) > [%s],[%s],[?]",newHue,newSaturation);
+      platform.log("    new brightness > [%s]",newBrightness);
+      platform.log("    new RGB > [%s],[%s],[%s]",newColour[0],newColour[1],newColour[2]);
+   }
+
+   let payload = {};
    payload.action = 'update';
    payload.userAgent = 'app';
    payload.params = {};
@@ -1159,7 +1168,7 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    }
    let string = JSON.stringify(payload);
    platform.sendWebSocketMessage(string, callback);
-   if (platform.debug) platform.log("[%s] requesting to turn HSL to [%s %s %s].", accessory.displayName, newHue, newSaturation, newBrightness);
+   if (platform.debug) platform.log("[%s] requesting to turn HSL to [%s %s %s] (RGB %s,%s,%s).", accessory.displayName, newHue, newSaturation, newBrightness, newColour[0],newColour[1],newColour[2]);
 };
 
 eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, callback) {
