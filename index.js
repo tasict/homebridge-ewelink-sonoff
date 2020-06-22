@@ -1385,7 +1385,7 @@ eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
          otherAccessory = platform.devicesInHB.get(idToCheck + i);
          if (params.hasOwnProperty("rfTrig" + (i - 1)))
          {
-            timeOfMotion = new Date(params["rfTrig" + i]);
+            timeOfMotion = new Date(params["rfTrig" + (i - 1)]);
             timeDifference = (timeNow.getTime() - timeOfMotion.getTime()) / 1000;
             if (timeDifference < platform.sensorTimeDifference)  {
                otherAccessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, true);
