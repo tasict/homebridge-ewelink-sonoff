@@ -40,7 +40,7 @@ function eWeLink(log, config, api) {
    platform.webSocketOpen = false;
    platform.devicesInHB = new Map();
    platform.devicesInEwe = new Map();
-   platform.devicesUnsupported = [28];
+   platform.devicesUnsupported = [];
    platform.devicesSingleSwitch = [1, 5, 6, 14, 15, 22, 24, 27, 32, 36, 59]; // Supported single switch uiid models
    platform.devicesSingleSwitchLight = ["T1 1C", "L1", "B1", "TX1C"]; // A subset of above which we can expose as lights
    platform.devicesMultiSwitch = [2, 3, 4, 7, 8, 9, 29, 30, 31, 34, 41, 77]; // Supported multi switch uiid models
@@ -49,6 +49,7 @@ function eWeLink(log, config, api) {
    platform.devicesColourable = [59]; // Supported light with dimmer and light function uiid models
    platform.devicesThermostat = [15]; // Supported thermostat uiid models
    platform.devicesFan = [34]; // Supported fan uiid models
+   platform.devicesBridge = [28];
    platform.deviceGroups = new Map();
    platform.groupDefaults = {
       "switchUp": 1,
@@ -179,8 +180,14 @@ function eWeLink(log, config, api) {
                         else if (platform.devicesMultiSwitch.includes(accessory.context.eweUIID)) {
                            if (Array.isArray(device.params.switches)) {
                               platform.externalMultiSwitchUpdate(idToCheck + "SW0", device.params);
-                              return
+                              return;
                            }
+                        }
+                        //*********//
+                        // BRIDGES //
+                        //*********//
+                        else if (platform.devicesBridge.includes(accessory.context.eweUIID)) {
+                           return;                      
                         }
                         platform.log.error("[%s] could not be refreshed due to a hiccup in the eWeLink message.", accessory.deviceid);
                      } else {
@@ -366,7 +373,24 @@ function eWeLink(log, config, api) {
                                  platform.addAccessory(device, idToCheck + "SW" + i, services);
                               }
                            }
-                        } else platform.log("[%s] There has been a problem adding this device.", device.name);
+                        }
+                        //*********//
+                        // BRIDGES //
+                        //*********//          
+                        else if (platform.devicesBridge.includes(device.uiid)) {
+                           if (device.params.hasOwnProperty("rfList")) {
+                              if (device.params.rfList.length > 0)
+                              {
+                                 services.bridge = true;
+                                 services.bridgeDeviceCount = device.params.rfList.length;
+                                 for (i = 0; i <= device.params.rfList.length; i++) {
+                                    platform.addAccessory(device, idToCheck + "SW" + i, services);
+                                 }
+                              }
+                           }
+                        } else {
+                           platform.log("[%s] There has been a problem adding this device.", device.name);
+                        }
                      }
                      //*****************************************//
                      // REFRESH EXISTING AND JUST ADDED DEVICES //
@@ -444,6 +468,12 @@ function eWeLink(log, config, api) {
                               return;
                            }
                         }
+                        //*********//
+                        // BRIDGES //
+                        //*********//
+                        else if (platform.devicesBridge.includes(accessory.context.eweUIID)) {
+                           return;
+                        }
                      }
                   });
                }
@@ -470,8 +500,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       platform.log.warn("[%s] is not currently compatible with this plugin.", hbDeviceId);
       return;
    }
-   
-   let channelCount = platform.getChannelsByUIID(device.uiid);
+   let channelCount = services.bridge ? services.bridgeDeviceCount : platform.getChannelsByUIID(device.uiid);
    let switchNumber = hbDeviceId.substr(-1);
    
    if (switchNumber > channelCount) {
@@ -479,25 +508,11 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       return;
    }
    
-   let status;
    let newDeviceName;
-   
-   switch (switchNumber) {
-      case "X":
-      status = device.params.switch;
+   if (switchNumber == "X" || switchNumber == "0") {
       newDeviceName = device.name;
-      break;
-      case "0":
-      status = (device.params.switches[0].switch === "on" || device.params.switches[1].switch === "on" || device.params.switches[2].switch === "on" || device.params.switches[3].switch === "on") ? "on" : "off";
-      newDeviceName = device.name;
-      break;
-      case "1":
-      case "2":
-      case "3":
-      case "4":
+   } else {
       newDeviceName = device.name + " SW" + switchNumber;
-      status = device.params.switches[parseInt(switchNumber) - 1].switch;
-      break;
    }
    
    const accessory = new Accessory(newDeviceName, UUIDGen.generate(hbDeviceId).toString());
@@ -511,6 +526,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    accessory.context.isDimmable = false;
    accessory.context.isColourable = false;
    accessory.context.isFan = false;
+   accessory.context.isBridge = false;
    accessory.context.channelCount = channelCount;
    accessory.reachable = device.online;
    
@@ -586,6 +602,11 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentRelativeHumidity);
       accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.HeatingThresholdTemperature);
       accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetRelativeHumidity);
+   }
+   
+   if (services.bridge) {
+      accessory.context.isBridge = true;
+      accessory.addService(Service.MotionSensor, newDeviceName).getCharacteristic(Characteristic.MotionDetected);
    }
    
    if (services.blind) {
@@ -692,6 +713,11 @@ eWeLink.prototype.configureAccessory = function (accessory) {
          platform.internalFanUpdate(accessory, "light", value, callback);
       });
    }
+   
+   if (accessory.getService(Service.MotionSensor) && accessory.context.isBridge) {
+      accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.MotionDetected).updateValue(false);
+   }   
+   
    if (accessory.getService(Service.Thermostat)) {
       accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentHeatingCoolingState);
       accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetHeatingCoolingState);
@@ -1585,7 +1611,7 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       29: "GSM_SOCKET_2",
       30: "GSM_SOCKET_3",
       31: "GSM_SOCKET_4",
-      32: "POWER_DETECTION_SOCKET",
+      32: "POWER_DETECTION_SOCKET", //Pow_R2
       33: "LIGHT_BELT",
       34: "FAN_LIGHT",
       35: "EZVIZ_CAMERA",
