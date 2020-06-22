@@ -582,7 +582,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    }
    if (services.fan) {
       accessory.context.isFan = true;
-      accessory.addService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.Active);
+      accessory.addService(Service.Fanv2, newDeviceName);
       accessory.getService(Service.Fanv2, newDeviceName).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
          platform.internalFanUpdate(accessory, "power", value, callback);
@@ -600,19 +600,11 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       });
    }
    if (services.thermostat) {
-      accessory.addService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentHeatingCoolingState);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetHeatingCoolingState);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentTemperature);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetTemperature);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TemperatureDisplayUnits);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CoolingThresholdTemperature);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentRelativeHumidity);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.HeatingThresholdTemperature);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetRelativeHumidity);
+      accessory.addService(Service.Thermostat, newDeviceName);
    }
    if (services.bridge) {
       accessory.context.isBridge = true;
-      accessory.addService(Service.MotionSensor, newDeviceName).getCharacteristic(Characteristic.MotionDetected);
+      accessory.addService(Service.MotionSensor, newDeviceName);
    }
    if (services.blind) {
       accessory.context.switchUp = (services.group.switchUp || platform.groupDefaults["switchUp"]) - 1;
@@ -697,7 +689,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       }
    }
    if (accessory.getService(Service.Fanv2)) {
-      accessory.getService(Service.Fanv2, newDeviceName).updateCharacteristic(Characteristic.Active, "1");
+      accessory.getService(Service.Fanv2, newDeviceName).setCharacteristic(Characteristic.Active, "1");
       accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
          platform.internalFanUpdate(accessory, "power", value, callback);
@@ -717,18 +709,18 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       });
    }
    if (accessory.getService(Service.MotionSensor) && accessory.context.isBridge) {
-      accessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, false);
+      accessory.getService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);
    }
    if (accessory.getService(Service.Thermostat)) {
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentHeatingCoolingState);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetHeatingCoolingState);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentTemperature);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetTemperature);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TemperatureDisplayUnits);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CoolingThresholdTemperature);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentRelativeHumidity);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.HeatingThresholdTemperature);
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetRelativeHumidity);
+      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentHeatingCoolingState);
+      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetHeatingCoolingState);
+      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentTemperature);
+      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetTemperature);
+      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TemperatureDisplayUnits);
+      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CoolingThresholdTemperature);
+      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CurrentRelativeHumidity);
+      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.HeatingThresholdTemperature);
+      //accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetRelativeHumidity);
    }
    if (accessory.getService(Service.WindowCovering)) {
       accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
