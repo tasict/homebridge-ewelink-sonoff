@@ -1111,7 +1111,9 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
       return;
    }
-   
+   platform.log(type);
+   platform.log(targetHSL);
+
    let newHue;
    let newSaturation;
    let newBrightness;
@@ -1133,7 +1135,8 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       break;
    }
    
-   let newColour = convert.hsl.rgb(newHue, newSaturation, newBrightness);
+   let newColour = convert.hsl.rgb(newHue, newSaturation, 50);
+   platform.log (newColour);
    let payload = {};  
    payload.action = 'update';
    payload.userAgent = 'app';
@@ -1147,6 +1150,7 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       payload.params.colorR = newColour[0];
       payload.params.colorG = newColour[1];
       payload.params.colorB = newColour[2];
+      payload.params.bright = newBrightness;
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHue);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newSaturation);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
