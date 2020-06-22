@@ -1371,18 +1371,28 @@ eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
    
    let accessory = platform.devicesInHB.get(hbDeviceId);
    let idToCheck = hbDeviceId.slice(0, -1);
+   let timeNow = new Date();
+   let timeOfMotion;
+   let timeDifference;
    let i;
    let otherAccessory;
+   let master = false;
+   
    for (i = 1; i <= accessory.context.channelCount; i++) {
       if (platform.devicesInHB.has(idToCheck + i)) {
          otherAccessory = platform.devicesInHB.get(idToCheck + i);
-         if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
          if (params.hasOwnProperty("rfTrig" + (i - 1)))
          {
-            otherAccessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, true);
+            timeOfMotion = new Date(device.params["rfTrig" + i]);
+            timeDifference = (timeNow.getTime() - timeOfMotion.getTime()) / 1000;
+            if (timeDifference < 120)  {
+               otherAccessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, true);
+               master = true;
+               if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
+            }
          }
       }
-      accessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, true);
+      accessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, master);
    }
    setTimeout(() => {
       for (i = 0; i <= accessory.context.channelCount; i++) {
