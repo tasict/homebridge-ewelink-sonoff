@@ -11,8 +11,8 @@ Thanks :)
 The plugin **should** work with Sonoff switches (single- and multi-channel).
 #### 🟢 Outlets
 The plugin **should** work with Sonoff outlets.
-#### 🟢 Lights
-The plugin **should** work with Sonoff light wall switches (and will be exposed as lights in Homebridge). The plugin **should** also work with LED strips and colour bulbs, giving you full control of the brightness and colour from the Home app.
+#### 🟠 Lights
+The plugin **should** work with Sonoff light wall switches (and will be exposed as lights in Homebridge). The plugin **should** also work with LED strips giving you full control of the brightness and colour from the Home app. The Sonoff Bulbs (B1) are a work in progress!
 #### 🟢 RF Bridges
 The plugin **should** work with the Sonoff Bridge, at the moment exposing motion sensors that will detect motion and notify Homebridge/HomeKit. Other devices connected to the RF bridge might cause issues.
 #### 🟢 Thermostats
