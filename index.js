@@ -199,7 +199,7 @@ function eWeLink(log, config, api) {
                         }
                         platform.log.warn("[%s] could not be refreshed due to a hiccup in the eWeLink message.", device.deviceid);
                      } else {
-                        platform.log.warn("Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.");
+                        platform.log.warn("[%s] Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.", device.deviceid);
                      }
                   } else if (device.action === "sysmsg") {
                      if (platform.devicesInHB.has(device.deviceid + "SWX")) {
