@@ -53,10 +53,10 @@ Add the following to your Homebridge configuration file in the appropriate place
 And voila your eWeLink devices *should* be added to your Homebridge instance.
 ## About
 #### Changes from [homebridge-ewelink-max](https://github.com/howanghk/homebridge-ewelink)
-> By "primary device", I mean the main device (whether it just have one switch or more).
+> By *primary device* I mean the main device (whether it just have one switch or more).
 > 
-> By "secondary device", I mean an accessory that is created from a particular channel from a "primary device".
-- For multi-switch devices, a primary device will now appear in Homebridge. Turning it on/off will turn all its secondary devices on/off respectively. The primary device will show as on if **any** of its secondary devices are on, otherwise it will show as off.
+> By *secondary device* I mean an accessory that is created from a particular channel from a *primary device*.
+- For general multi-switch devices, a primary device will now appear in Homebridge. Turning it on/off will turn all its secondary devices on/off respectively. The primary device will show as on if **any** of its secondary devices are on, otherwise it will show as off.
 - If any device is externally updated (eg. physically or through eWeLink app/alexa/google), the plugin will no longer {notice the change and send a request to update the device with eWeLink} ([see here](https://github.com/howanghk/homebridge-ewelink/issues/96)).
 - Certain devices are no longer removed and re-added upon Homebridge (re)start ([see here](https://github.com/howanghk/homebridge-ewelink/issues/105)).
 #### My future plans/ideas
