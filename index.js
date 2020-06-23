@@ -1672,7 +1672,7 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       17: "THREE_GEAR_FAN",
       18: "SENSORS_CENTER",
       19: "HUMIDIFIER",
-      22: "RGB_BALL_LIGHT",
+      22: "RGB_BALL_LIGHT", //B1, B1_R2
       23: "NEST_THERMOSTAT",
       24: "GSM_SOCKET",
       25: "AROMATHERAPY",
