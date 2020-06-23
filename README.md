@@ -27,6 +27,7 @@ The plugin **should** work with the Sonoff Thermostat devices, at the moment det
 The plugin **might** work with the Sonoff Fan devices. I need a kind person with the fan device to assist!
 #### 🔴 Custom Devices (Blinds, Garage Doors)
 > By custom devices I mean using a generic Sonoff multi switch device to simulate a specific type of accessory that is HomeKit supported, for example blinds and garage doors.
+
 The plugin **probably won't** work for blinds and **definitely won't** work for garage doors... yet.
 ## Installation
 > Please note if you are currently using a different Sonoff plugin, then you will need to reset your Homebridge accessory cache and take note of the changed configuration options.
