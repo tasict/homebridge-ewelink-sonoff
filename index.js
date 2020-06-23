@@ -145,9 +145,10 @@ function eWeLink(log, config, api) {
                         // THERMOSTATS //
                         //*************//                                    
                         else if (platform.devicesThermostat.includes(accessory.context.eweUIID)) {
-                           //platform.updateTempAndHumidity(idToCheck + "SWX", device.params);
-                           platform.log.warn("Thermostats coming soon!");
-                           return;
+                           if (device.params.hasOwnProperty("currentTemperature") || device.params.hasOwnProperty("currentHumidity")) {
+                              platform.externalThermostatUpdate(idToCheck + "SWX", device.params);
+                              return;
+                           }
                         }
                         //************************//
                         // LIGHTS [SINGLE SWITCH] //
@@ -439,9 +440,10 @@ function eWeLink(log, config, api) {
                         // THERMOSTATS //
                         //*************//                                    
                         else if (platform.devicesThermostat.includes(accessory.context.eweUIID)) {
-                           //platform.updateTempAndHumidity(idToCheck + "SWX", device.params);
-                           platform.log.warn("Thermostats coming soon!");
-                           return;
+                           if (device.params.hasOwnProperty("currentTemperature") || device.params.hasOwnProperty("currentHumidity")) {
+                              platform.externalThermostatUpdate(idToCheck + "SWX", device.params);
+                              return;
+                           }
                         }
                         //************************//
                         // LIGHTS [SINGLE SWITCH] //
@@ -1248,12 +1250,31 @@ eWeLink.prototype.externalFanUpdate = function (hbDeviceId, params) {
    } else if (params.switches[1].switch === "on" && params.switches[2].switch === "on" && params.switches[3].switch === "off") {
       status = true;
       speed = 66;
-   } else if (params.switches[1].switch === "on" && params.switches[2].switch === "off" && device.params.switches[3].switch === "on") {
+   } else if (params.switches[1].switch === "on" && params.switches[2].switch === "off" && params.switches[3].switch === "on") {
       status = true;
       speed = 100;
    }
    accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, status);
    accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, speed);
+   return;
+}
+
+eWeLink.prototype.externalThermostatUpdate = function (hbDeviceId, params) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
+   let accessory = platform.devicesInHB.get(hbDeviceId);
+   if (params.hasOwnProperty("currentTemperature")) {
+      let currentTemp = params.currentTemperature;
+      accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.CurrentTemperature, currentTemp);
+      accessory.getService(Service.TemperatureSensor).updateCharacteristic(Characteristic.CurrentTemperature, currentTemp);
+   }
+   if (params.hasOwnProperty("currentHumidity")) {
+      let currentHumi = params.currentHumidity;
+      accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumi);
+      accessory.getService(Service.HumiditySensor).updateCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumi);
+   }
    return;
 }
 
@@ -1612,7 +1633,7 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       12: "EW-RE",
       13: "FIREPLACE",
       14: "SWITCH_CHANGE",
-      15: "THERMOSTAT",
+      15: "THERMOSTAT", //TH10, TH16
       16: "COLD_WARM_LED",
       17: "THREE_GEAR_FAN",
       18: "SENSORS_CENTER",
