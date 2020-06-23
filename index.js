@@ -835,10 +835,6 @@ eWeLink.prototype.internalSwitchUpdate = function (accessory, isOn, callback) {
    if (!platform.log) {
       return;
    }
-   if (!accessory.reachable) {
-      platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
-      return;
-   }
    let targetState = isOn ? "on" : "off";
    let otherAccessory;
    let i;
@@ -903,10 +899,6 @@ eWeLink.prototype.internalSwitchUpdate = function (accessory, isOn, callback) {
 eWeLink.prototype.internalLightbulbUpdate = function (accessory, isOn, callback) {
    let platform = this;
    if (!platform.log) {
-      return;
-   }
-   if (!accessory.reachable) {
-      platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
       return;
    }
    let targetState = isOn ? "on" : "off";
@@ -975,10 +967,6 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
    if (!platform.log) {
       return;
    }
-   if (!accessory.reachable) {
-      platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
-      return;
-   }
    let otherAccessory;
    let i;
    let payload = {};
@@ -1004,10 +992,6 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
 eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, callback) {
    let platform = this;
    if (!platform.log) {
-      return;
-   }
-   if (!accessory.reachable) {
-      platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
       return;
    }
    if (platform.debug) {
@@ -1066,10 +1050,6 @@ eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, ca
    if (!platform.log) {
       return;
    }
-   if (!accessory.reachable) {
-      platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
-      return;
-   }
    let newPower;
    let newSpeed;
    let newLight;
@@ -1117,10 +1097,6 @@ eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, ca
 eWeLink.prototype.internalThermostatUpdate = function (accessory, type, targetState, callback) {
    let platform = this;
    if (!platform.log) {
-      return;
-   }
-   if (!accessory.reachable) {
-      platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
       return;
    }
    let newState;
