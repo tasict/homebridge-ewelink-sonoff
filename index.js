@@ -604,7 +604,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       });
    }
    if (services.thermostat) {
-      accessory.addService(Service.Thermostat, newDeviceName);
+      accessory.addService(Service.Thermostat, newDeviceName).setCharacteristic(Characteristic.TemperatureDisplayUnits, 0);
    }
    if (services.temperature) {
       accessory.addService(Service.TemperatureSensor, newDeviceName);
@@ -698,7 +698,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       }
    }
    if (accessory.getService(Service.Fanv2)) {
-      accessory.getService(Service.Fanv2, newDeviceName).setCharacteristic(Characteristic.Active, "1");
+      accessory.getService(Service.Fanv2, newDeviceName).setCharacteristic(Characteristic.Active, 1);
       accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
          platform.internalFanUpdate(accessory, "power", value, callback);
@@ -722,34 +722,16 @@ eWeLink.prototype.configureAccessory = function (accessory) {
    }
    if (accessory.getService(Service.Thermostat)) {
       accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetHeatingCoolingState)
-      .on("set", () => {
-         platform.log.warn("Thermostat functions coming soon.")
-         return;
+      .on("set", function (value, callback) {
+         platform.internalThermostatUpdate(accessory, "targetState", value, callback);
       });
       accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetTemperature)
-      .on("set", () => {
-         platform.log.warn("Thermostat functions coming soon.")
-         return;
-      });
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TemperatureDisplayUnits)
-      .on("set", () => {
-         platform.log.warn("Thermostat functions coming soon.")
-         return;
-      });
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.CoolingThresholdTemperature)
-      .on("set", () => {
-         platform.log.warn("Thermostat functions coming soon.")
-         return;
-      });
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.HeatingThresholdTemperature)
-      .on("set", () => {
-         platform.log.warn("Thermostat functions coming soon.")
-         return;
+      .on("set", function (value, callback) {
+         platform.internalThermostatUpdate(accessory, "targetTemp", value, callback);
       });
       accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetRelativeHumidity)
-      .on("set", () => {
-         platform.log.warn("Thermostat functions coming soon.")
-         return;
+      .on("set", function (value, callback) {
+         platform.internalThermostatUpdate(accessory, "targetHumi", value, callback);
       });
    }
    if (accessory.getService(Service.WindowCovering)) {
@@ -1139,6 +1121,62 @@ eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, ca
    let string = JSON.stringify(payload);
    platform.sendWebSocketMessage(string, callback);
    if (platform.debug) platform.log("[%s] requesting to change fan %s.", accessory.displayName, type);
+};
+
+eWeLink.prototype.internalThermostatUpdate = function (accessory, type, targetState, callback) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
+   if (!accessory.reachable) {
+      platform.log.error("[%s] is currently offline so cannot be updated.", accessory.displayName);
+      return;
+   }
+   let newState;
+   let newTemp;
+   let newHumi;
+   switch (type) {
+      case "targetState":
+      newState = targetState;
+      newTemp = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentTemperature).value;
+      newHumi = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentRelativeHumidity).value;
+      break;
+      case "targetTemp":
+      newState = 0;
+      if (accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentTemperature).value < targetState) {
+         newState = 1;
+      } else if (accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentTemperature).value > targetState) {
+         newState = 2;
+      }
+      newTemp = targetState;
+      newHumi = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentRelativeHumidity).value;
+      break;
+      case "targetHumi":
+      newState = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentHeatingCoolingState).value;
+      newTemp = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentTemperature).value;
+      newHumi = targetState;
+      break;
+   }
+   switch (accessory.context.switchNumber) {
+      case "X":
+      accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.TargetHeatingCoolingState, newState);
+      accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.TargetTemperature, newTemp);
+      accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.TargetRelativeHumidity, newHumi);
+      break;
+   }
+   let comment = false; // just to blank out the following lines
+   if (comment) {
+      let payload = {};
+      payload.params = {};
+      payload.action = "update";
+      payload.userAgent = "app";
+      payload.apikey = accessory.context.eweApiKey;
+      payload.deviceid = accessory.context.eweDeviceId;
+      payload.sequence = platform.getSequence();
+      let string = JSON.stringify(payload);
+      platform.sendWebSocketMessage(string, callback);
+   }
+   if (platform.debug) platform.log("[%s] requesting to change thermostat %s.", accessory.displayName, type);
 };
 
 eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
