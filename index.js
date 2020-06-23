@@ -1036,11 +1036,6 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       break;
    }
    let newColour = convert.hsl.rgb(newHue, newSaturation, 50);
-   if (platform.debug) {
-      platform.log("    new HSL (no L) > [%s],[%s],[?]", newHue, newSaturation);
-      platform.log("    new brightness > [%s]", newBrightness);
-      platform.log("    new RGB > [%s],[%s],[%s]", newColour[0], newColour[1], newColour[2]);
-   }
    let payload = {};
    payload.action = "update";
    payload.userAgent = "app";
@@ -1653,14 +1648,14 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       return;
    }
    const UIID_MAPPING = {
-      1: "SOCKET", // S20, MINI
+      1: "SOCKET", // S20, MINI, BASIC, S26
       2: "SOCKET_2",
       3: "SOCKET_3",
       4: "SOCKET_4",
       5: "SOCKET_POWER",
-      6: "SWITCH", // T1 1C
+      6: "SWITCH", // T1 1C, TX1C
       7: "SWITCH_2", // T1 2C, TX2C
-      8: "SWITCH_3", // TX3C
+      8: "SWITCH_3", // T1 3C, TX3C
       9: "SWITCH_4",
       10: "OSPF",
       11: "CURTAIN",
@@ -1678,7 +1673,7 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       25: "AROMATHERAPY",
       26: "BJ_THERMOSTAT",
       27: "GSM_UNLIMIT_SOCKET",
-      28: "RF_BRIDGE", //RFBridge
+      28: "RF_BRIDGE", //RFBridge, RF_Bridge
       29: "GSM_SOCKET_2",
       30: "GSM_SOCKET_3",
       31: "GSM_SOCKET_4",
@@ -1686,7 +1681,7 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       33: "LIGHT_BELT",
       34: "FAN_LIGHT",
       35: "EZVIZ_CAMERA",
-      36: "SINGLE_CHANNEL_DIMMER_SWITCH",
+      36: "SINGLE_CHANNEL_DIMMER_SWITCH", //KING-M4
       38: "HOME_KIT_BRIDGE",
       40: "FUJIN_OPS",
       41: "CUN_YOU_DOOR",
@@ -1704,6 +1699,8 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       57: "MONOCHROMATIC_BALL_LIGHT",
       59: "MEARICAMERA", // L1
       77: "MICRO",
+      87: "", // GK-200MP2B
+      102: "", // OPL-DMA
       1001: "BLADELESS_FAN",
       1002: "NEW_HUMIDIFIER",
       1003: "WARM_AIR_BLOWER"
