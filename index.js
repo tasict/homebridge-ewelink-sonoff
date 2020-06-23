@@ -698,7 +698,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       }
    }
    if (accessory.getService(Service.Fanv2)) {
-      accessory.getService(Service.Fanv2, newDeviceName).setCharacteristic(Characteristic.Active, 1);
+      accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.Active, 1);
       accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
          platform.internalFanUpdate(accessory, "power", value, callback);
@@ -721,15 +721,15 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       accessory.getService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);
    }
    if (accessory.getService(Service.Thermostat)) {
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetHeatingCoolingState)
+      accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetHeatingCoolingState)
       .on("set", function (value, callback) {
          platform.internalThermostatUpdate(accessory, "targetState", value, callback);
       });
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetTemperature)
+      accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetTemperature)
       .on("set", function (value, callback) {
          platform.internalThermostatUpdate(accessory, "targetTemp", value, callback);
       });
-      accessory.getService(Service.Thermostat, newDeviceName).getCharacteristic(Characteristic.TargetRelativeHumidity)
+      accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetRelativeHumidity)
       .on("set", function (value, callback) {
          platform.internalThermostatUpdate(accessory, "targetHumi", value, callback);
       });
