@@ -21,20 +21,20 @@ module.exports = function (homebridge) {
 };
 
 function eWeLink(log, config, api) {
-   if (!config || (!config.username || !config.password || !config.countryCode)) {
-      log.error("Please check you have set your username, password and country code in the Homebridge config.");
-      return;
-   }
    let platform = this;
    platform.log = log;
    platform.config = config;
+   if (!platform.config || (!platform.config.username || !platform.config.password || !platform.config.countryCode)) {
+      log.error("Please check you have set your username, password and country code in the Homebridge config.");
+      return;
+   }
    platform.apiKey = "UNCONFIGURED";
    platform.authenticationToken = "UNCONFIGURED";
    platform.appid = "oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq";
-   platform.debug = platform.config.debug || false;
    platform.emailLogin = platform.config.username.includes("@") ? true : false;
    platform.apiHost = (platform.config.apiHost || "eu-api.coolkit.cc") + ":8080";
    platform.wsHost = platform.config.wsHost || "eu-pconnect3.coolkit.cc";
+   platform.debug = platform.config.debug || false;
    platform.debugReqRes = platform.config.debugReqRes || false;
    platform.debugInitial = platform.config.debugInitial || false;
    platform.sensorTimeLength = platform.config.sensorTimeLength || 2;
@@ -48,7 +48,7 @@ function eWeLink(log, config, api) {
    platform.devicesMultiSwitch = [2, 3, 4, 7, 8, 9, 29, 30, 31, 34, 41, 77]; // Supported multi switch uiid models
    platform.devicesMultiSwitchLight = ["T1 2C", "T1 3C", "TX2C", "TX3C"]; // A subset of above which we can expose as lights
    platform.devicesLightsDimmable = [36]; // Supported light with dimmer function uiid models
-   platform.devicesColourable = [59]; // Supported light with dimmer and light function uiid models
+   platform.devicesColourable = [22, 59]; // Supported light with dimmer and light function uiid models
    platform.devicesThermostat = [15]; // Supported thermostat uiid models
    platform.devicesFan = [34]; // Supported fan uiid models
    platform.devicesBridge = [28];
@@ -103,6 +103,8 @@ function eWeLink(log, config, api) {
                try {
                   device = JSON.parse(message);
                } catch (e) {
+                  if (platform.debug) platform.log.warn("An error occured reading the web socket message.");
+                  if (platform.debug) platform.log.warn(e);
                   return;
                }
                if (device.hasOwnProperty("action")) {
@@ -278,7 +280,7 @@ function eWeLink(log, config, api) {
                });
                
                // Blind groupings found in the configuration are set in the "platform.deviceGroups" map.
-               if (platform.config["groups"] && Object.keys(platform.config["groups"]).length > 0) {
+               if (platform.config["groups"] && Object.keys(platform.config.groups).length > 0) {
                   platform.config.groups.forEach((group) => {
                      if (typeof group.deviceId !== "undefined" && platform.devicesInEwe.has(group.deviceId + "SWX")) {
                         platform.deviceGroups.set(group.deviceId + "SWX", group);
@@ -1854,7 +1856,7 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
             diffTime = Math.round(accessory.context.percentDurationUp * diffPosition);
          }
          diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
-
+         
          let timestamp = Date.now();
          if (accessory.context.currentPositionState === 1) {
             actualPosition = Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
