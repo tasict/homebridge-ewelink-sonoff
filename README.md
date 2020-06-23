@@ -63,5 +63,5 @@ And voila your eWeLink devices *should* be added to your Homebridge instance.
 - The only devices I own are T1-1C and T1-2C light switches so I can only test with those.
 #### Issues/Pull Requests
 Please feel free to submit - the more the merrier! As the name suggests, this is still in beta so it's most likely you'll run into issues.
-## Credits
+#### Credits
 Where do I start... 😄
