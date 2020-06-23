@@ -44,7 +44,7 @@ function eWeLink(log, config, api) {
    platform.devicesInEwe = new Map();
    platform.devicesUnsupported = [];
    platform.devicesSingleSwitch = [1, 5, 6, 14, 15, 22, 24, 27, 32, 36, 59]; // Supported single switch uiid models
-   platform.devicesSingleSwitchLight = ["T1 1C", "L1", "B1", "TX1C"]; // A subset of above which we can expose as lights
+   platform.devicesSingleSwitchLight = ["T1 1C", "L1", "B1", "B1_R2", "TX1C", "KING-M4"]; // A subset of above which we can expose as lights
    platform.devicesMultiSwitch = [2, 3, 4, 7, 8, 9, 29, 30, 31, 34, 41, 77]; // Supported multi switch uiid models
    platform.devicesMultiSwitchLight = ["T1 2C", "T1 3C", "TX2C", "TX3C"]; // A subset of above which we can expose as lights
    platform.devicesDimmable = [36]; // Supported light with dimmer function uiid models
@@ -350,7 +350,7 @@ function eWeLink(log, config, api) {
                         //************************//
                         // LIGHTS [SINGLE SWITCH] //
                         //************************//
-                        else if (platform.devicesSingleSwitch.includes(device.uiid) || platform.devicesSingleSwitchLight.includes(device.productModel)) {
+                        else if (platform.devicesSingleSwitch.includes(device.uiid) && platform.devicesSingleSwitchLight.includes(device.productModel)) {
                            if (device.params.hasOwnProperty("switch")) {
                               services.lightbulb = true;
                               if (platform.devicesColourable.includes(device.uiid)) services.colourable = true;
@@ -361,7 +361,7 @@ function eWeLink(log, config, api) {
                         //***********************//
                         // LIGHTS [MULTI SWITCH] //
                         //***********************//
-                        else if (platform.devicesMultiSwitch.includes(device.uiid) || platform.devicesMultiSwitchLight.includes(device.productModel)) {
+                        else if (platform.devicesMultiSwitch.includes(device.uiid) && platform.devicesMultiSwitchLight.includes(device.productModel)) {
                            if (Array.isArray(device.params.switches)) {
                               services.lightbulb = true;
                               channelCount = platform.getChannelsByUIID(device.uiid);
