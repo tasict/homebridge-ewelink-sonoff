@@ -65,3 +65,5 @@ And voila your eWeLink devices *should* be added to your Homebridge instance.
 #### My limitations
 - I am not an expert in javascript, but can certainly work around the template I have.
 - The only devices I own are T1-1C and T1-2C light switches so I can only test with those.
+## Credits
+Where do I start... 😄
