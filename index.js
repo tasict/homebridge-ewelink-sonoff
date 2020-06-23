@@ -796,14 +796,12 @@ eWeLink.prototype.configureAccessory = function (accessory) {
          return;
       });
       if (platform.debug) platform.log("[%s] initialising switches for correct start up.", accessory.displayName);
-      
       let lastPosition = accessory.context.lastPosition;
       if ((lastPosition === undefined) || (lastPosition < 0)) lastPosition = 0;
       if (platform.debug) platform.log("[%s] cached position was [%s].", accessory.displayName, lastPosition);
       accessory.context.lastPosition = lastPosition;
       accessory.context.currentTargetPosition = lastPosition;
-      accessory.context.currentPositionState = 2; // 0 = Moving up, 1 = Moving down, 2 = Not moving.
-      
+      accessory.context.currentPositionState = 2;
       let group = platform.deviceGroups.get(accessory.context.hbDeviceId);
       if (group) {
          accessory.context.switchUp = (group.switchUp || platform.groupDefaults["switchUp"]) - 1;
@@ -1825,122 +1823,6 @@ WebSocketClient.prototype.onclose = function (e) {
    // console.log("WebSocketClient: Web socket closed.", arguments);
 };
 
-eWeLink.prototype.getBlindPosition = function (accessory, callback) {
-   let platform = this;
-   if (!platform.log) {
-      return;
-   }
-   let lastPosition = accessory.context.lastPosition;
-   if (lastPosition === undefined) {
-      lastPosition = 0;
-   }
-   platform.log("[%s] 'getCurrentPosition' is [%s].", accessory.displayName, lastPosition);
-   callback(null, lastPosition);
-};
-
-eWeLink.prototype.getBlindMovementState = function (accessory, callback) {
-   let platform = this;
-   if (!platform.log) {
-      return;
-   }
-   if (!platform.webClient) {
-      callback("this.webClient not yet ready while obtaining blind position for your device.");
-      accessory.reachable = false;
-      return;
-   }
-   platform.log("Requesting blind position for [%s]", accessory.displayName);
-   
-   platform.webClient.get("/api/user/device?" + platform.getArguments(platform.apiKey), function (err, res, body) {
-      
-      if (err) {
-         if (res && [503].indexOf(parseInt(res.statusCode)) !== -1) {
-            platform.log("Sonoff API 503 error. Will try again.");
-            setTimeout(function () {
-               platform.getHumidityState(accessory, callback);
-            }, 1000);
-         } else {
-            platform.log("An error occurred while requesting blind position for [%s]. Error [%s].", accessory.displayName, err);
-         }
-         return;
-      } else if (!body) {
-         platform.log("An error occurred while requesting blind position for [%s]. Error [No data in response].", accessory.displayName);
-         return;
-      } else if (body.hasOwnProperty("error") && body.error != 0) {
-         platform.log("An error occurred while requesting blind position for [%s]. Error [%s].", accessory.displayName, JSON.stringify(body));
-         if ([401, 402].indexOf(parseInt(body.error)) !== -1) {
-            platform.relogin();
-         }
-         callback("An error occurred while requesting blind position for your device");
-         return;
-      }
-      
-      body = body.devicelist;
-      
-      let size = Object.keys(body)
-      .length;
-      if (body.length < 1) {
-         callback("An error occurred while requesting blind position for your device");
-         accessory.reachable = false;
-         return;
-      }
-      let deviceId = accessory.context.hbDeviceId;
-      if (accessory.context.switches > 1) {
-         deviceId = deviceId.replace("CH" + accessory.context.channel, "");
-      }
-      let filteredResponse = body.filter(device => (device.deviceid === deviceId));
-      
-      if (filteredResponse.length === 1) {
-         let device = filteredResponse[0];
-         if (device.deviceid === deviceId) {
-            if (device.online !== true) {
-               accessory.reachable = false;
-               platform.log("Device [%s] was reported to be offline by the API", accessory.displayName);
-               callback("API reported that [%s] is not online", device.name);
-               return;
-            }
-            let switchCount = platform.getChannelsByUIID(device);
-            for (let i = 0; i !== switchCount; i++) {
-               if (device.params.switches[i].switch === "on") {
-                  accessory.reachable = true;
-                  platform.log("API reported that [%s CH-%s] is [on].", device.name, i);
-               }
-            }
-            let currentBlindState = platform.prepareCurrentBlindState(device.params.switches, accessory);
-            platform.log("[%s] 'CurrentPositionState' is [%s].", accessory.displayName, currentBlindState);
-            // Handling error;
-            if (currentBlindState > 2) {
-               platform.log("Error with requesting [%s] position. Stopping.", accessory.displayName);
-               currentBlindState = 2;
-               accessory.context.currentPositionState = 2;
-               platform.prepareBlindFinalState(accessory);
-            }
-            callback(null, currentBlindState);
-         }
-      } else if (filteredResponse.length > 1) {
-         // More than one device matches our Device ID. This should not happen.
-         platform.log("Error - the response contained more than one device with ID [%s].", device.deviceid);
-         platform.log(filteredResponse);
-         callback("The response contained more than one device with ID " + device.deviceid);
-      } else if (filteredResponse.length < 1) {
-         // The device is no longer registered
-         platform.log("Error - [%s] did not exist in the response. Verify the device is connected to your eWeLink account.", accessory.displayName);
-         platform.removeAccessory(accessory);
-      } else {
-         callback("An error occurred while requesting blind position for your device");
-      }
-   });
-};
-
-eWeLink.prototype.getBlindTargetPosition = function (accessory, callback) {
-   let platform = this;
-   if (!platform.log) {
-      return;
-   }
-   let currentTargetPosition = accessory.context.currentTargetPosition;
-   platform.log("[%s] 'getTargetPosition' is [%s].", accessory.displayName, currentTargetPosition);
-   callback(null, currentTargetPosition);
-};
-
 eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
    
    let platform = this;
@@ -1972,7 +1854,15 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
             diffTime = Math.round(accessory.context.percentDurationUp * diffPosition);
          }
          diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
-         actualPosition = platform.prepareBlindPosition(accessory);
+
+         let timestamp = Date.now();
+         if (accessory.context.currentPositionState === 1) {
+            actualPosition = Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
+         } else if (accessory.context.currentPositionState === 0) {
+            actualPosition = Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
+         } else {
+            actualPosition = accessory.context.lastPosition;
+         }
          
          // platform.log("diffPosition:", diffPosition);
          // platform.log("diffTime:", diffTime);
@@ -2095,42 +1985,6 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
    }
 };
 
-eWeLink.prototype.prepareCurrentBlindState = function (switches, accessory) {
-   
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   
-   // platform.log("Switches: %s", switches);
-   var switch0 = 0;
-   if (switches[accessory.context.switchUp].switch === "on") {
-      switch0 = 1;
-   }
-   
-   var switch1 = 0;
-   if (switches[accessory.context.switchDown].switch === "on") {
-      switch1 = 1;
-   }
-   
-   let sum = (switch0 * 2) + switch1;
-   
-   // this.log("Sum: ", sum);
-   // [0,0] = 0 => 2 Stopped
-   // [0,1] = 1 => 1 Moving down
-   // [1,0] = 2 => 0 Moving up
-   // [1,1] = 3 => Error
-   
-   const MAPPING = {
-      0: 2,
-      1: 1,
-      2: 0,
-      3: 3
-   };
-   // this.log("Sum: %s => Blind State: %s", sum, MAPPING[sum]);
-   return MAPPING[sum];
-};
 
 eWeLink.prototype.prepareBlindFinalState = function (accessory) {
    
@@ -2223,15 +2077,4 @@ eWeLink.prototype.prepareBlindPayload = function (accessory) {
    payload.sequence = platform.getSequence();
    // platform.log("Payload genretad:", JSON.stringify(payload))
    return payload;
-};
-
-eWeLink.prototype.prepareBlindPosition = function (accessory) {
-   let timestamp = Date.now();
-   if (accessory.context.currentPositionState === 1) {
-      return Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
-   } else if (accessory.context.currentPositionState === 0) {
-      return Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
-   } else {
-      return accessory.context.lastPosition;
-   }
 };
