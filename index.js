@@ -1157,6 +1157,262 @@ eWeLink.prototype.internalThermostatUpdate = function (accessory, type, targetSt
    if (platform.debug) platform.log("[%s] requesting to change thermostat %s.", accessory.displayName, type);
 };
 
+eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
+   
+   let platform = this;
+   
+   if (!platform.log) {
+      return;
+   }
+   platform.log("Setting [%s] new target position from [%s] to [%s].", accessory.displayName, accessory.context.cTargetPos, pos, );
+   
+   let timestamp = Date.now();
+   
+   if (accessory.context.cMoveState != 2) {
+      
+      var diffPosition = Math.abs(pos - accessory.context.cTargetPos);
+      var actualPosition;
+      var diffTime;
+      var diff;
+      
+      if (diffPosition === 0) {
+         actualPosition = pos;
+         diffTime = 0;
+         diff = 0;
+      } else {
+         if (accessory.context.cMoveState === 1) {
+            diffPosition = accessory.context.cTargetPos - pos;
+            diffTime = Math.round(accessory.context.percentDurationDown * diffPosition);
+         } else {
+            diffPosition = pos - accessory.context.cTargetPos;
+            diffTime = Math.round(accessory.context.percentDurationUp * diffPosition);
+         }
+         diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
+         
+         let timestamp = Date.now();
+         if (accessory.context.cMoveState === 1) {
+            actualPosition = Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
+         } else if (accessory.context.cMoveState === 0) {
+            actualPosition = Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
+         } else {
+            actualPosition = accessory.context.lastPosition;
+         }
+         
+         // platform.log("diffPosition:", diffPosition);
+         // platform.log("diffTime:", diffTime);
+         // platform.log("actualPosition:", actualPosition);
+         // platform.log("diff:", diff);
+         
+         if (diff > 0) {
+            accessory.context.targetTimestamp += diffTime;
+            // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+            accessory.context.cTargetPos = pos;
+            platform.log("[%s] Blinds are moving. Current position: %s, new targuet: %s, adjusting target milliseconds: %s", accessory.displayName, actualPosition, pos, diffTime);
+            callback();
+            return false;
+         }
+         if (diff < 0) {
+            platform.log("[%s] ==> Revert Blinds moving. Current pos: %s, new target: %s, new duration: %s", accessory.displayName, actualPosition, pos, Math.abs(diff));
+            accessory.context.startTimestamp = timestamp;
+            accessory.context.targetTimestamp = timestamp + Math.abs(diff);
+            // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+            accessory.context.lastPosition = actualPosition;
+            accessory.context.cTargetPos = pos;
+            accessory.context.cMoveState = accessory.context.cMoveState === 0 ? 1 : 0;
+            
+            let payload = platform.prepareBlindPayload(accessory);
+            let string = JSON.stringify(payload);
+            if (platform.debugReqRes) platform.log.warn(payload);
+            
+            if (platform.webSocketOpen) {
+               platform.sendWebSocketMessage(string, function () {
+                  return;
+               });
+               platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.cMoveState === 1 ? "moving up" : "moving down");
+               let service = accessory.getService(Service.WindowCovering);
+               service.getCharacteristic(Characteristic.CurrentPosition)
+               .updateValue(accessory.context.lastPosition);
+               service.getCharacteristic(Characteristic.TargetPosition)
+               .updateValue(accessory.context.cTargetPos);
+               service.getCharacteristic(Characteristic.PositionState)
+               .updateValue(accessory.context.cMoveState);
+            } else {
+               platform.log("Socket was closed. It will reconnect automatically; please retry your command");
+               callback("Socket was closed. It will reconnect automatically; please retry your command");
+               return false;
+            }
+         }
+         callback();
+         return false;
+      }
+      callback();
+      return false;
+   }
+   
+   if (accessory.context.lastPosition === pos) {
+      platform.log("[%s] Current position already matches target position. There is nothing to do.", accessory.displayName);
+      callback();
+      return true;
+   }
+   
+   accessory.context.cTargetPos = pos;
+   moveUp = (pos > accessory.context.lastPosition);
+   
+   var withoutmarginetimeUP;
+   var withoutmarginetimeDOWN;
+   var duration;
+   withoutmarginetimeUP = accessory.context.durationUp - accessory.context.durationBMU;
+   withoutmarginetimeDOWN = accessory.context.durationDown - accessory.context.durationBMD;
+   
+   if (moveUp) {
+      if (accessory.context.lastPosition === 0) {
+         duration = ((pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP) + accessory.context.durationBMU;
+      } else {
+         duration = (pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP;
+      }
+   } else {
+      if (pos === 0) {
+         duration = ((accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN) + accessory.context.durationBMD;
+      } else {
+         duration = (accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN;
+      }
+   }
+   if (pos === 0 || pos === 100) duration += accessory.context.fullOverdrive;
+   if (pos === 0 || pos === 100) platform.log("[%s] add overdive: %s", accessory.displayName, accessory.context.fullOverdrive);
+   
+   duration = Math.round(duration * 100) / 100;
+   
+   platform.log("[%s] %s, Duration: %s", accessory.displayName, moveUp ? "Moving up" : "Moving down", duration);
+   
+   accessory.context.startTimestamp = timestamp;
+   accessory.context.targetTimestamp = timestamp + (duration * 1000);
+   // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+   accessory.context.cMoveState = (moveUp ? 0 : 1);
+   accessory.getService(Service.WindowCovering)
+   .setCharacteristic(Characteristic.PositionState, (moveUp ? 0 : 1));
+   
+   let payload = platform.prepareBlindPayload(accessory);
+   let string = JSON.stringify(payload);
+   if (platform.debugReqRes) platform.log.warn(payload);
+   
+   if (platform.webSocketOpen) {
+      
+      setTimeout(function () {
+         platform.sendWebSocketMessage(string, function () {
+            return;
+         });
+         platform.log("[%s] Request sent for %s", accessory.displayName, moveUp ? "moving up" : "moving down");
+         
+         var interval = setInterval(function () {
+            if (Date.now() >= accessory.context.targetTimestamp) {
+               platform.prepareBlindFinalState(accessory);
+               clearInterval(interval);
+               return true;
+            }
+         }, 100);
+         callback();
+      }, 1);
+   } else {
+      platform.log("Socket was closed. It will reconnect automatically; please retry your command");
+      callback("Socket was closed. It will reconnect automatically; please retry your command");
+      return false;
+   }
+};
+
+
+eWeLink.prototype.prepareBlindFinalState = function (accessory) {
+   
+   let platform = this;
+   
+   if (!platform.log) {
+      return;
+   }
+   accessory.context.cMoveState = 2;
+   let payload = platform.prepareBlindPayload(accessory);
+   let string = JSON.stringify(payload);
+   if (platform.debugReqRes) platform.log.warn(payload);
+   
+   if (platform.webSocketOpen) {
+      
+      setTimeout(function () {
+         platform.sendWebSocketMessage(string, function () {
+            return;
+         });
+         platform.log("[%s] Request sent to stop moving", accessory.displayName);
+         accessory.context.cMoveState = 2;
+         
+         let cTargetPos = accessory.context.cTargetPos;
+         accessory.context.lastPosition = cTargetPos;
+         let service = accessory.getService(Service.WindowCovering);
+         // Using updateValue to avoid loop
+         service.getCharacteristic(Characteristic.CurrentPosition)
+         .updateValue(cTargetPos);
+         service.getCharacteristic(Characteristic.TargetPosition)
+         .updateValue(cTargetPos);
+         service.setCharacteristic(Characteristic.PositionState, Characteristic.PositionState.STOPPED);
+         
+         platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, cTargetPos);
+         return true;
+         // TODO Here we need to wait for the response to the socket
+      }, 1);
+      
+   } else {
+      platform.log("Socket was closed. It will reconnect automatically; please retry your command");
+      return false;
+   }
+};
+
+eWeLink.prototype.prepareBlindPayload = function (accessory) {
+   
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
+   let payload = {};
+   payload.action = "update";
+   payload.userAgent = "app";
+   payload.params = {};
+   let deviceFromApi = platform.devicesInEwe.get(accessory.context.hbDeviceId);
+   
+   payload.params.switches = deviceFromApi.params.switches;
+   
+   // [0,0] = 0 => 2 Stopped
+   // [0,1] = 1 => 1 Moving down
+   // [1,0] = 2 => 0 Moving up
+   // [1,1] = 3 => should not happen...
+   
+   var switch0 = "off";
+   var switch1 = "off";
+   
+   let state = accessory.context.cMoveState;
+   
+   switch (state) {
+      case 2:
+      switch0 = "off";
+      switch1 = "off";
+      break;
+      case 1:
+      switch0 = "off";
+      switch1 = "on";
+      break;
+      case 0:
+      switch0 = "on";
+      switch1 = "off";
+      break;
+      default:
+      platform.log("[%s] PositionState type error !", accessory.displayName);
+      break;
+   }
+   
+   payload.params.switches[accessory.context.switchUp].switch = switch0;
+   payload.params.switches[accessory.context.switchDown].switch = switch1;
+   payload.apikey = accessory.context.eweApiKey;
+   payload.deviceid = accessory.context.hbDeviceId;
+   payload.sequence = platform.getSequence();
+   // platform.log("Payload genretad:", JSON.stringify(payload))
+   return payload;
+};
+
 eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
    let platform = this;
    if (!platform.log) {
@@ -1673,97 +1929,65 @@ eWeLink.prototype.relogin = function (callback) {
 };
 
 eWeLink.prototype.getChannelsByUIID = function (uiid) {
-   let platform = this;
-   if (!platform.log) {
-      return;
-   }
-   const UIID_MAPPING = {
-      1: "SOCKET", // S20, MINI, BASIC, S26
-      2: "SOCKET_2",
-      3: "SOCKET_3",
-      4: "SOCKET_4",
-      5: "SOCKET_POWER",
-      6: "SWITCH", // T1 1C, TX1C
-      7: "SWITCH_2", // T1 2C, TX2C
-      8: "SWITCH_3", // T1 3C, TX3C
-      9: "SWITCH_4",
-      10: "OSPF",
-      11: "CURTAIN",
-      12: "EW-RE",
-      13: "FIREPLACE",
-      14: "SWITCH_CHANGE",
-      15: "THERMOSTAT", //TH10, TH16
-      16: "COLD_WARM_LED",
-      17: "THREE_GEAR_FAN",
-      18: "SENSORS_CENTER",
-      19: "HUMIDIFIER",
-      22: "RGB_BALL_LIGHT", //B1, B1_R2
-      23: "NEST_THERMOSTAT",
-      24: "GSM_SOCKET",
-      25: "AROMATHERAPY",
-      26: "BJ_THERMOSTAT",
-      27: "GSM_UNLIMIT_SOCKET",
-      28: "RF_BRIDGE", //RFBridge, RF_Bridge
-      29: "GSM_SOCKET_2",
-      30: "GSM_SOCKET_3",
-      31: "GSM_SOCKET_4",
-      32: "POWER_DETECTION_SOCKET", //Pow_R2
-      33: "LIGHT_BELT",
-      34: "FAN_LIGHT", //iFan02, iFan
-      35: "EZVIZ_CAMERA",
-      36: "SINGLE_CHANNEL_DIMMER_SWITCH", //KING-M4
-      38: "HOME_KIT_BRIDGE",
-      40: "FUJIN_OPS",
-      41: "CUN_YOU_DOOR",
-      42: "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT",
-      43: "",
-      44: "TPF_DIMMER_D1", //D1
-      45: "DOWN_CEILING_LIGHT",
-      46: "AIR_CLEANER",
-      49: "MACHINE_BED",
-      51: "COLD_WARM_DESK_LIGHT",
-      52: "DOUBLE_COLOR_DEMO_LIGHT",
-      53: "ELECTRIC_FAN_WITH_LAMP",
-      55: "SWEEPING_ROBOT",
-      56: "RGB_BALL_LIGHT_4",
-      57: "MONOCHROMATIC_BALL_LIGHT",
-      59: "MEARICAMERA", // L1
-      77: "MICRO",
-      87: "", // GK-200MP2B
-      102: "", // OPL-DMA
-      1001: "BLADELESS_FAN",
-      1002: "NEW_HUMIDIFIER",
-      1003: "WARM_AIR_BLOWER"
+   const UIID_TO_CHAN = {
+      1: 1,              // "SOCKET"                                 \\ 20, MINI, BASIC, S26
+      2: 2,              // "SOCKET_2"                               \\ 
+      3: 3,              // "SOCKET_3"                               \\ 
+      4: 4,              // "SOCKET_4",                              \\ 
+      5: 1,              // "SOCKET_POWER"                           \\ 
+      6: 1,              // "SWITCH"                                 \\ T1 1C, TX1C
+      7: 2,              // "SWITCH_2"                               \\ T1 2C, TX2C
+      8: 3,              // "SWITCH_3"                               \\ T1 3C, TX3C
+      9: 4,              // "SWITCH_4"                               \\ 
+      10: 0,             // "OSPF"                                   \\ 
+      11: 0,             // "CURTAIN"                                \\ 
+      12: 0,             // "EW-RE"                                  \\ 
+      13: 0,             // "FIREPLACE"                              \\ 
+      14: 1,             // "SWITCH_CHANGE"                          \\ 
+      15: 1,             // "THERMOSTAT"                             \\ TH10, TH16
+      16: 0,             // "COLD_WARM_LED"                          \\ 
+      17: 0,             // "THREE_GEAR_FAN"                         \\ 
+      18: 0,             // "SENSORS_CENTER"                         \\ 
+      19: 0,             // "HUMIDIFIER"                             \\ 
+      22: 1,             // "RGB_BALL_LIGHT"                         \\ B1, B1_R2
+      23: 0,             // "NEST_THERMOSTAT"                        \\ 
+      24: 1,             // "GSM_SOCKET"                             \\
+      25: 0,             // "AROMATHERAPY",                          \\
+      26: 0,             // "BJ_THERMOSTAT",                         \\
+      27: 1,             // "GSM_UNLIMIT_SOCKET"                     \\
+      28: 1,             // "RF_BRIDGE"                              \\ RFBridge, RF_Bridge
+      29: 2,             // "GSM_SOCKET_2"                           \\
+      30: 3,             // "GSM_SOCKET_3"                           \\
+      31: 4,             // "GSM_SOCKET_4"                           \\
+      32: 1,             // "POWER_DETECTION_SOCKET"                 \\ Pow_R2
+      33: 0,             // "LIGHT_BELT",                            \\
+      34: 4,             // "FAN_LIGHT"                              \\ iFan02, iFan
+      35: 0,             // "EZVIZ_CAMERA",                          \\
+      36: 1,             // "SINGLE_CHANNEL_DIMMER_SWITCH"           \\ KING-M4
+      38: 0,             // "HOME_KIT_BRIDGE",                       \\
+      40: 0,             // "FUJIN_OPS"                              \\
+      41: 4,             // "CUN_YOU_DOOR"                           \\
+      42: 0,             // "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT"   \\ 
+      43: 0,             // "?"                                      \\ 
+      44: 1,             // "?"                                      \\ D1
+      45: 0,             // "DOWN_CEILING_LIGHT"
+      46: 0,             // "AIR_CLEANER"
+      49: 0,             // "MACHINE_BED"
+      51: 0,             // "COLD_WARM_DESK_LIGHT",
+      52: 0,             // "DOUBLE_COLOR_DEMO_LIGHT"
+      53: 0,             // "ELECTRIC_FAN_WITH_LAMP"
+      55: 0,             // "SWEEPING_ROBOT"
+      56: 0,             // "RGB_BALL_LIGHT_4"
+      57: 0,             // "MONOCHROMATIC_BALL_LIGHT"
+      59: 1,             // "MEARICAMERA"                            \\ L1
+      77: 4,             // "MICRO"
+      87: 0,             // "?"                                      \\ GK-200MP2B
+      102: 0,            // "?"                                      \\ OPL-DMA
+      1001: 0,           // "BLADELESS_FAN"
+      1002: 0,           // "NEW_HUMIDIFIER",
+      1003: 0            // "WARM_AIR_BLOWER"
    };
-   const CHANNEL_MAPPING = {
-      SOCKET: 1,
-      SWITCH_CHANGE: 1,
-      GSM_UNLIMIT_SOCKET: 1,
-      SWITCH: 1,
-      THERMOSTAT: 1,
-      SOCKET_POWER: 1,
-      GSM_SOCKET: 1,
-      POWER_DETECTION_SOCKET: 1,
-      MEARICAMERA: 1,
-      SINGLE_CHANNEL_DIMMER_SWITCH: 1,
-      TPF_DIMMER_D1: 1,
-      RGB_BALL_LIGHT: 1,
-      SOCKET_2: 2,
-      GSM_SOCKET_2: 2,
-      SWITCH_2: 2,
-      SOCKET_3: 3,
-      GSM_SOCKET_3: 3,
-      SWITCH_3: 3,
-      SOCKET_4: 4,
-      GSM_SOCKET_4: 4,
-      SWITCH_4: 4,
-      CUN_YOU_DOOR: 4,
-      FAN_LIGHT: 4,
-      MICRO: 4
-   };
-   let deviceType = UIID_MAPPING[uiid] || "";
-   if (deviceType === "") return 0;
-   else return CHANNEL_MAPPING[deviceType] || 0;
+   return UIID_TO_CHAN[uiid] || 0;
 };
 
 eWeLink.prototype.getArguments = function (apiKey) {
@@ -1851,260 +2075,4 @@ WebSocketClient.prototype.onerror = function (e) {
 };
 WebSocketClient.prototype.onclose = function (e) {
    // console.log("WebSocketClient: Web socket closed.", arguments);
-};
-
-eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
-   
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   platform.log("Setting [%s] new target position from [%s] to [%s].", accessory.displayName, accessory.context.cTargetPos, pos, );
-   
-   let timestamp = Date.now();
-   
-   if (accessory.context.cMoveState != 2) {
-      
-      var diffPosition = Math.abs(pos - accessory.context.cTargetPos);
-      var actualPosition;
-      var diffTime;
-      var diff;
-      
-      if (diffPosition === 0) {
-         actualPosition = pos;
-         diffTime = 0;
-         diff = 0;
-      } else {
-         if (accessory.context.cMoveState === 1) {
-            diffPosition = accessory.context.cTargetPos - pos;
-            diffTime = Math.round(accessory.context.percentDurationDown * diffPosition);
-         } else {
-            diffPosition = pos - accessory.context.cTargetPos;
-            diffTime = Math.round(accessory.context.percentDurationUp * diffPosition);
-         }
-         diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
-         
-         let timestamp = Date.now();
-         if (accessory.context.cMoveState === 1) {
-            actualPosition = Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
-         } else if (accessory.context.cMoveState === 0) {
-            actualPosition = Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
-         } else {
-            actualPosition = accessory.context.lastPosition;
-         }
-         
-         // platform.log("diffPosition:", diffPosition);
-         // platform.log("diffTime:", diffTime);
-         // platform.log("actualPosition:", actualPosition);
-         // platform.log("diff:", diff);
-         
-         if (diff > 0) {
-            accessory.context.targetTimestamp += diffTime;
-            // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-            accessory.context.cTargetPos = pos;
-            platform.log("[%s] Blinds are moving. Current position: %s, new targuet: %s, adjusting target milliseconds: %s", accessory.displayName, actualPosition, pos, diffTime);
-            callback();
-            return false;
-         }
-         if (diff < 0) {
-            platform.log("[%s] ==> Revert Blinds moving. Current pos: %s, new target: %s, new duration: %s", accessory.displayName, actualPosition, pos, Math.abs(diff));
-            accessory.context.startTimestamp = timestamp;
-            accessory.context.targetTimestamp = timestamp + Math.abs(diff);
-            // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-            accessory.context.lastPosition = actualPosition;
-            accessory.context.cTargetPos = pos;
-            accessory.context.cMoveState = accessory.context.cMoveState === 0 ? 1 : 0;
-            
-            let payload = platform.prepareBlindPayload(accessory);
-            let string = JSON.stringify(payload);
-            if (platform.debugReqRes) platform.log.warn(payload);
-            
-            if (platform.webSocketOpen) {
-               platform.sendWebSocketMessage(string, function () {
-                  return;
-               });
-               platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.cMoveState === 1 ? "moving up" : "moving down");
-               let service = accessory.getService(Service.WindowCovering);
-               service.getCharacteristic(Characteristic.CurrentPosition)
-               .updateValue(accessory.context.lastPosition);
-               service.getCharacteristic(Characteristic.TargetPosition)
-               .updateValue(accessory.context.cTargetPos);
-               service.getCharacteristic(Characteristic.PositionState)
-               .updateValue(accessory.context.cMoveState);
-            } else {
-               platform.log("Socket was closed. It will reconnect automatically; please retry your command");
-               callback("Socket was closed. It will reconnect automatically; please retry your command");
-               return false;
-            }
-         }
-         callback();
-         return false;
-      }
-      callback();
-      return false;
-   }
-   
-   if (accessory.context.lastPosition === pos) {
-      platform.log("[%s] Current position already matches target position. There is nothing to do.", accessory.displayName);
-      callback();
-      return true;
-   }
-   
-   accessory.context.cTargetPos = pos;
-   moveUp = (pos > accessory.context.lastPosition);
-   
-   var withoutmarginetimeUP;
-   var withoutmarginetimeDOWN;
-   var duration;
-   withoutmarginetimeUP = accessory.context.durationUp - accessory.context.durationBMU;
-   withoutmarginetimeDOWN = accessory.context.durationDown - accessory.context.durationBMD;
-   
-   if (moveUp) {
-      if (accessory.context.lastPosition === 0) {
-         duration = ((pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP) + accessory.context.durationBMU;
-      } else {
-         duration = (pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP;
-      }
-   } else {
-      if (pos === 0) {
-         duration = ((accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN) + accessory.context.durationBMD;
-      } else {
-         duration = (accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN;
-      }
-   }
-   if (pos === 0 || pos === 100) duration += accessory.context.fullOverdrive;
-   if (pos === 0 || pos === 100) platform.log("[%s] add overdive: %s", accessory.displayName, accessory.context.fullOverdrive);
-   
-   duration = Math.round(duration * 100) / 100;
-   
-   platform.log("[%s] %s, Duration: %s", accessory.displayName, moveUp ? "Moving up" : "Moving down", duration);
-   
-   accessory.context.startTimestamp = timestamp;
-   accessory.context.targetTimestamp = timestamp + (duration * 1000);
-   // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-   accessory.context.cMoveState = (moveUp ? 0 : 1);
-   accessory.getService(Service.WindowCovering)
-   .setCharacteristic(Characteristic.PositionState, (moveUp ? 0 : 1));
-   
-   let payload = platform.prepareBlindPayload(accessory);
-   let string = JSON.stringify(payload);
-   if (platform.debugReqRes) platform.log.warn(payload);
-   
-   if (platform.webSocketOpen) {
-      
-      setTimeout(function () {
-         platform.sendWebSocketMessage(string, function () {
-            return;
-         });
-         platform.log("[%s] Request sent for %s", accessory.displayName, moveUp ? "moving up" : "moving down");
-         
-         var interval = setInterval(function () {
-            if (Date.now() >= accessory.context.targetTimestamp) {
-               platform.prepareBlindFinalState(accessory);
-               clearInterval(interval);
-               return true;
-            }
-         }, 100);
-         callback();
-      }, 1);
-   } else {
-      platform.log("Socket was closed. It will reconnect automatically; please retry your command");
-      callback("Socket was closed. It will reconnect automatically; please retry your command");
-      return false;
-   }
-};
-
-
-eWeLink.prototype.prepareBlindFinalState = function (accessory) {
-   
-   let platform = this;
-   
-   if (!platform.log) {
-      return;
-   }
-   accessory.context.cMoveState = 2;
-   let payload = platform.prepareBlindPayload(accessory);
-   let string = JSON.stringify(payload);
-   if (platform.debugReqRes) platform.log.warn(payload);
-   
-   if (platform.webSocketOpen) {
-      
-      setTimeout(function () {
-         platform.sendWebSocketMessage(string, function () {
-            return;
-         });
-         platform.log("[%s] Request sent to stop moving", accessory.displayName);
-         accessory.context.cMoveState = 2;
-         
-         let cTargetPos = accessory.context.cTargetPos;
-         accessory.context.lastPosition = cTargetPos;
-         let service = accessory.getService(Service.WindowCovering);
-         // Using updateValue to avoid loop
-         service.getCharacteristic(Characteristic.CurrentPosition)
-         .updateValue(cTargetPos);
-         service.getCharacteristic(Characteristic.TargetPosition)
-         .updateValue(cTargetPos);
-         service.setCharacteristic(Characteristic.PositionState, Characteristic.PositionState.STOPPED);
-         
-         platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, cTargetPos);
-         return true;
-         // TODO Here we need to wait for the response to the socket
-      }, 1);
-      
-   } else {
-      platform.log("Socket was closed. It will reconnect automatically; please retry your command");
-      return false;
-   }
-};
-
-eWeLink.prototype.prepareBlindPayload = function (accessory) {
-   
-   let platform = this;
-   if (!platform.log) {
-      return;
-   }
-   let payload = {};
-   payload.action = "update";
-   payload.userAgent = "app";
-   payload.params = {};
-   let deviceFromApi = platform.devicesInEwe.get(accessory.context.hbDeviceId);
-   
-   payload.params.switches = deviceFromApi.params.switches;
-   
-   // [0,0] = 0 => 2 Stopped
-   // [0,1] = 1 => 1 Moving down
-   // [1,0] = 2 => 0 Moving up
-   // [1,1] = 3 => should not happen...
-   
-   var switch0 = "off";
-   var switch1 = "off";
-   
-   let state = accessory.context.cMoveState;
-   
-   switch (state) {
-      case 2:
-      switch0 = "off";
-      switch1 = "off";
-      break;
-      case 1:
-      switch0 = "off";
-      switch1 = "on";
-      break;
-      case 0:
-      switch0 = "on";
-      switch1 = "off";
-      break;
-      default:
-      platform.log("[%s] PositionState type error !", accessory.displayName);
-      break;
-   }
-   
-   payload.params.switches[accessory.context.switchUp].switch = switch0;
-   payload.params.switches[accessory.context.switchDown].switch = switch1;
-   payload.apikey = accessory.context.eweApiKey;
-   payload.deviceid = accessory.context.hbDeviceId;
-   payload.sequence = platform.getSequence();
-   // platform.log("Payload genretad:", JSON.stringify(payload))
-   return payload;
 };
