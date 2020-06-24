@@ -1033,8 +1033,6 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = platform.getSequence();
-   payload.params.switch = newBrightness != 0 ? "on" : "off";
-   payload.params.state = newBrightness != 0 ? "on" : "off";
    if (accessory.context.eweUIID === 59) //LED LIGHT
    {
       payload.params.bright = Math.max(newBrightness, 1);
