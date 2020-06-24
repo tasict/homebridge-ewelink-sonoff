@@ -581,7 +581,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       });
       accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation)
       .on("set", function (value, callback) {
-         platform.internalHSLUpdate(accessory, "saturaton", value, callback);
+         platform.internalHSLUpdate(accessory, "saturation", value, callback);
       });
       accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
       .on("set", function (value, callback) {
@@ -633,16 +633,16 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       accessory.context.percentDurationDown = accessory.context.durationDown * 10;
       accessory.context.percentDurationUp = accessory.context.durationUp * 10;
       accessory.context.lastPosition = 100;
-      accessory.context.currentPositionState = 2;
-      accessory.context.currentTargetPosition = 100;
+      accessory.context.cMoveState = 2;
+      accessory.context.cTargetPos = 100;
       
       accessory.addService(Service.WindowCovering);
       accessory.getService(Service.WindowCovering)
       .setCharacteristic(Characteristic.CurrentPosition, accessory.context.lastPosition);
       accessory.getService(Service.WindowCovering)
-      .setCharacteristic(Characteristic.PositionState, accessory.context.currentPositionState);
+      .setCharacteristic(Characteristic.PositionState, accessory.context.cMoveState);
       accessory.getService(Service.WindowCovering, newDeviceName)
-      .setCharacteristic(Characteristic.TargetPosition, accessory.context.currentTargetPosition);
+      .setCharacteristic(Characteristic.TargetPosition, accessory.context.cTargetPos);
    }
    try {
       accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.SerialNumber, hbDeviceId);
@@ -798,12 +798,9 @@ eWeLink.prototype.configureAccessory = function (accessory) {
          return;
       });
       if (platform.debug) platform.log("[%s] initialising switches for correct start up.", accessory.displayName);
-      let lastPosition = accessory.context.lastPosition;
-      if ((lastPosition === undefined) || (lastPosition < 0)) lastPosition = 0;
-      if (platform.debug) platform.log("[%s] cached position was [%s].", accessory.displayName, lastPosition);
-      accessory.context.lastPosition = lastPosition;
-      accessory.context.currentTargetPosition = lastPosition;
-      accessory.context.currentPositionState = 2;
+      accessory.context.lastPosition = accessory.context.lastPosition >= 0 ? accessory.context.lastPosition : 0;
+      accessory.context.cTargetPos = accessory.context.lastPosition;
+      accessory.context.cMoveState = 2;
       let group = platform.deviceGroups.get(accessory.context.hbDeviceId);
       if (group) {
          accessory.context.switchUp = (group.switchUp || platform.groupDefaults["switchUp"]) - 1;
@@ -1168,55 +1165,48 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
    let accessory = platform.devicesInHB.get(hbDeviceId);
    let switchUp = params.switches[accessory.context.switchUp].switch === "on" ? 1 : 0;
    let switchDown = params.switches[accessory.context.switchDown].switch === "on" ? 1 : 0;
-   let sum = (switchUp * 2) + switchDown;
-   
-   // Sum can be:
-   // [0,0] = 0 => 2 Stopped
-   // [0,1] = 1 => 1 Moving down
-   // [1,0] = 2 => 0 Moving up
-   // [1,1] = 3 => 3 Error
    
    const MAPPING = {
-      0: 2,
-      1: 1,
-      2: 0,
-      3: 3
+      0: 2,      // [0,0] = 0 => 2 Stopped
+      1: 1,      // [0,1] = 1 => 1 Moving down
+      2: 0,      // [1,0] = 2 => 0 Moving up
+      3: 3      // [1,1] = 3 => 3 Error
    };
-   let state = MAPPING[sum];
+   let state = MAPPING[(switchUp * 2) + switchDown];
    let actualPosition;
    if (state === 2 || state === 3) {
       let timestamp = Date.now();
-      if (accessory.context.currentPositionState === 1) {
-         actualPosition = Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
-      } else if (accessory.context.currentPositionState === 0) {
-         actualPosition = Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
+      if (accessory.context.cMoveState === 1) {
+         aPos = Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
+      } else if (accessory.context.cMoveState === 0) {
+         aPos = Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
       } else {
-         actualPosition = accessory.context.lastPosition;
+         aPos = accessory.context.lastPosition;
       }
    }
    switch (state) {
       case 3:
       platform.log("[%s] Error with current movement state so resetting.", accessory.displayName);
-      accessory.context.currentTargetPosition = actualPosition;
+      accessory.context.cTargetPos = aPos;
       accessory.context.targetTimestamp = Date.now() + 10;
-      accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, actualPosition);
+      accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, aPos);
       break;
       case 2:
-      if (accessory.context.currentPositionState === 2) {
+      if (accessory.context.cMoveState === 2) {
          platform.log("[%s] received request to stop moving. Nothing to do as blind is already stopped.", accessory.displayName);
          return;
       }
-      platform.log("[%s] received request to stop moving. Updating new position [%s].", accessory.displayName, actualPosition);
-      accessory.context.currentTargetPosition = actualPosition;
+      platform.log("[%s] received request to stop moving. Updating new position [%s].", accessory.displayName, aPos);
+      accessory.context.cTargetPos = aPos;
       accessory.context.targetTimestamp = Date.now() + 10;
-      accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, actualPosition);
+      accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, aPos);
       break;
       case 1:
-      if (accessory.context.currentPositionState === 1) {
+      if (accessory.context.cMoveState === 1) {
          platform.log("[%s] received request to move down. Nothing to do as blind is already moving down.", accessory.displayName);
          return;
       }
-      if (accessory.context.currentTargetPosition === 0) {
+      if (accessory.context.cTargetPos === 0) {
          platform.log("[%s] received request to move down but was already fully closing. Stopping.", accessory.displayName);
       } else {
          platform.log("[%s] received request to move down so setting target position to 0.", accessory.displayName);
@@ -1224,11 +1214,11 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
       }
       break;
       case 0:
-      if (accessory.context.currentPositionState === 0) {
+      if (accessory.context.cMoveState === 0) {
          platform.log("[%s] received request to move up. Nothing to do as blind is already moving up.", accessory.displayName);
          return;
       }
-      if (accessory.context.currentTargetPosition === 100) {
+      if (accessory.context.cTargetPos === 100) {
          platform.log("[%s] received request to move up but was already fully opening. Stopping.", accessory.displayName);
          
       } else {
@@ -1237,15 +1227,49 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
       }
       break;
    }
-   if ((state === 0 && accessory.context.currentTargetPosition === 0) || (state === 1 && accessory.context.currentTargetPosition === 100)) {
-      accessory.context.currentPositionState = 2;
-      platform.log("[%s] Request sent to stop moving.", accessory.displayName);
-      let currentTargetPosition = accessory.context.currentTargetPosition;
-      accessory.context.lastPosition = currentTargetPosition;
-      accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).updateValue(currentTargetPosition);
-      accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).updateValue(currentTargetPosition);
-      platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, currentTargetPosition);
-      let payload = platform.prepareBlindPayload(accessory);
+   if ((state === 0 && accessory.context.cTargetPos === 0) || (state === 1 && accessory.context.cTargetPos === 100)) {
+      accessory.context.cMoveState = 2;
+      platform.log("[%s] received a request to stop moving.", accessory.displayName);
+      let cTargetPos = accessory.context.cTargetPos;
+      accessory.context.lastPosition = cTargetPos;
+      accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).updateValue(cTargetPos);
+      accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).updateValue(cTargetPos);
+      platform.log("[%s] has new target position of %s%", accessory.displayName, cTargetPos);
+      let payload = {};
+      payload.action = "update";
+      payload.userAgent = "app";
+      let deviceFromEwe = platform.devicesInEwe.get(hbDeviceId);
+      payload.params = {};
+      payload.params.switches = deviceFromEwe.params.switches;
+      
+      let switch0 = "off";
+      let switch1 = "off";
+      
+      let state = accessory.context.cMoveState;
+      
+      switch (state) {
+         case 2:
+         switch0 = "off";
+         switch1 = "off";
+         break;
+         case 1:
+         switch0 = "off";
+         switch1 = "on";
+         break;
+         case 0:
+         switch0 = "on";
+         switch1 = "off";
+         break;
+         default:
+         platform.log("[%s] PositionState type error !", accessory.displayName);
+         break;
+      }
+      
+      payload.params.switches[accessory.context.switchUp].switch = switch0;
+      payload.params.switches[accessory.context.switchDown].switch = switch1;
+      payload.apikey = accessory.context.eweApiKey;
+      payload.deviceid = accessory.context.hbDeviceId;
+      payload.sequence = platform.getSequence();
       let string = JSON.stringify(payload);
       platform.sendWebSocketMessage(string, function () {
          return;
@@ -1837,13 +1861,13 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
    if (!platform.log) {
       return;
    }
-   platform.log("Setting [%s] new target position from [%s] to [%s].", accessory.displayName, accessory.context.currentTargetPosition, pos, );
+   platform.log("Setting [%s] new target position from [%s] to [%s].", accessory.displayName, accessory.context.cTargetPos, pos, );
    
    let timestamp = Date.now();
    
-   if (accessory.context.currentPositionState != 2) {
+   if (accessory.context.cMoveState != 2) {
       
-      var diffPosition = Math.abs(pos - accessory.context.currentTargetPosition);
+      var diffPosition = Math.abs(pos - accessory.context.cTargetPos);
       var actualPosition;
       var diffTime;
       var diff;
@@ -1853,19 +1877,19 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
          diffTime = 0;
          diff = 0;
       } else {
-         if (accessory.context.currentPositionState === 1) {
-            diffPosition = accessory.context.currentTargetPosition - pos;
+         if (accessory.context.cMoveState === 1) {
+            diffPosition = accessory.context.cTargetPos - pos;
             diffTime = Math.round(accessory.context.percentDurationDown * diffPosition);
          } else {
-            diffPosition = pos - accessory.context.currentTargetPosition;
+            diffPosition = pos - accessory.context.cTargetPos;
             diffTime = Math.round(accessory.context.percentDurationUp * diffPosition);
          }
          diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
          
          let timestamp = Date.now();
-         if (accessory.context.currentPositionState === 1) {
+         if (accessory.context.cMoveState === 1) {
             actualPosition = Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
-         } else if (accessory.context.currentPositionState === 0) {
+         } else if (accessory.context.cMoveState === 0) {
             actualPosition = Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
          } else {
             actualPosition = accessory.context.lastPosition;
@@ -1879,7 +1903,7 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
          if (diff > 0) {
             accessory.context.targetTimestamp += diffTime;
             // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-            accessory.context.currentTargetPosition = pos;
+            accessory.context.cTargetPos = pos;
             platform.log("[%s] Blinds are moving. Current position: %s, new targuet: %s, adjusting target milliseconds: %s", accessory.displayName, actualPosition, pos, diffTime);
             callback();
             return false;
@@ -1890,8 +1914,8 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
             accessory.context.targetTimestamp = timestamp + Math.abs(diff);
             // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
             accessory.context.lastPosition = actualPosition;
-            accessory.context.currentTargetPosition = pos;
-            accessory.context.currentPositionState = accessory.context.currentPositionState === 0 ? 1 : 0;
+            accessory.context.cTargetPos = pos;
+            accessory.context.cMoveState = accessory.context.cMoveState === 0 ? 1 : 0;
             
             let payload = platform.prepareBlindPayload(accessory);
             let string = JSON.stringify(payload);
@@ -1901,14 +1925,14 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
                platform.sendWebSocketMessage(string, function () {
                   return;
                });
-               platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.currentPositionState === 1 ? "moving up" : "moving down");
+               platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.cMoveState === 1 ? "moving up" : "moving down");
                let service = accessory.getService(Service.WindowCovering);
                service.getCharacteristic(Characteristic.CurrentPosition)
                .updateValue(accessory.context.lastPosition);
                service.getCharacteristic(Characteristic.TargetPosition)
-               .updateValue(accessory.context.currentTargetPosition);
+               .updateValue(accessory.context.cTargetPos);
                service.getCharacteristic(Characteristic.PositionState)
-               .updateValue(accessory.context.currentPositionState);
+               .updateValue(accessory.context.cMoveState);
             } else {
                platform.log("Socket was closed. It will reconnect automatically; please retry your command");
                callback("Socket was closed. It will reconnect automatically; please retry your command");
@@ -1928,7 +1952,7 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
       return true;
    }
    
-   accessory.context.currentTargetPosition = pos;
+   accessory.context.cTargetPos = pos;
    moveUp = (pos > accessory.context.lastPosition);
    
    var withoutmarginetimeUP;
@@ -1960,7 +1984,7 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
    accessory.context.startTimestamp = timestamp;
    accessory.context.targetTimestamp = timestamp + (duration * 1000);
    // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-   accessory.context.currentPositionState = (moveUp ? 0 : 1);
+   accessory.context.cMoveState = (moveUp ? 0 : 1);
    accessory.getService(Service.WindowCovering)
    .setCharacteristic(Characteristic.PositionState, (moveUp ? 0 : 1));
    
@@ -2000,7 +2024,7 @@ eWeLink.prototype.prepareBlindFinalState = function (accessory) {
    if (!platform.log) {
       return;
    }
-   accessory.context.currentPositionState = 2;
+   accessory.context.cMoveState = 2;
    let payload = platform.prepareBlindPayload(accessory);
    let string = JSON.stringify(payload);
    if (platform.debugReqRes) platform.log.warn(payload);
@@ -2012,19 +2036,19 @@ eWeLink.prototype.prepareBlindFinalState = function (accessory) {
             return;
          });
          platform.log("[%s] Request sent to stop moving", accessory.displayName);
-         accessory.context.currentPositionState = 2;
+         accessory.context.cMoveState = 2;
          
-         let currentTargetPosition = accessory.context.currentTargetPosition;
-         accessory.context.lastPosition = currentTargetPosition;
+         let cTargetPos = accessory.context.cTargetPos;
+         accessory.context.lastPosition = cTargetPos;
          let service = accessory.getService(Service.WindowCovering);
          // Using updateValue to avoid loop
          service.getCharacteristic(Characteristic.CurrentPosition)
-         .updateValue(currentTargetPosition);
+         .updateValue(cTargetPos);
          service.getCharacteristic(Characteristic.TargetPosition)
-         .updateValue(currentTargetPosition);
+         .updateValue(cTargetPos);
          service.setCharacteristic(Characteristic.PositionState, Characteristic.PositionState.STOPPED);
          
-         platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, currentTargetPosition);
+         platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, cTargetPos);
          return true;
          // TODO Here we need to wait for the response to the socket
       }, 1);
@@ -2057,7 +2081,7 @@ eWeLink.prototype.prepareBlindPayload = function (accessory) {
    var switch0 = "off";
    var switch1 = "off";
    
-   let state = accessory.context.currentPositionState;
+   let state = accessory.context.cMoveState;
    
    switch (state) {
       case 2:
