@@ -980,6 +980,8 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
    switch (accessory.context.switchNumber) {
       case "X":
       payload.params.bright = targetBrightness;
+      payload.params.state = targetBrightness != 0 ? "on" : "off";
+      payload.params.switch = targetBrightness != 0 ? "on" : "off";
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetBrightness);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, targetBrightness != 0);
       break;
@@ -1034,6 +1036,8 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       payload.params.colorG = newColour[1];
       payload.params.colorB = newColour[2];
       payload.params.bright = newBrightness;
+      payload.params.state = newColour[0] + newColour[1] + newColour[2] != 0 ? "on" : "off";
+      payload.params.switch = newColour[0] + newColour[1] + newColour[2] != 0 ? "on" : "off";
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHue);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newSaturation);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
@@ -1042,7 +1046,7 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    }
    let string = JSON.stringify(payload);
    platform.sendWebSocketMessage(string, callback);
-   if (platform.debug) platform.log("[%s] requesting to turn colour to HSL [%s %s %s] RGB [%s %s %s].", accessory.displayName, newHue, newSaturation, newBrightness, newColour[0], newColour[1], newColour[2]);
+   platform.log("[%s] requesting to turn colour to HSL [%s %s %s] RGB [%s %s %s].", accessory.displayName, newHue, newSaturation, newBrightness, newColour[0], newColour[1], newColour[2]);
 };
 
 eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, callback) {
@@ -1140,6 +1144,9 @@ eWeLink.prototype.internalThermostatUpdate = function (accessory, type, targetSt
       payload.apikey = accessory.context.eweApiKey;
       payload.deviceid = accessory.context.eweDeviceId;
       payload.sequence = platform.getSequence();
+      payload.state = newState; // this will need to be changed
+      payload.targetHumidity = newHumi;      // this will need to be changed
+      payload.targetTemperature = newTemp;      // this will need to be changed
       let string = JSON.stringify(payload);
       platform.sendWebSocketMessage(string, callback);
    }
