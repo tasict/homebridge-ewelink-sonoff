@@ -43,11 +43,11 @@ function eWeLink(log, config, api) {
    platform.devicesInHB = new Map();
    platform.devicesInEwe = new Map();
    platform.devicesUnsupported = [];
-   platform.devicesSingleSwitch = [1, 5, 6, 14, 15, 22, 24, 27, 32, 36, 59]; // Supported single switch uiid models
-   platform.devicesSingleSwitchLight = ["T1 1C", "L1", "B1", "B1_R2", "TX1C", "KING-M4"]; // A subset of above which we can expose as lights
+   platform.devicesSingleSwitch = [1, 5, 6, 14, 15, 22, 24, 27, 32, 36, 44, 59]; // Supported single switch uiid models
+   platform.devicesSingleSwitchLight = ["T1 1C", "L1", "B1", "B1_R2", "TX1C", "D1", "KING-M4"]; // A subset of above which we can expose as lights
    platform.devicesMultiSwitch = [2, 3, 4, 7, 8, 9, 29, 30, 31, 34, 41, 77]; // Supported multi switch uiid models
    platform.devicesMultiSwitchLight = ["T1 2C", "T1 3C", "TX2C", "TX3C"]; // A subset of above which we can expose as lights
-   platform.devicesDimmable = [36]; // Supported light with dimmer function uiid models
+   platform.devicesDimmable = [36, 44]; // Supported light with dimmer function uiid models
    platform.devicesColourable = [22, 59]; // Supported light with dimmer and light function uiid models
    platform.devicesThermostat = [15]; // Supported thermostat uiid models
    platform.devicesFan = [34]; // Supported fan uiid models
@@ -156,7 +156,7 @@ function eWeLink(log, config, api) {
                         // LIGHTS [SINGLE SWITCH] //
                         //************************//       
                         else if (platform.devicesSingleSwitch.includes(accessory.context.eweUIID) && platform.devicesSingleSwitchLight.includes(accessory.context.eweModel)) {
-                           if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("bright") || device.params.hasOwnProperty("colorR")) {
+                           if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("bright") || device.params.hasOwnProperty("colorR") || device.params.hasOwnProperty("brightness" || device.params.hasOwnProperty("channel0"))) {
                               platform.externalSingleLightUpdate(idToCheck + "SWX", device.params);
                               return;
                            }
@@ -451,7 +451,7 @@ function eWeLink(log, config, api) {
                         // LIGHTS [SINGLE SWITCH] //
                         //************************//       
                         else if (platform.devicesSingleSwitch.includes(accessory.context.eweUIID) && platform.devicesSingleSwitchLight.includes(accessory.context.eweModel)) {
-                           if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("bright") || device.params.hasOwnProperty("colorR")) {
+                           if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("bright") || device.params.hasOwnProperty("colorR") || device.params.hasOwnProperty("brightness" || device.params.hasOwnProperty("channel0"))) {
                               platform.externalSingleLightUpdate(idToCheck + "SWX", device.params);
                               return;
                            }
@@ -977,15 +977,20 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = platform.getSequence();
    
-   switch (accessory.context.switchNumber) {
-      case "X":
-      payload.params.bright = targetBrightness;
-      payload.params.state = targetBrightness != 0 ? "on" : "off";
-      payload.params.switch = targetBrightness != 0 ? "on" : "off";
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetBrightness);
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, targetBrightness != 0);
-      break;
+   // Sonoff D1 - HomeKit brightness (0-100) Sonoff brightness (1-255)
+   let newBrightness = max(Math.round(targetBrightness * 2.55), 1);
+   
+   if (accessory.context.eweUIID === 44) {
+      payload.params.brightness = newBrightness;
    }
+   else if (accessory.context.ewwUIID == 36) {
+      payload.params.bright = newBrightness;
+   }
+   payload.params.switch = targetBrightness != 0 ? "on" : "off";
+   
+   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetBrightness);
+   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, targetBrightness != 0);
+   
    let string = JSON.stringify(payload);
    platform.sendWebSocketMessage(string, callback);
    if (platform.debug) platform.log("[%s] requesting to turn brightness to [%s%].", accessory.displayName, targetBrightness);
@@ -1018,10 +1023,10 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       case "brightness":
       newHue = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value;
       newSaturation = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
-      newBrightness = targetHSL;
+      newBrightness = max(Math.round(targetHSL * 2.55), 1);
       break;
    }
-   let newColour = convert.hsl.rgb(newHue, newSaturation, 50);
+   let newColour = convert.hsl.rgb(newHue, newSaturation, newBrightness);
    let payload = {};
    payload.action = "update";
    payload.userAgent = "app";
@@ -1041,7 +1046,7 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHue);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newSaturation);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newColour[0] + newColour[1] + newColour[2] != 0);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newBrightness === 1);
       break;
    }
    let string = JSON.stringify(payload);
@@ -1298,9 +1303,13 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
    let accessory = platform.devicesInHB.get(hbDeviceId);
    if (params.hasOwnProperty("switch")) {
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switch === "on");
+   } else if (params.hasOwnProperty("state")) {
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.state === "on");
    }
    if (params.hasOwnProperty("bright")) {
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.bright);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, Math.round(params.bright / 2.55));
+   } else if (params.hasOwnProperty("brightness")) {
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, Math.round(params.brightness / 2.55));
    }
    if (params.hasOwnProperty("colorR")) {
       let newColour = convert.rgb.hsl(params.colorR, params.colorG, params.colorB);
@@ -1662,7 +1671,7 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       31: "GSM_SOCKET_4",
       32: "POWER_DETECTION_SOCKET", //Pow_R2
       33: "LIGHT_BELT",
-      34: "FAN_LIGHT",
+      34: "FAN_LIGHT", //iFan02, iFan
       35: "EZVIZ_CAMERA",
       36: "SINGLE_CHANNEL_DIMMER_SWITCH", //KING-M4
       38: "HOME_KIT_BRIDGE",
@@ -1670,7 +1679,7 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       41: "CUN_YOU_DOOR",
       42: "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT",
       43: "",
-      44: "",
+      44: "TPF_DIMMER_D1", //D1
       45: "DOWN_CEILING_LIGHT",
       46: "AIR_CLEANER",
       49: "MACHINE_BED",
@@ -1699,6 +1708,7 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       POWER_DETECTION_SOCKET: 1,
       MEARICAMERA: 1,
       SINGLE_CHANNEL_DIMMER_SWITCH: 1,
+      TPF_DIMMER_D1: 1,
       RGB_BALL_LIGHT: 1,
       SOCKET_2: 2,
       GSM_SOCKET_2: 2,
