@@ -1937,7 +1937,7 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       29: 2,             // "GSM_SOCKET_2"                           \\
       30: 3,             // "GSM_SOCKET_3"                           \\
       31: 4,             // "GSM_SOCKET_4"                           \\
-      32: 1,             // "POWER_DETECTION_SOCKET"                 \\ Pow_R2
+      32: 1,             // "POWER_DETECTION_SOCKET"                 \\ Pow_R2 POW
       33: 0,             // "LIGHT_BELT",                            \\
       34: 4,             // "FAN_LIGHT"                              \\ iFan02, iFan
       35: 0,             // "EZVIZ_CAMERA",                          \\
@@ -1947,7 +1947,7 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       41: 4,             // "CUN_YOU_DOOR"                           \\
       42: 0,             // "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT"   \\ 
       43: 0,             // "?"                                      \\ 
-      44: 1,             // "?"                                      \\ D1
+      44: 1,             // "(the sonoff dimmer)"                    \\ D1
       45: 0,             // "DOWN_CEILING_LIGHT"
       46: 0,             // "AIR_CLEANER"
       49: 0,             // "MACHINE_BED"
@@ -1959,8 +1959,8 @@ eWeLink.prototype.getChannelsByUIID = function (uiid) {
       57: 0,             // "MONOCHROMATIC_BALL_LIGHT"
       59: 1,             // "MEARICAMERA"                            \\ L1
       77: 4,             // "MICRO"
-      87: 0,             // "?"                                      \\ GK-200MP2B
-      102: 0,            // "?"                                      \\ OPL-DMA
+      87: 0,             // "(the sonoff camera)"                    \\ GK-200MP2B
+      102: 0,            // "(the door opener??)"                    \\ OPL-DMA
       1001: 0,           // "BLADELESS_FAN"
       1002: 0,           // "NEW_HUMIDIFIER",
       1003: 0            // "WARM_AIR_BLOWER"

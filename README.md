@@ -11,7 +11,7 @@ Thanks :)
 The plugin **should** work with Sonoff switches (single and multi-channel).
 - **Supported:** BASIC, MINI, 4CH
 #### 🟠 Lights/Bulbs/Dimmers
-The plugin **should** also work with colour lighting giving you full control of the brightness and colour from the Home app.
+The plugin **should** work with LED strips, dimmers etc. Giving you control of the colour/brightness of your device.
 - **Supported:** L1, D1
 - **Coming Soon:** B1, SLAMPHER
 #### 🟢 Light Switches
