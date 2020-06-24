@@ -1034,23 +1034,27 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = platform.getSequence();
-   
+   payload.params.switch = newBrightness != 1 ? "on" : "off";
+   payload.params.state = newBrightness != 1 ? "on" : "off";
    if (accessory.context.eweUIID === 59)
    {
       payload.params.colorR = newColour[0];
       payload.params.colorG = newColour[1];
       payload.params.colorB = newColour[2];
       payload.params.bright = newBrightness;
-      payload.params.state = newBrightness != 1 ? "on" : "off";
    } else {
-      payload.params.switch = newBrightness != 1 ? "on" : "off";
+      
+      payload.params.colorR = newColour[0];
+      payload.params.colorG = newColour[1];
+      payload.params.colorB = newColour[2];
+      payload.params.zyx_mode = 2
    }
-
+   
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHue);
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newSaturation);
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newBrightness === 1);
-
+   
    let string = JSON.stringify(payload);
    platform.sendWebSocketMessage(string, callback);
    platform.log("[%s] requesting to turn colour to HSL [%s %s %s] RGB [%s %s %s].", accessory.displayName, newHue, newSaturation, newBrightness, newColour[0], newColour[1], newColour[2]);
@@ -1313,11 +1317,24 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
    } else if (params.hasOwnProperty("brightness")) {
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, Math.round(params.brightness / 2.55));
    }
+   let newColour;
    if (params.hasOwnProperty("colorR")) {
-      let newColour = convert.rgb.hsl(params.colorR, params.colorG, params.colorB);
+      newColour = convert.rgb.hsl(params.colorR, params.colorG, params.colorB);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newColour[2]);
+   }
+   else if (params.hasOwnProperty("zyx_mode") && params.hasOwnProperty("channel0")) {
+      if (params.zyx_mode === 1) {
+         newColour = convert.rgb.hsl(params.channel2, params.channel3, params.channel4);
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newColour[2]);
+      } else if (params.zyx_mode === 2) {
+         let newBrightness = Math.round((max(params.channel0, params.channel1) - 25) / (255 - 25) * 255);
+         // Converting a figure [25->225] to [0->100]
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
+      }
    }
    return;
 }
