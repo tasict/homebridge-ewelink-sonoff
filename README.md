@@ -10,13 +10,13 @@ Thanks :)
 #### 🟢 Switches
 The plugin **should** work with Sonoff switches (single and multi-channel).
 - **Supported:** BASIC, MINI, 4CH
+#### 🟠 Lights/Bulbs/Dimmers
+The plugin **should** also work with colour lighting giving you full control of the brightness and colour from the Home app.
+- **Supported:** L1, D1
+- **Coming Soon:** B1, SLAMPHER
 #### 🟢 Light Switches
 The plugin **should** work with Sonoff light wall switches, and will be exposed as lights in Homebridge.
 - **Supported:** T1-1C, T1-2C, T1-3C, TX-1C, TX-2C, TX-3C, KING-M4
-#### 🟠 Lights/Bulbs
-The plugin **should** also work with colour lighting giving you full control of the brightness and colour from the Home app.
-- **Supported:** L1
-- **Coming Soon:** B1, SLAMPHER
 #### 🟢 Outlets
 The plugin **should** work with Sonoff outlets. But it's something I haven't tested properly.
 #### 🟢 RF Bridges
