@@ -8,7 +8,7 @@ More information about this package and how it's evolved from [homebridge-ewelin
 Thanks :)
 ## Supported Devices
 #### 🟢 Switches
-The plugin **should** work with Sonoff switches (single- and multi-channel).
+The plugin **should** work with Sonoff switches (single and multi-channel): T1 1C, T1 2C, T1 3C, TX1C, TX2C, TX3C, 4CH, MINI
 #### 🟢 Outlets
 The plugin **should** work with Sonoff outlets.
 #### 🟠 Lights
@@ -33,14 +33,14 @@ Simply go to the "Plugins" page, search `homebridge-ewelink-beta` and click "Ins
 sudo npm i homebridge-ewelink-beta -g
 ```
 #### 2. Configure
-Add the following to your Homebridge configuration file in the appropriate place. These are the basic required fields.
+Add the following to your Homebridge configuration file in the appropriate place. These are the basic required fields. (this plugin uses a single field for e-mail / phone number)
 ```json
 {
    "platform" : "eWeLink",
    "name" : "eWeLink",
    "username" : "your-ewelink-username (either phone or email)",
    "password" : "your-ewelink-password",
-   "countryCode" : "your-ewelink-country-code (eg 44 for UK or 1 for USA)"
+   "countryCode" : "your-ewelink-country-code (eg 44 for UK, 1 for USA, 55 for Brazil)"
 }
 ```
 There are extra optional configuration options that can be configured via Homebridge-UI-X. Or you can browse the code to see them.
