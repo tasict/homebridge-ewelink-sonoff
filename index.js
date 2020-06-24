@@ -977,14 +977,11 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = platform.getSequence();
    
-   // Sonoff D1 - HomeKit brightness (0-100) Sonoff brightness (1-255)
-   let newBrightness = max(Math.round(targetBrightness * 2.55), 1);
-   
    if (accessory.context.eweUIID === 44) {
-      payload.params.brightness = newBrightness;
+      payload.params.brightness = targetBrightness;
    }
    else if (accessory.context.ewwUIID == 36) {
-      payload.params.bright = newBrightness;
+      payload.params.bright = targetBrightness;
    }
    payload.params.switch = targetBrightness != 0 ? "on" : "off";
    
@@ -1040,7 +1037,7 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    payload.params.state = newBrightness != 0 ? "on" : "off";
    if (accessory.context.eweUIID === 59) //LED LIGHT
    {
-      payload.params.bright = max(newBrightness, 1);
+      payload.params.bright = Math.max(newBrightness, 1);
       payload.params.colorR = newColour[0];
       payload.params.colorG = newColour[1];
       payload.params.colorB = newColour[2];
@@ -1333,7 +1330,7 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newColour[2]);
       } else if (params.zyx_mode === 2) {
-         let newBrightness = max(params.channel0, params.channel1);
+         let newBrightness = Math.max(params.channel0, params.channel1);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
       }
    }
