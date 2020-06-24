@@ -18,7 +18,8 @@ The plugin **should** work with LED strips, dimmers etc. Giving you control of t
 The plugin **should** work with Sonoff light wall switches, and will be exposed as lights in Homebridge.
 - **Supported:** T1-1C, T1-2C, T1-3C, TX-1C, TX-2C, TX-3C, KING-M4
 #### 🟢 Outlets
-The plugin **should** work with Sonoff outlets. But it's something I haven't tested properly.
+The plugin **should** work with Sonoff outlets.
+- **Supported:** POW
 #### 🟢 RF Bridges
 The plugin **should** work with the Sonoff Bridge, at the moment exposing motion sensors that will detect motion and notify Homebridge/HomeKit. Other devices connected to the RF bridge might cause issues.
 #### 🟢 Thermostats
