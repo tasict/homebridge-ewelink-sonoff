@@ -8,17 +8,25 @@ More information about this package and how it's evolved from [homebridge-ewelin
 Thanks :)
 ## Supported Devices
 #### 🟢 Switches
-The plugin **should** work with Sonoff switches (single and multi-channel): T1 1C, T1 2C, T1 3C, TX1C, TX2C, TX3C, 4CH, MINI
+The plugin **should** work with Sonoff switches (single and multi-channel).
+- **Supported:** BASIC, MINI, 4CH
+#### 🟢 Light Switches
+The plugin **should** work with Sonoff light wall switches, and will be exposed as lights in Homebridge.
+- **Supported:** T1-1C, T1-2C, T1-3C, TX-1C, TX-2C, TX-3C, KING-M4
+#### 🟠 Lights/Bulbs
+The plugin **should** also work with LED strips giving you full control of the brightness and colour from the Home app.
+- **Supported:** L1
+- **Coming Soon:** B1, SLAMPHER
 #### 🟢 Outlets
 The plugin **should** work with Sonoff outlets.
-#### 🟠 Lights
-The plugin **should** work with Sonoff light wall switches (and will be exposed as lights in Homebridge). The plugin **should** also work with LED strips giving you full control of the brightness and colour from the Home app. The Sonoff Bulbs (B1) are a work in progress!
 #### 🟢 RF Bridges
 The plugin **should** work with the Sonoff Bridge, at the moment exposing motion sensors that will detect motion and notify Homebridge/HomeKit. Other devices connected to the RF bridge might cause issues.
 #### 🟢 Thermostats
-The plugin **should** work with Sonoff Thermostat devices, showing the current temperature and relative humidity in Homebridge/HomeKit. I am looking for ways to relay target temperature changes from HomeKit apps back to eWeLink for constistency.
-#### 🟠 Fans
+The plugin **should** work with Sonoff Thermostat devices, showing the current temperature and relative humidity in Homebridge/HomeKit. I am looking for ways to relay target temperature changes from HomeKit apps back to eWeLink for consistency.
+- **Coming Soon:** TH10, TH16
+#### 🔴 Fans
 The plugin **might** work with Sonoff Fan devices. I need a kind person with the a device to assist!
+- **Unsupported:** iFan02, iFan03
 #### 🔴 Custom Devices (Blinds, Garage Doors)
 > By custom devices I mean using a generic Sonoff multi-switch device to simulate a specific type of accessory that is HomeKit supported, for example blinds and garage doors.
 
@@ -33,7 +41,8 @@ Simply go to the "Plugins" page, search `homebridge-ewelink-beta` and click "Ins
 sudo npm i homebridge-ewelink-beta -g
 ```
 #### 2. Configure
-Add the following to your Homebridge configuration file in the appropriate place. These are the basic required fields. (this plugin uses a single field for e-mail / phone number)
+Add the following to your Homebridge configuration file in the appropriate place. These are the basic required fields.
+> This plugin uses a single field for e-mail / phone number.
 ```json
 {
    "platform" : "eWeLink",
