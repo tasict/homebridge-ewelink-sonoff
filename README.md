@@ -79,4 +79,5 @@ Please feel free to submit - the more the merrier! As the name suggests, this is
 - @ozzyobr - for his continued support throughout, e.g. his work with colour conversion, his help with supporting the L1 LED strip.
 - @attarawnneh - for his hours of patience whilst we trialled and errored with the RF Bridge - we got there I hope!
 - @gmeiburg88 - for trusting my control of his baby's dimmer lamp to enable support for D1... and the heater too!
+
 Thank you to all 😃.
