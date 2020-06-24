@@ -958,8 +958,24 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = platform.getSequence();
    payload.params = {};
-   payload.params.bright = Math.max(targetBrightness, 1);
-   payload.params.switch = targetBrightness != 0 ? "on" : "off";
+   
+   if (accessory.context.eweUIID === 44) {
+      if (targetBrightness === 0) {
+         payload.params.switch = "off";
+      } else {
+         payload.params.switch = "on";
+         payload.params.brightness = Math.max(targetBrightness, 1); 
+         payload.params.bright = Math.max(targetBrightness, 1); 
+      }
+   }
+   else if (accessory.context.eweUIID == 36) {
+      if (targetBrightness === 0) {
+         payload.params.switch = "off";
+      } else {
+         payload.params.bright = Math.max(targetBrightness, 1); 
+      }
+   }
+   
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetBrightness);
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, targetBrightness != 0);
    platform.sendWebSocketMessage(JSON.stringify(payload), callback);
