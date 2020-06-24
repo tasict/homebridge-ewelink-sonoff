@@ -159,6 +159,42 @@ function eWeLink(log, config, api) {
                               return;
                            }
                         }
+                        //************************//
+                        // LIGHTS [SINGLE SWITCH] //
+                        //************************//       
+                        else if (platform.devicesSingleSwitch.includes(accessory.context.eweUIID) && platform.devicesSingleSwitchLight.includes(accessory.context.eweModel)) {
+                           if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("bright") || device.params.hasOwnProperty("colorR") || device.params.hasOwnProperty("brightness" || device.params.hasOwnProperty("channel0"))) {
+                              platform.externalSingleLightUpdate(idToCheck + "SWX", device.params);
+                              return;
+                           }
+                        }
+                        //***********************//
+                        // LIGHTS [MULTI SWITCH] //
+                        //***********************//
+                        else if (platform.devicesMultiSwitch.includes(accessory.context.eweUIID) && platform.devicesMultiSwitchLight.includes(accessory.context.eweModel)) {
+                           if (Array.isArray(device.params.switches)) {
+                              platform.externalMultiLightUpdate(idToCheck + "SW0", device.params);
+                              return;
+                           }
+                        }
+                        //***********************//
+                        // OTHER SINGLE SWITCHES //
+                        //***********************//       
+                        else if (platform.devicesSingleSwitch.includes(accessory.context.eweUIID)) {
+                           if (device.params.hasOwnProperty("switch")) {
+                              platform.externalSingleSwitchUpdate(idToCheck + "SWX", device.params);
+                              return;
+                           }
+                        }
+                        //**********************//
+                        // OTHER MULTI SWITCHES //
+                        //**********************//
+                        else if (platform.devicesMultiSwitch.includes(accessory.context.eweUIID)) {
+                           if (Array.isArray(device.params.switches)) {
+                              platform.externalMultiSwitchUpdate(idToCheck + "SW0", device.params);
+                              return;
+                           }
+                        }
                         //*********//
                         // BRIDGES //
                         //*********//
