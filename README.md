@@ -18,7 +18,7 @@ The plugin **should** also work with LED strips giving you full control of the b
 - **Supported:** L1
 - **Coming Soon:** B1, SLAMPHER
 #### 🟢 Outlets
-The plugin **should** work with Sonoff outlets.
+The plugin **should** work with Sonoff outlets. But it's something I haven't tested properly.
 #### 🟢 RF Bridges
 The plugin **should** work with the Sonoff Bridge, at the moment exposing motion sensors that will detect motion and notify Homebridge/HomeKit. Other devices connected to the RF bridge might cause issues.
 #### 🟢 Thermostats
