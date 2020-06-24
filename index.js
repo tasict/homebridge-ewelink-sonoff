@@ -1241,7 +1241,6 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
       let deviceFromEwe = platform.devicesInEwe.get(hbDeviceId);
       payload.params = {};
       payload.params.switches = deviceFromEwe.params.switches;
-      
       let switch0 = "off";
       let switch1 = "off";
       
