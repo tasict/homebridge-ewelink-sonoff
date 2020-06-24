@@ -75,4 +75,7 @@ And voila your eWeLink devices *should* be added to your Homebridge instance.
 #### Issues/Pull Requests
 Please feel free to submit - the more the merrier! As the name suggests, this is still in beta so it's most likely you'll run into issues.
 #### Credits
-Where do I start... 😄
+- @gbro115 → @MrTomAsh → @howanghk - the line of succession of this plugin that I forked from. Otherwise this wouldn't exist.
+- @ozzyobr - for his work with colour conversion, help supporting the L1 LED strip and his continued support throughout :)
+- @attarawnneh - for his patience while I trialled and errored with the RF Bridge - we got there I hope!
+- @gmeiburg88 - for trusting my control of his baby's dimmer lamp to enable support for D1, and the heater!
