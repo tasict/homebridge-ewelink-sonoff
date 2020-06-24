@@ -1035,20 +1035,22 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = platform.getSequence();
    
-   switch (accessory.context.switchNumber) {
-      case "X":
+   if (accessory.context.eweUIID === 59)
+   {
       payload.params.colorR = newColour[0];
       payload.params.colorG = newColour[1];
       payload.params.colorB = newColour[2];
       payload.params.bright = newBrightness;
-      payload.params.state = newColour[0] + newColour[1] + newColour[2] != 0 ? "on" : "off";
-      payload.params.switch = newColour[0] + newColour[1] + newColour[2] != 0 ? "on" : "off";
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHue);
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newSaturation);
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newBrightness === 1);
-      break;
+      payload.params.state = newBrightness != 1 ? "on" : "off";
+   } else {
+      payload.params.switch = newBrightness != 1 ? "on" : "off";
    }
+
+   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHue);
+   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newSaturation);
+   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
+   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newBrightness === 1);
+
    let string = JSON.stringify(payload);
    platform.sendWebSocketMessage(string, callback);
    platform.log("[%s] requesting to turn colour to HSL [%s %s %s] RGB [%s %s %s].", accessory.displayName, newHue, newSaturation, newBrightness, newColour[0], newColour[1], newColour[2]);
