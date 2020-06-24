@@ -1023,10 +1023,12 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       case "brightness":
       newHue = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value;
       newSaturation = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
-      newBrightness = max(Math.round(targetHSL * 2.55), 1);
+      newBrightness = targetHSL;
       break;
    }
-   let newColour = convert.hsl.rgb(newHue, newSaturation, newBrightness);
+   // let newColour = convert.hsl.rgb(newHue, newSaturation, newBrightness); DIDNT SEEM TO WORK
+   let newColour = convert.hsl.rgb(newHue, newSaturation, 50); // @ozzyobr
+   
    let payload = {};
    payload.action = "update";
    payload.userAgent = "app";
@@ -1034,26 +1036,25 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = platform.getSequence();
-   payload.params.switch = newBrightness != 1 ? "on" : "off";
-   payload.params.state = newBrightness != 1 ? "on" : "off";
-   if (accessory.context.eweUIID === 59)
+   payload.params.switch = newBrightness != 0 ? "on" : "off";
+   payload.params.state = newBrightness != 0 ? "on" : "off";
+   if (accessory.context.eweUIID === 59) //LED LIGHT
    {
+      payload.params.bright = max(newBrightness, 1);
       payload.params.colorR = newColour[0];
       payload.params.colorG = newColour[1];
       payload.params.colorB = newColour[2];
-      payload.params.bright = newBrightness;
-   } else {
-      
-      payload.params.colorR = newColour[0];
-      payload.params.colorG = newColour[1];
-      payload.params.colorB = newColour[2];
+   } else { // B1
       payload.params.zyx_mode = 2;
+      payload.params.channel2 = newColour[0];
+      payload.params.channel3 = newColour[1];
+      payload.params.channel4 = newColour[2];
    }
    
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHue);
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newSaturation);
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
-   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newBrightness === 1);
+   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newBrightness != 0);
    
    let string = JSON.stringify(payload);
    platform.sendWebSocketMessage(string, callback);
@@ -1313,26 +1314,26 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.state === "on");
    }
    if (params.hasOwnProperty("bright")) {
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, Math.round(params.bright / 2.55));
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.bright);
    } else if (params.hasOwnProperty("brightness")) {
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, Math.round(params.brightness / 2.55));
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.brightness);
    }
    let newColour;
-   if (params.hasOwnProperty("colorR")) {
+   if (params.hasOwnProperty("colorR")) { // LED Strip
       newColour = convert.rgb.hsl(params.colorR, params.colorG, params.colorB);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newColour[2]);
+      // accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newColour[2]);
+      // Commented out as this is the case of the LED Strip and the brightness will have been updated above
    }
-   else if (params.hasOwnProperty("zyx_mode") && params.hasOwnProperty("channel0")) {
+   else if (params.hasOwnProperty("zyx_mode") && params.hasOwnProperty("channel0")) { // B1
       if (params.zyx_mode === 1) {
          newColour = convert.rgb.hsl(params.channel2, params.channel3, params.channel4);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newColour[2]);
       } else if (params.zyx_mode === 2) {
-         let newBrightness = Math.round((max(params.channel0, params.channel1) - 25) / (255 - 25) * 255);
-         // Converting a figure [25->225] to [0->100]
+         let newBrightness = max(params.channel0, params.channel1);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
       }
    }
