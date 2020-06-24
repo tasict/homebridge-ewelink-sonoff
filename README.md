@@ -14,7 +14,7 @@ The plugin **should** work with Sonoff switches (single and multi-channel).
 The plugin **should** work with Sonoff light wall switches, and will be exposed as lights in Homebridge.
 - **Supported:** T1-1C, T1-2C, T1-3C, TX-1C, TX-2C, TX-3C, KING-M4
 #### 🟠 Lights/Bulbs
-The plugin **should** also work with LED strips giving you full control of the brightness and colour from the Home app.
+The plugin **should** also work with colour lighting giving you full control of the brightness and colour from the Home app.
 - **Supported:** L1
 - **Coming Soon:** B1, SLAMPHER
 #### 🟢 Outlets
@@ -23,8 +23,8 @@ The plugin **should** work with Sonoff outlets. But it's something I haven't tes
 The plugin **should** work with the Sonoff Bridge, at the moment exposing motion sensors that will detect motion and notify Homebridge/HomeKit. Other devices connected to the RF bridge might cause issues.
 #### 🟢 Thermostats
 The plugin **should** work with Sonoff Thermostat devices, showing the current temperature and relative humidity in Homebridge/HomeKit. I am looking for ways to relay target temperature changes from HomeKit apps back to eWeLink for consistency.
-- **Coming Soon:** TH10, TH16
-#### 🔴 Fans
+- **Supported:** TH10, TH16
+#### 🟠 Fans
 The plugin **might** work with Sonoff Fan devices. I need a kind person with the a device to assist!
 - **Unsupported:** iFan02, iFan03
 #### 🔴 Custom Devices (Blinds, Garage Doors)
