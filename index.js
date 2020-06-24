@@ -1047,7 +1047,7 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       payload.params.colorR = newColour[0];
       payload.params.colorG = newColour[1];
       payload.params.colorB = newColour[2];
-      payload.params.zyx_mode = 2
+      payload.params.zyx_mode = 2;
    }
    
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHue);
