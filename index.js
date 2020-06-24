@@ -213,7 +213,7 @@ function eWeLink(log, config, api) {
                            if (device.params.hasOwnProperty("cmd") && device.params.cmd === "trigger") {
                               platform.externalBridgeUpdate(idToCheck + "SW0", device.params);
                               return;
-                           }                   
+                           }
                         }
                         platform.log.warn("[%s] could not be refreshed due to a hiccup in the eWeLink message.", device.deviceid);
                      } else {
@@ -518,7 +518,7 @@ function eWeLink(log, config, api) {
                            if (Array.isArray(device.params)) {
                               platform.externalBridgeUpdate(idToCheck + "SW0", device.params);
                               return;
-                           }                   
+                           }
                         }
                      } else {
                         platform.log.warn("[%s] There has been a problem refreshing this device.", device.name);
@@ -971,15 +971,14 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
          payload.params.switch = "off";
       } else {
          payload.params.switch = "on";
-         payload.params.brightness = Math.max(targetBrightness, 1); 
-         payload.params.bright = Math.max(targetBrightness, 1); 
+         payload.params.brightness = Math.max(targetBrightness, 1);
+         payload.params.bright = Math.max(targetBrightness, 1);
       }
-   }
-   else if (accessory.context.eweUIID == 36) {
+   } else if (accessory.context.eweUIID == 36) {
       if (targetBrightness === 0) {
          payload.params.switch = "off";
       } else {
-         payload.params.bright = Math.max(targetBrightness, 1); 
+         payload.params.bright = Math.max(targetBrightness, 1);
       }
    }
    
@@ -1142,8 +1141,8 @@ eWeLink.prototype.internalThermostatUpdate = function (accessory, type, targetSt
       payload.deviceid = accessory.context.eweDeviceId;
       payload.sequence = platform.getSequence();
       payload.state = newState; // this will need to be changed
-      payload.targetHumidity = newHumi;      // this will need to be changed
-      payload.targetTemperature = newTemp;      // this will need to be changed
+      payload.targetHumidity = newHumi; // this will need to be changed
+      payload.targetTemperature = newTemp; // this will need to be changed
       platform.sendWebSocketMessage(JSON.stringify(payload), callback);
    }
 };
@@ -1408,10 +1407,10 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
    let switchDown = params.switches[accessory.context.switchDown].switch === "on" ? 1 : 0;
    
    const MAPPING = {
-      0: 2,      // [0,0] = 0 => 2 Stopped
-      1: 1,      // [0,1] = 1 => 1 Moving down
-      2: 0,      // [1,0] = 2 => 0 Moving up
-      3: 3      // [1,1] = 3 => 3 Error
+      0: 2, // [0,0] = 0 => 2 Stopped
+      1: 1, // [0,1] = 1 => 1 Moving down
+      2: 0, // [1,0] = 2 => 0 Moving up
+      3: 3 // [1,1] = 3 => 3 Error
    };
    let state = MAPPING[(switchUp * 2) + switchDown];
    let actualPosition;
@@ -1594,8 +1593,7 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
       // accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newColour[2]);
       // Commented out as this is the case of the LED Strip and the brightness will have been updated above
-   }
-   else if (params.hasOwnProperty("zyx_mode") && params.hasOwnProperty("channel0")) { // B1
+   } else if (params.hasOwnProperty("zyx_mode") && params.hasOwnProperty("channel0")) { // B1
       if (params.zyx_mode === 1) {
          newColour = convert.rgb.hsl(params.channel2, params.channel3, params.channel4);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
@@ -1682,11 +1680,10 @@ eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
    for (i = 1; i <= accessory.context.channelCount; i++) {
       if (platform.devicesInHB.has(idToCheck + i)) {
          otherAccessory = platform.devicesInHB.get(idToCheck + i);
-         if (params.hasOwnProperty("rfTrig" + (i - 1)))
-         {
+         if (params.hasOwnProperty("rfTrig" + (i - 1))) {
             timeOfMotion = new Date(params["rfTrig" + (i - 1)]);
             timeDifference = (timeNow.getTime() - timeOfMotion.getTime()) / 1000;
-            if (timeDifference < platform.sensorTimeDifference)  {
+            if (timeDifference < platform.sensorTimeDifference) {
                otherAccessory.getService(Service.MotionSensor).updateCharacteristic(Characteristic.MotionDetected, true);
                master = true;
                if (platform.debug) platform.log("[%s] has detected motion.", otherAccessory.displayName);
@@ -1925,62 +1922,62 @@ eWeLink.prototype.relogin = function (callback) {
 
 eWeLink.prototype.getChannelsByUIID = function (uiid) {
    const UIID_TO_CHAN = {
-      1: 1,              // "SOCKET"                                 \\ 20, MINI, BASIC, S26
-      2: 2,              // "SOCKET_2"                               \\ 
-      3: 3,              // "SOCKET_3"                               \\ 
-      4: 4,              // "SOCKET_4",                              \\ 
-      5: 1,              // "SOCKET_POWER"                           \\ 
-      6: 1,              // "SWITCH"                                 \\ T1 1C, TX1C
-      7: 2,              // "SWITCH_2"                               \\ T1 2C, TX2C
-      8: 3,              // "SWITCH_3"                               \\ T1 3C, TX3C
-      9: 4,              // "SWITCH_4"                               \\ 
-      10: 0,             // "OSPF"                                   \\ 
-      11: 0,             // "CURTAIN"                                \\ 
-      12: 0,             // "EW-RE"                                  \\ 
-      13: 0,             // "FIREPLACE"                              \\ 
-      14: 1,             // "SWITCH_CHANGE"                          \\ 
-      15: 1,             // "THERMOSTAT"                             \\ TH10, TH16
-      16: 0,             // "COLD_WARM_LED"                          \\ 
-      17: 0,             // "THREE_GEAR_FAN"                         \\ 
-      18: 0,             // "SENSORS_CENTER"                         \\ 
-      19: 0,             // "HUMIDIFIER"                             \\ 
-      22: 1,             // "RGB_BALL_LIGHT"                         \\ B1, B1_R2
-      23: 0,             // "NEST_THERMOSTAT"                        \\ 
-      24: 1,             // "GSM_SOCKET"                             \\
-      25: 0,             // "AROMATHERAPY",                          \\
-      26: 0,             // "BJ_THERMOSTAT",                         \\
-      27: 1,             // "GSM_UNLIMIT_SOCKET"                     \\
-      28: 1,             // "RF_BRIDGE"                              \\ RFBridge, RF_Bridge
-      29: 2,             // "GSM_SOCKET_2"                           \\
-      30: 3,             // "GSM_SOCKET_3"                           \\
-      31: 4,             // "GSM_SOCKET_4"                           \\
-      32: 1,             // "POWER_DETECTION_SOCKET"                 \\ Pow_R2 POW
-      33: 0,             // "LIGHT_BELT",                            \\
-      34: 4,             // "FAN_LIGHT"                              \\ iFan02, iFan
-      35: 0,             // "EZVIZ_CAMERA",                          \\
-      36: 1,             // "SINGLE_CHANNEL_DIMMER_SWITCH"           \\ KING-M4
-      38: 0,             // "HOME_KIT_BRIDGE",                       \\
-      40: 0,             // "FUJIN_OPS"                              \\
-      41: 4,             // "CUN_YOU_DOOR"                           \\
-      42: 0,             // "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT"   \\ 
-      43: 0,             // "?"                                      \\ 
-      44: 1,             // "(the sonoff dimmer)"                    \\ D1
-      45: 0,             // "DOWN_CEILING_LIGHT"
-      46: 0,             // "AIR_CLEANER"
-      49: 0,             // "MACHINE_BED"
-      51: 0,             // "COLD_WARM_DESK_LIGHT",
-      52: 0,             // "DOUBLE_COLOR_DEMO_LIGHT"
-      53: 0,             // "ELECTRIC_FAN_WITH_LAMP"
-      55: 0,             // "SWEEPING_ROBOT"
-      56: 0,             // "RGB_BALL_LIGHT_4"
-      57: 0,             // "MONOCHROMATIC_BALL_LIGHT"
-      59: 1,             // "MEARICAMERA"                            \\ L1
-      77: 4,             // "MICRO"
-      87: 0,             // "(the sonoff camera)"                    \\ GK-200MP2B
-      102: 0,            // "(the door opener??)"                    \\ OPL-DMA
-      1001: 0,           // "BLADELESS_FAN"
-      1002: 0,           // "NEW_HUMIDIFIER",
-      1003: 0            // "WARM_AIR_BLOWER"
+      1: 1, // "SOCKET"                                 \\ 20, MINI, BASIC, S26
+      2: 2, // "SOCKET_2"                               \\ 
+      3: 3, // "SOCKET_3"                               \\ 
+      4: 4, // "SOCKET_4",                              \\ 
+      5: 1, // "SOCKET_POWER"                           \\ 
+      6: 1, // "SWITCH"                                 \\ T1 1C, TX1C
+      7: 2, // "SWITCH_2"                               \\ T1 2C, TX2C
+      8: 3, // "SWITCH_3"                               \\ T1 3C, TX3C
+      9: 4, // "SWITCH_4"                               \\ 
+      10: 0, // "OSPF"                                   \\ 
+      11: 0, // "CURTAIN"                                \\ 
+      12: 0, // "EW-RE"                                  \\ 
+      13: 0, // "FIREPLACE"                              \\ 
+      14: 1, // "SWITCH_CHANGE"                          \\ 
+      15: 1, // "THERMOSTAT"                             \\ TH10, TH16
+      16: 0, // "COLD_WARM_LED"                          \\ 
+      17: 0, // "THREE_GEAR_FAN"                         \\ 
+      18: 0, // "SENSORS_CENTER"                         \\ 
+      19: 0, // "HUMIDIFIER"                             \\ 
+      22: 1, // "RGB_BALL_LIGHT"                         \\ B1, B1_R2
+      23: 0, // "NEST_THERMOSTAT"                        \\ 
+      24: 1, // "GSM_SOCKET"                             \\
+      25: 0, // "AROMATHERAPY",                          \\
+      26: 0, // "BJ_THERMOSTAT",                         \\
+      27: 1, // "GSM_UNLIMIT_SOCKET"                     \\
+      28: 1, // "RF_BRIDGE"                              \\ RFBridge, RF_Bridge
+      29: 2, // "GSM_SOCKET_2"                           \\
+      30: 3, // "GSM_SOCKET_3"                           \\
+      31: 4, // "GSM_SOCKET_4"                           \\
+      32: 1, // "POWER_DETECTION_SOCKET"                 \\ Pow_R2 POW
+      33: 0, // "LIGHT_BELT",                            \\
+      34: 4, // "FAN_LIGHT"                              \\ iFan02, iFan
+      35: 0, // "EZVIZ_CAMERA",                          \\
+      36: 1, // "SINGLE_CHANNEL_DIMMER_SWITCH"           \\ KING-M4
+      38: 0, // "HOME_KIT_BRIDGE",                       \\
+      40: 0, // "FUJIN_OPS"                              \\
+      41: 4, // "CUN_YOU_DOOR"                           \\
+      42: 0, // "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT"   \\ 
+      43: 0, // "?"                                      \\ 
+      44: 1, // "(the sonoff dimmer)"                    \\ D1
+      45: 0, // "DOWN_CEILING_LIGHT"
+      46: 0, // "AIR_CLEANER"
+      49: 0, // "MACHINE_BED"
+      51: 0, // "COLD_WARM_DESK_LIGHT",
+      52: 0, // "DOUBLE_COLOR_DEMO_LIGHT"
+      53: 0, // "ELECTRIC_FAN_WITH_LAMP"
+      55: 0, // "SWEEPING_ROBOT"
+      56: 0, // "RGB_BALL_LIGHT_4"
+      57: 0, // "MONOCHROMATIC_BALL_LIGHT"
+      59: 1, // "MEARICAMERA"                            \\ L1
+      77: 4, // "MICRO"
+      87: 0, // "(the sonoff camera)"                    \\ GK-200MP2B
+      102: 0, // "(the door opener??)"                    \\ OPL-DMA
+      1001: 0, // "BLADELESS_FAN"
+      1002: 0, // "NEW_HUMIDIFIER",
+      1003: 0 // "WARM_AIR_BLOWER"
    };
    return UIID_TO_CHAN[uiid] || 0;
 };
