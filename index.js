@@ -1745,7 +1745,9 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
       newColour = convert.rgb.hsl(params.colorR, params.colorG, params.colorB);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
-   } else if (params.hasOwnProperty("channel2")) {
+   }
+   
+   if (params.hasOwnProperty("channel2") || (params.hasOwnProperty("zyx_mode") && params.zyx_mode === 2)) {
       if (params.channel2 + params.channel3 + params.channel4 === "000") {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
       } else {
@@ -1753,16 +1755,7 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
          newColour = convert.rgb.hsl(params.channel2, params.channel3, params.channel4);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 50);
-      }
-   } else if (params.hasOwnProperty("zyx_mode")) {
-      if (params.zyx_mode === 2) {
-         newColour = convert.rgb.hsl(params.channel2, params.channel3, params.channel4);
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 50);         
-      } else {
-         platform.log.warn("[%s] has been set to a mode which this plugin doesn't support yet.", accessory.displayName);
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, Math.max(newColour[1], 1));
       }
    }
    return;
