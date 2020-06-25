@@ -230,7 +230,7 @@ function eWeLink(log, config, api) {
                         accessory = false;
                      }
                      if (accessory) {
-                        accessory.reachable = device.online;
+                        accessory.reachable = device.params.online;
                         if (accessory.reachable) platform.log("[%s] has been reported online.", accessory.displayName);
                         else platform.log.warn("[%s] has been reported offline.", accessory.displayName);
                      } else {
@@ -798,6 +798,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
          accessory.context.percentDurationUp = accessory.context.durationUp * 10;
       }
    }
+   accessory.reachable = true;
    platform.devicesInHB.set(accessory.context.hbDeviceId, accessory);
 };
 
