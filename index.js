@@ -1161,8 +1161,7 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
       break;
    }
    let newColour;
-   if (accessory.context.eweUIID === 59) newColour = convert.hsl.rgb(newHue, newSaturation, 50); //@ozzyobr
-   else newColour = convert.hsl.rgb(newHue, 100, 50);
+   newColour = convert.hsl.rgb(newHue, newSaturation, 50); // @ozzyobr
    platform.log("[%s] requesting to turn colour to HSL [%s %s %s] RGB [%s %s %s].", accessory.displayName, newHue, newSaturation, newBrightness, newColour[0], newColour[1], newColour[2]);
    let payload = {};
    payload.action = "update";
@@ -1760,7 +1759,7 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 50);         
       } else {
-         platform.log.warn("[%s] has been set to a mode which Homebridge doesn't support.", accessory.displayName);
+         platform.log.warn("[%s] has been set to a mode which this plugin doesn't support yet.", accessory.displayName);
       }
    }
    return;
