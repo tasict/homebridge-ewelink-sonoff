@@ -96,7 +96,7 @@ function eWeLink(log, config, api) {
                payload.nonce = nonce();
                payload.ts = Math.floor(new Date() / 1000);
                payload.userAgent = "app";
-               payload.sequence = platform.getSequence();
+               payload.sequence = Math.floor(new Date());
                payload.version = 8;
                if (platform.debugReqRes) platform.log.warn("Sending web socket login request.\n" + JSON.stringify(payload, null, 2));
                else if (platform.debug) platform.log("Sending web socket login request.");
@@ -774,7 +774,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       };
       payload.apikey = accessory.context.eweApiKey;
       payload.deviceid = accessory.context.eweDeviceId;
-      payload.sequence = platform.getSequence();
+      payload.sequence = Math.floor(new Date());
       if (platform.debugReqRes) platform.log.warn(payload);
       platform.sendWebSocketMessage(JSON.stringify(payload), function () {
          return;
@@ -822,7 +822,7 @@ eWeLink.prototype.internalSwitchUpdate = function (accessory, isOn, callback) {
    payload.userAgent = "app";
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
-   payload.sequence = platform.getSequence();
+   payload.sequence = Math.floor(new Date());
    payload.params = {};
    switch (accessory.context.switchNumber) {
       case "X":
@@ -881,7 +881,7 @@ eWeLink.prototype.internalOutletUpdate = function (accessory, isOn, callback) {
    payload.userAgent = "app";
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
-   payload.sequence = platform.getSequence();
+   payload.sequence = Math.floor(new Date());
    payload.params = {};
    if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
    payload.params.switch = targetState;
@@ -902,7 +902,7 @@ eWeLink.prototype.internalLightbulbUpdate = function (accessory, isOn, callback)
    payload.userAgent = "app";
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
-   payload.sequence = platform.getSequence();
+   payload.sequence = Math.floor(new Date());
    payload.params = {};
    switch (accessory.context.switchNumber) {
       case "X":
@@ -963,7 +963,7 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
    payload.userAgent = "app";
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
-   payload.sequence = platform.getSequence();
+   payload.sequence = Math.floor(new Date());
    payload.params = {};
    
    if (accessory.context.eweUIID === 44) {
@@ -978,6 +978,7 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
       if (targetBrightness === 0) {
          payload.params.switch = "off";
       } else {
+         payload.params.switch = "on";
          payload.params.bright = Math.max(targetBrightness, 1);
       }
    }
@@ -991,11 +992,6 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    let platform = this;
    if (!platform.log) {
       return;
-   }
-   if (platform.debug) {
-      platform.log(">>> type [%s]: targethsl [%s]", type, targetHSL);
-      platform.log("    current HSL (no L) > [%s],[%s]", accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value, accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value);
-      platform.log("    current brightness > [%s]", accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value);
    }
    let newHue;
    let newSaturation;
@@ -1024,19 +1020,24 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    payload.userAgent = "app";
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
-   payload.sequence = platform.getSequence();
+   payload.sequence = Math.floor(new Date());
    payload.params = {};
-   if (accessory.context.eweUIID === 59) // L1
-   {
+   if (targetBrightness === 0) {
+      payload.params.switch = "off";
+   } else {
+      payload.params.switch = "on";
       payload.params.bright = Math.max(newBrightness, 1);
-      payload.params.colorR = newColour[0];
-      payload.params.colorG = newColour[1];
-      payload.params.colorB = newColour[2];
-   } else { // B1
-      payload.params.zyx_mode = 2;
-      payload.params.channel2 = newColour[0];
-      payload.params.channel3 = newColour[1];
-      payload.params.channel4 = newColour[2];
+      if (accessory.context.eweUIID === 59) // L1
+      {
+         payload.params.colorR = newColour[0];
+         payload.params.colorG = newColour[1];
+         payload.params.colorB = newColour[2];
+      } else { // B1
+         payload.params.zyx_mode = 2;
+         payload.params.channel2 = newColour[0];
+         payload.params.channel3 = newColour[1];
+         payload.params.channel4 = newColour[2];
+      }
    }
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHue);
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newSaturation);
@@ -1089,7 +1090,7 @@ eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, ca
    payload.userAgent = "app";
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
-   payload.sequence = platform.getSequence();
+   payload.sequence = Math.floor(new Date());
    platform.sendWebSocketMessage(JSON.stringify(payload), callback);
 };
 
@@ -1139,7 +1140,7 @@ eWeLink.prototype.internalThermostatUpdate = function (accessory, type, targetSt
       payload.userAgent = "app";
       payload.apikey = accessory.context.eweApiKey;
       payload.deviceid = accessory.context.eweDeviceId;
-      payload.sequence = platform.getSequence();
+      payload.sequence = Math.floor(new Date());
       payload.state = newState; // this will need to be changed
       payload.targetHumidity = newHumi; // this will need to be changed
       payload.targetTemperature = newTemp; // this will need to be changed
@@ -1392,7 +1393,7 @@ eWeLink.prototype.prepareBlindPayload = function (accessory) {
    payload.params.switches[accessory.context.switchDown].switch = switch1;
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.hbDeviceId;
-   payload.sequence = platform.getSequence();
+   payload.sequence = Math.floor(new Date());
    // platform.log("Payload genretad:", JSON.stringify(payload))
    return payload;
 };
@@ -1508,7 +1509,7 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
       payload.params.switches[accessory.context.switchDown].switch = switch1;
       payload.apikey = accessory.context.eweApiKey;
       payload.deviceid = accessory.context.hbDeviceId;
-      payload.sequence = platform.getSequence();
+      payload.sequence = Math.floor(new Date());
       let string = JSON.stringify(payload);
       platform.sendWebSocketMessage(string, function () {
          return;
@@ -1591,8 +1592,6 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
       newColour = convert.rgb.hsl(params.colorR, params.colorG, params.colorB);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
-      // accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newColour[2]);
-      // Commented out as this is the case of the LED Strip and the brightness will have been updated above
    } else if (params.hasOwnProperty("zyx_mode") && params.hasOwnProperty("channel0")) { // B1
       if (params.zyx_mode === 1) {
          newColour = convert.rgb.hsl(params.channel2, params.channel3, params.channel4);
@@ -1702,12 +1701,6 @@ eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
    }, platform.sensorTimeLength * 1000);
    return;
 }
-
-eWeLink.prototype.getSequence = function () {
-   let time_stamp = new Date() / 1000;
-   this.sequence = Math.floor(time_stamp * 1000);
-   return this.sequence;
-};
 
 eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
    let platform = this;
