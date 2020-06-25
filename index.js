@@ -116,13 +116,13 @@ class eWeLink {
                      return;
                   }
                   if (device.hasOwnProperty("action")) {
+                     let idToCheck = device.deviceid;
+                     let accessory;
+                     let channelCount;
+                     let group;
+                     let i;
                      if (device.action === "update" && device.hasOwnProperty("params")) {
                         if (platform.debug) platform.log("External update received via web socket.");
-                        let idToCheck = device.deviceid;
-                        let accessory;
-                        let channelCount;
-                        let group;
-                        let i;
                         if (platform.devicesInHB.has(idToCheck + "SW0") || platform.devicesInHB.has(idToCheck + "SWX")) {
                            if (platform.devicesInHB.has(idToCheck + "SWX")) {
                               accessory = platform.devicesInHB.get(idToCheck + "SWX");
@@ -169,8 +169,6 @@ class eWeLink {
                            else if (platform.devicesOutlets.includes(accessory.context.eweUIID)) {
                               if (device.params.hasOwnProperty("switch")) {
                                  platform.externalOutletUpdate(idToCheck + "SWX", device.params);
-                                 return;
-                              } else if (device.params.hasOwnProperty("power")) {
                                  return;
                               }
                            }
@@ -219,6 +217,13 @@ class eWeLink {
                                  return;
                               }
                            }
+                           //**********************//
+                           // CATCH OTHER MESSAGES //
+                           //**********************//
+                           if (device.params.hasOwnProperty("power") || device.params.hasOwnProperty("rssi") || device.params.hasOwnProperty("uiActive")) {
+                              return;
+                           }
+                           
                            platform.log.warn("[%s] could not be refreshed due to a hiccup in the eWeLink message.", device.deviceid);
                         } else {
                            platform.log.warn("[%s] Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.", device.deviceid);
@@ -376,7 +381,7 @@ class eWeLink {
                            // LIGHTS [SINGLE SWITCH] //
                            //************************//
                            else if (platform.devicesSingleSwitch.includes(device.uiid) && platform.devicesSingleSwitchLight.includes(device.productModel)) {
-                              if (device.params.hasOwnProperty("switch")) {
+                              if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("state")) {
                                  services.lightbulb = true;
                                  if (platform.devicesColourable.includes(device.uiid)) services.colourable = true;
                                  else if (platform.devicesDimmable.includes(device.uiid)) services.dimmable = true;
