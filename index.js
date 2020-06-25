@@ -331,6 +331,7 @@ class eWeLink {
                         let accessory;
                         let group;
                         let channelCount;
+                        let i;
                         //**************************//
                         // ADD NON EXISTING DEVICES //
                         //**************************//
