@@ -23,11 +23,14 @@ module.exports = function (homebridge) {
 class eWeLink {
    constructor(log, config, api) {
       let platform = this;
+      let check = true;
       platform.log = log;
       platform.config = config;
       if (!platform.config || (!platform.config.username || !platform.config.password || !platform.config.countryCode)) {
+         platform.log.error("********************************************************************************************");
          platform.log.error("Please check you have set your username, password and country code in the Homebridge config.");
-         // need some kind of exit plan here - currently HB will go into a cycle of crash and restart.
+         platform.log.error("********************************************************************************************");
+         check = false;
       }
       platform.apiKey = "UNCONFIGURED";
       platform.authenticationToken = "UNCONFIGURED";
@@ -74,7 +77,7 @@ class eWeLink {
          "timeBottomMarginDown": 0,
          "fullOverdrive": 0
       };
-      if (api) {
+      if (api && check) {
          platform.api = api;
          platform.api.on("didFinishLaunching", function () {
             let afterLogin = function () {
