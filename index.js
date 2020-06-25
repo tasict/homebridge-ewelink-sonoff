@@ -168,6 +168,8 @@ function eWeLink(log, config, api) {
                            if (device.params.hasOwnProperty("switch")) {
                               platform.externalOutletUpdate(idToCheck + "SWX", device.params);
                               return;
+                           } else if (device.params.hasOwnProperty("power")) {
+                              return;
                            }
                         }
                         //************************//
