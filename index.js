@@ -329,6 +329,7 @@ class eWeLink {
                         let services = {};
                         let accessory;
                         let group;
+                        let channelCount;
                         //**************************//
                         // ADD NON EXISTING DEVICES //
                         //**************************//
