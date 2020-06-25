@@ -122,6 +122,7 @@ class eWeLink {
                         let accessory;
                         let channelCount;
                         let group;
+                        let i;
                         if (platform.devicesInHB.has(idToCheck + "SW0") || platform.devicesInHB.has(idToCheck + "SWX")) {
                            if (platform.devicesInHB.has(idToCheck + "SWX")) {
                               accessory = platform.devicesInHB.get(idToCheck + "SWX");
