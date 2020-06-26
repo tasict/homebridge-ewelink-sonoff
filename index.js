@@ -50,7 +50,7 @@ class eWeLink {
       // Supported single-switch UIIDs:
       platform.devicesSingleSwitch = [1, 5, 6, 14, 15, 22, 24, 27, 32, 36, 44, 59];
       // Supported single-switch models we can expose as lights:
-      platform.devicesSingleSwitchLight = ["T1 1C", "L1", "B1", "B1_R2", "TX1C", "D1", "KING-M4"];
+      platform.devicesSingleSwitchLight = ["T1 1C", "L1", "B1", "B1_R2", "TX1C", "D1", "KING-M4", "Slampher"];
       // Supported multi-switch UIIDs:
       platform.devicesMultiSwitch = [2, 3, 4, 7, 8, 9, 29, 30, 31, 34, 41, 77];
       // Supported multi-switch models we can expose as lights:
