@@ -387,7 +387,7 @@ class eWeLink {
                               if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("state")) {
                                  services.lightbulb = true;
                                  if (platform.devicesColourable.includes(device.uiid)) services.colourable = true;
-                                 else if (platform.devicesDimmable.includes(device.uiid)) services.dimmable = true;
+                                 if (platform.devicesDimmable.includes(device.uiid)) services.dimmable = true;
                                  platform.addAccessory(device, idToCheck + "SWX", services);
                               }
                            }
@@ -614,10 +614,7 @@ eWeLink.prototype.addAccessory = function(device, hbDeviceId, services) {
       accessory.getService(Service.Outlet).setCharacteristic(Characteristic.OutletInUse, true);
    }
    if (services.lightbulb) {
-      accessory.addService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-      .on("set", function (value, callback) {
-         platform.internalLightbulbUpdate(accessory, value, callback);
-      });
+      accessory.addService(Service.Lightbulb);
       if (services.dimmable) {
          accessory.context.isDimmable = true;
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
@@ -625,20 +622,24 @@ eWeLink.prototype.addAccessory = function(device, hbDeviceId, services) {
             platform.internalBrightnessUpdate(accessory, value, callback);
          });
       }
-      if (services.colourable) {
+      else if (services.colourable) {
          accessory.context.isColourable = true;
+         accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
+         .on("set", function (value, callback) {
+            platform.internalColourUpdate(accessory, value, callback);
+         });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
          .on("set", function (value, callback) {
-            platform.internalHSLUpdate(accessory, "hue", value, callback);
+            let rgb = convert.hsv.rgb(value, 100, 100);
+            platform.internalColourUpdate(accessory, rgb, callback);
          });
-         accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation)
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
+      } else {
+         accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
          .on("set", function (value, callback) {
-            platform.internalHSLUpdate(accessory, "saturation", value, callback);
-         });
-         accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
-         .on("set", function (value, callback) {
-            platform.internalHSLUpdate(accessory, "brightness", value, callback);
-         });
+            platform.internalLightbulbUpdate(accessory, value, callback);
+         });         
       }
    }
    if (services.fan) {
@@ -799,29 +800,29 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       accessory.getService(Service.Outlet).setCharacteristic(Characteristic.OutletInUse, true);
    }
    if (accessory.getService(Service.Lightbulb) && !accessory.context.isFan) {
-      accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-      .on("set", function (value, callback) {
-         platform.internalLightbulbUpdate(accessory, value, callback);
-      });
       if (accessory.context.isDimmable) {
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
          .on("set", function (value, callback) {
             platform.internalBrightnessUpdate(accessory, value, callback);
          });
       }
-      if (accessory.context.isColourable) {
+      else if (accessory.context.isColourable) {
+         accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
+         .on("set", function (value, callback) {
+            platform.internalColourUpdate(accessory, value, callback);
+         });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
          .on("set", function (value, callback) {
-            platform.internalHSLUpdate(accessory, "hue", value, callback);
+            let rgb = convert.hsv.rgb(value, 100, 100);
+            platform.internalColourUpdate(accessory, rgb, callback);
          });
-         accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation)
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
+      } else {
+         accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
          .on("set", function (value, callback) {
-            platform.internalHSLUpdate(accessory, "saturation", value, callback);
-         });
-         accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
-         .on("set", function (value, callback) {
-            platform.internalHSLUpdate(accessory, "brightness", value, callback);
-         });
+            platform.internalLightbulbUpdate(accessory, value, callback);
+         });         
       }
    }
    if (accessory.getService(Service.Fanv2)) {
@@ -1138,34 +1139,12 @@ eWeLink.prototype.internalBrightnessUpdate = function (accessory, targetBrightne
    platform.sendWebSocketMessage(JSON.stringify(payload), callback);
 };
 
-eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, callback) {
+eWeLink.prototype.internalColourUpdate = function (accessory, newRGB, callback) {
    let platform = this;
    if (!platform.log) {
       return;
    }
-   let newHue;
-   let newSaturation;
-   let newBrightness;
-   switch (type) {
-      case "hue":
-      newHue = targetHSL;
-      newSaturation = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
-      newBrightness = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value;
-      break;
-      case "saturation":
-      newHue = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value;
-      newSaturation = targetHSL;
-      newBrightness = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value;
-      break;
-      case "brightness":
-      newHue = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value;
-      newSaturation = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
-      newBrightness = targetHSL;
-      break;
-   }
-   let newColour;
-   newColour = convert.hsl.rgb(newHue, newSaturation, 50); // @ozzyobr
-   platform.log("[%s] requesting to turn colour to HSL [%s %s %s] RGB [%s %s %s].", accessory.displayName, newHue, newSaturation, newBrightness, newColour[0], newColour[1], newColour[2]);
+   let newHSV;
    let payload = {};
    payload.action = "update";
    payload.userAgent = "app";
@@ -1173,30 +1152,30 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = Math.floor(new Date());
    payload.params = {};
-   if (newBrightness === 0) {
-      payload.params.switch = "off";
-      payload.params.state = "off";
-   } else {
-      payload.params.switch = "on";
-      payload.params.state = "on";
+   
+   if (Array.isArray(newRGB)) {
+      newHSV = convert.rgb.hsv(newRGB);
+      platform.log(newHSV);
+      
       if (accessory.context.eweUIID === 59) // L1
       {
-         payload.params.bright = Math.max(newBrightness, 1);
-         payload.params.colorR = newColour[0];
-         payload.params.colorG = newColour[1];
-         payload.params.colorB = newColour[2];
+         payload.params.colorR = newRGB[0];
+         payload.params.colorG = newRGB[1];
+         payload.params.colorB = newRGB[2];
       } else { // B1
          payload.params.zyx_mode = 2;
-         payload.params.channel2 = newColour[0];
-         payload.params.channel3 = newColour[1];
-         payload.params.channel4 = newColour[2];
+         payload.params.channel2 = newRGB[0];
+         payload.params.channel3 = newRGB[1];
+         payload.params.channel4 = newRGB[2];
       }
-   }
-   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newBrightness != 0);
-   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHue);
-   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newSaturation);
-   if (accessory.context.eweUIID === 59) {
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHSV[0]);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
+      if (platform.debug) platform.log("[%s] requesting to change colour to hue [%s].", accessory.displayName, newHSV[0]);
+   } else {
+      payload.params.state = newRGB ? "on" : "off";
+      if (platform.debug) platform.log("[%s] requesting to change turn [%s].", accessory.displayName, payload.params.state);
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 0);
    }
    platform.sendWebSocketMessage(JSON.stringify(payload), callback);
 };
@@ -1773,9 +1752,11 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
       } else {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
-         newColour = convert.rgb.hsl(params.channel2, params.channel3, params.channel4);
+         newColour = convert.rgb.hsv(parseInt(params.channel2), parseInt(params.channel3), parseInt(params.channel4));
+         platform.log(newColour);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
       }
    }
    return;
