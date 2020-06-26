@@ -227,7 +227,7 @@ class eWeLink {
                            if (device.params.hasOwnProperty("power") || device.params.hasOwnProperty("rssi") || device.params.hasOwnProperty("uiActive")) {
                               return;
                            }
-
+                           
                            platform.log.warn("[%s] could not be refreshed due to a hiccup in the eWeLink message.", device.deviceid);
                         } else {
                            platform.log.warn("[%s] Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.", device.deviceid);
@@ -594,7 +594,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    accessory.context.isOutlet = false;
    accessory.context.channelCount = channelCount;
    accessory.reachable = device.online;
-
+   
    accessory.on("identify", function (paired, callback) {
       platform.log("[%s] identified. Identification on device not supported.", accessory.displayName);
       try {
@@ -603,16 +603,16 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    });
    if (services.switch) {
       accessory.addService(Service.Switch).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalSwitchUpdate(accessory, value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalSwitchUpdate(accessory, value, callback);
+      });
    }
    if (services.outlet) {
       accessory.context.isOutlet = true;
       accessory.addService(Service.Outlet).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalOutletUpdate(accessory, value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalOutletUpdate(accessory, value, callback);
+      });
       accessory.getService(Service.Outlet).setCharacteristic(Characteristic.OutletInUse, true);
    }
    if (services.lightbulb) {
@@ -620,83 +620,83 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       if (services.dimmable) {
          accessory.context.isDimmable = true;
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("set", function (value, callback) {
-               platform.internalDimmerUpdate(accessory, value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalDimmerUpdate(accessory, value, callback);
+         });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
-            .on("set", function (value, callback) {
-               platform.internalDimmerUpdate(accessory, value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalDimmerUpdate(accessory, value, callback);
+         });
       } else if (services.colourable) {
          accessory.context.isColourable = true;
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("set", function (value, callback) {
-               platform.internalColourUpdate(accessory, value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalColourUpdate(accessory, value, callback);
+         });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
-            .on("set", function (value, callback) {
-               platform.internalColourUpdate(accessory, convert.hsv.rgb(value, 100, 100), callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalColourUpdate(accessory, convert.hsv.rgb(value, 100, 100), callback);
+         });
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
-
+         
       } else if (services.dimmableAndColourable) {
          accessory.context.isDimmableAndColourable = true;
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("set", function (value, callback) {
-               platform.internalDimmerAndColourUpdate(accessory, 'on', value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalDimmerAndColourUpdate(accessory, 'on', value, callback);
+         });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
-            .on("set", function (value, callback) {
-               platform.internalDimmerAndColourUpdate(accessory, 'brightness', value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalDimmerAndColourUpdate(accessory, 'brightness', value, callback);
+         });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
-            .on("set", function (value, callback) {
-               platform.internalDimmerAndColourUpdate(accessory, 'hue', value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalDimmerAndColourUpdate(accessory, 'hue', value, callback);
+         });
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
       } else {
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("set", function (value, callback) {
-               platform.internalLightbulbUpdate(accessory, value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalLightbulbUpdate(accessory, value, callback);
+         });
       }
    }
    if (services.fan) {
       accessory.context.isFan = true;
       accessory.addService(Service.Fanv2).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "power", value, callback);
-         })
+      .on("set", function (value, callback) {
+         platform.internalFanUpdate(accessory, "power", value, callback);
+      })
       accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed)
-         .setProps({
-            minStep: 3
-         })
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "speed", value, callback);
-         });
+      .setProps({
+         minStep: 3
+      })
+      .on("set", function (value, callback) {
+         platform.internalFanUpdate(accessory, "speed", value, callback);
+      });
       accessory.addService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "light", value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalFanUpdate(accessory, "light", value, callback);
+      });
       accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.Active, 1);
    }
-
+   
    if (services.thermostat) {
       accessory.context.isThermostat = true;
       accessory.addService(Service.Thermostat).getCharacteristic(Characteristic.TargetHeatingCoolingState)
-         .on("set", function (value, callback) {
-            platform.internalThermostatUpdate(accessory, "targetState", value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalThermostatUpdate(accessory, "targetState", value, callback);
+      });
       accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetTemperature)
-         .on("set", function (value, callback) {
-            platform.internalThermostatUpdate(accessory, "targetTemp", value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalThermostatUpdate(accessory, "targetTemp", value, callback);
+      });
       accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.TemperatureDisplayUnits, 0);
       accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetRelativeHumidity)
-         .on("set", function (value, callback) {
-            platform.internalThermostatUpdate(accessory, "targetHumi", value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalThermostatUpdate(accessory, "targetHumi", value, callback);
+      });
    }
    if (services.temperature) {
       accessory.addService(Service.TemperatureSensor);
@@ -711,9 +711,9 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    if (services.blind) {
       accessory.context.isBlind = true;
       accessory.addService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
-         .on("set", function (value, callback) {
-            platform.setBlindTargetPosition(accessory, value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.setBlindTargetPosition(accessory, value, callback);
+      });
       let payload = {};
       payload.action = "update";
       payload.userAgent = "app";
@@ -808,102 +808,102 @@ eWeLink.prototype.configureAccessory = function (accessory) {
    }
    if (accessory.getService(Service.Switch)) {
       accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalSwitchUpdate(accessory, value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalSwitchUpdate(accessory, value, callback);
+      });
    }
    if (accessory.getService(Service.Outlet)) {
       accessory.getService(Service.Outlet).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalOutletUpdate(accessory, value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalOutletUpdate(accessory, value, callback);
+      });
       accessory.getService(Service.Outlet).setCharacteristic(Characteristic.OutletInUse, true);
    }
    if (accessory.getService(Service.Lightbulb) && !accessory.context.isFan) {
       if (accessory.context.isDimmable) {
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("set", function (value, callback) {
-               platform.internalDimmerUpdate(accessory, value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalDimmerUpdate(accessory, value, callback);
+         });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
-            .on("set", function (value, callback) {
-               platform.internalDimmerUpdate(accessory, value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalDimmerUpdate(accessory, value, callback);
+         });
       } else if (accessory.context.isColourable) {
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("set", function (value, callback) {
-               platform.internalColourUpdate(accessory, value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalColourUpdate(accessory, value, callback);
+         });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
-            .on("set", function (value, callback) {
-               platform.internalColourUpdate(accessory, convert.hsv.rgb(value, 100, 100), callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalColourUpdate(accessory, convert.hsv.rgb(value, 100, 100), callback);
+         });
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
       } else if (accessory.context.isDimmableAndColourable) {
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("set", function (value, callback) {
-               platform.internalDimmerAndColourUpdate(accessory, 'on', value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalDimmerAndColourUpdate(accessory, 'on', value, callback);
+         });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
-            .on("set", function (value, callback) {
-               platform.internalDimmerAndColourUpdate(accessory, 'brightness', value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalDimmerAndColourUpdate(accessory, 'brightness', value, callback);
+         });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
-            .on("set", function (value, callback) {
-               platform.internalDimmerAndColourUpdate(accessory, 'hue', value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalDimmerAndColourUpdate(accessory, 'hue', value, callback);
+         });
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
       } else {
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("set", function (value, callback) {
-               platform.internalLightbulbUpdate(accessory, value, callback);
-            });
+         .on("set", function (value, callback) {
+            platform.internalLightbulbUpdate(accessory, value, callback);
+         });
       }
    }
    if (accessory.getService(Service.Fanv2)) {
       accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.Active, 1);
       accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "power", value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalFanUpdate(accessory, "power", value, callback);
+      });
       accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed)
-         .setProps({
-            minStep: 3
-         })
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "speed", value, callback);
-         });
+      .setProps({
+         minStep: 3
+      })
+      .on("set", function (value, callback) {
+         platform.internalFanUpdate(accessory, "speed", value, callback);
+      });
    }
    if (accessory.getService(Service.Lightbulb) && accessory.context.isFan) {
       accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "light", value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalFanUpdate(accessory, "light", value, callback);
+      });
    }
    if (accessory.getService(Service.MotionSensor) && accessory.context.isBridge) {
       accessory.getService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);
    }
    if (accessory.getService(Service.Thermostat)) {
       accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetHeatingCoolingState)
-         .on("set", function (value, callback) {
-            platform.internalThermostatUpdate(accessory, "targetState", value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalThermostatUpdate(accessory, "targetState", value, callback);
+      });
       accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetTemperature)
-         .on("set", function (value, callback) {
-            platform.internalThermostatUpdate(accessory, "targetTemp", value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalThermostatUpdate(accessory, "targetTemp", value, callback);
+      });
       accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.TemperatureDisplayUnits, 0);
       accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetRelativeHumidity)
-         .on("set", function (value, callback) {
-            platform.internalThermostatUpdate(accessory, "targetHumi", value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.internalThermostatUpdate(accessory, "targetHumi", value, callback);
+      });
    }
    if (accessory.getService(Service.WindowCovering)) {
       accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
-         .on("set", function (value, callback) {
-            platform.setBlindTargetPosition(accessory, value, callback);
-         });
+      .on("set", function (value, callback) {
+         platform.setBlindTargetPosition(accessory, value, callback);
+      });
       let payload = {};
       payload.action = "update";
       payload.userAgent = "app";
@@ -1008,12 +1008,12 @@ eWeLink.prototype.internalSwitchUpdate = function (accessory, isOn, callback) {
    payload.sequence = Math.floor(new Date());
    payload.params = {};
    switch (accessory.context.switchNumber) {
-   case "X":
+      case "X":
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
       payload.params.switch = targetState;
       accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
       break;
-   case "0":
+      case "0":
       if (platform.debug) platform.log("[%s] requesting to turn group [%s].", accessory.displayName, targetState);
       payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
       payload.params.switches[0].switch = targetState;
@@ -1028,10 +1028,10 @@ eWeLink.prototype.internalSwitchUpdate = function (accessory, isOn, callback) {
          }
       }
       break;
-   case "1":
-   case "2":
-   case "3":
-   case "4":
+      case "1":
+      case "2":
+      case "3":
+      case "4":
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
       payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
       payload.params.switches[parseInt(accessory.context.switchNumber) - 1].switch = targetState;
@@ -1088,13 +1088,13 @@ eWeLink.prototype.internalLightbulbUpdate = function (accessory, isOn, callback)
    payload.sequence = Math.floor(new Date());
    payload.params = {};
    switch (accessory.context.switchNumber) {
-   case "X":
+      case "X":
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
       payload.params.state = targetState;
       payload.params.switch = targetState;
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, isOn);
       break;
-   case "0":
+      case "0":
       if (platform.debug) platform.log("[%s] requesting to turn group [%s].", accessory.displayName, targetState);
       payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
       payload.params.switches[0].switch = targetState;
@@ -1109,10 +1109,10 @@ eWeLink.prototype.internalLightbulbUpdate = function (accessory, isOn, callback)
          }
       }
       break;
-   case "1":
-   case "2":
-   case "3":
-   case "4":
+      case "1":
+      case "2":
+      case "3":
+      case "4":
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
       payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
       payload.params.switches[parseInt(accessory.context.switchNumber) - 1].switch = targetState;
@@ -1189,10 +1189,10 @@ eWeLink.prototype.internalColourUpdate = function (accessory, newRGB, callback) 
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = Math.floor(new Date());
    payload.params = {};
-
+   
    if (Array.isArray(newRGB)) {
       newHSV = convert.rgb.hsv(newRGB);
-
+      
       if (accessory.context.eweUIID === 59) // L1
       {
          payload.params.colorR = newRGB[0];
@@ -1221,7 +1221,7 @@ eWeLink.prototype.internalDimmerAndColourUpdate = function (accessory, type, val
    if (!platform.log) {
       return;
    }
-
+   
    let payload = {};
    payload.action = "update";
    payload.userAgent = "app";
@@ -1229,9 +1229,9 @@ eWeLink.prototype.internalDimmerAndColourUpdate = function (accessory, type, val
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = Math.floor(new Date());
    payload.params = {};
-
+   
    switch (type) {
-   case "on":
+      case "on":
       if (value) {
          if (platform.debug) platform.log("[%s] requesting to turn on.", accessory.displayName);
          payload.params.switch = "on";
@@ -1244,7 +1244,7 @@ eWeLink.prototype.internalDimmerAndColourUpdate = function (accessory, type, val
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
       }
       break;
-   case "brightness":
+      case "brightness":
       if (Number.isInteger(targetBrightness)) {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, targetBrightness != 0);
          if (targetBrightness === 0) {
@@ -1273,12 +1273,12 @@ eWeLink.prototype.internalDimmerAndColourUpdate = function (accessory, type, val
          }
       }
       break;
-
-   case "hue":
+      
+      case "hue":
       let newRGB = convert.hsv.rgb(value, 100, 100);
       let newHSV = convert.rgb.hsv(newRGB);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHSV[0]);
-
+      
       if (accessory.context.eweUIID === 59) { // L1
          payload.params.colorR = newRGB[0];
          payload.params.colorG = newRGB[1];
@@ -1304,24 +1304,24 @@ eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, ca
    let newSpeed;
    let newLight;
    switch (type) {
-   case "power":
+      case "power":
       newPower = targetState;
       newSpeed = targetState ? 33 : 0;
       newLight = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
       break;
-   case "speed":
+      case "speed":
       newPower = targetState >= 33;
       newSpeed = targetState;
       newLight = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
       break;
-   case "light":
+      case "light":
       newPower = accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On).value;
       newSpeed = accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed).value;
       newLight = targetState;
       break;
    }
    switch (accessory.context.switchNumber) {
-   case "X":
+      case "X":
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newLight);
       accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, newPower);
       accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, newSpeed);
@@ -1352,12 +1352,12 @@ eWeLink.prototype.internalThermostatUpdate = function (accessory, type, targetSt
    let newTemp;
    let newHumi;
    switch (type) {
-   case "targetState":
+      case "targetState":
       newState = targetState;
       newTemp = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentTemperature).value;
       newHumi = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentRelativeHumidity).value;
       break;
-   case "targetTemp":
+      case "targetTemp":
       newState = 0;
       if (accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentTemperature).value < targetState) {
          newState = 1;
@@ -1367,14 +1367,14 @@ eWeLink.prototype.internalThermostatUpdate = function (accessory, type, targetSt
       newTemp = targetState;
       newHumi = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentRelativeHumidity).value;
       break;
-   case "targetHumi":
+      case "targetHumi":
       newState = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentHeatingCoolingState).value;
       newTemp = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentTemperature).value;
       newHumi = targetState;
       break;
    }
    switch (accessory.context.switchNumber) {
-   case "X":
+      case "X":
       accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.TargetHeatingCoolingState, newState);
       accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.TargetTemperature, newTemp);
       accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.TargetRelativeHumidity, newHumi);
@@ -1409,7 +1409,7 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
       var actualPosition;
       var diffTime;
       var diff;
-
+      
       if (diffPosition === 0) {
          actualPosition = pos;
          diffTime = 0;
@@ -1423,7 +1423,7 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
             diffTime = Math.round(accessory.context.percentDurationUp * diffPosition);
          }
          diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
-
+         
          let timestamp = Date.now();
          if (accessory.context.cMoveState === 1) {
             actualPosition = Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
@@ -1432,12 +1432,12 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
          } else {
             actualPosition = accessory.context.lastPosition;
          }
-
+         
          // platform.log("diffPosition:", diffPosition);
          // platform.log("diffTime:", diffTime);
          // platform.log("actualPosition:", actualPosition);
          // platform.log("diff:", diff);
-
+         
          if (diff > 0) {
             accessory.context.targetTimestamp += diffTime;
             // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
@@ -1454,11 +1454,11 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
             accessory.context.lastPosition = actualPosition;
             accessory.context.cTargetPos = pos;
             accessory.context.cMoveState = accessory.context.cMoveState === 0 ? 1 : 0;
-
+            
             let payload = platform.prepareBlindPayload(accessory);
             let string = JSON.stringify(payload);
             if (platform.debugReqRes) platform.log.warn(payload);
-
+            
             if (platform.webSocketOpen) {
                platform.sendWebSocketMessage(string, function () {
                   return;
@@ -1466,11 +1466,11 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
                platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.cMoveState === 1 ? "moving up" : "moving down");
                let service = accessory.getService(Service.WindowCovering);
                service.getCharacteristic(Characteristic.CurrentPosition)
-                  .updateValue(accessory.context.lastPosition);
+               .updateValue(accessory.context.lastPosition);
                service.getCharacteristic(Characteristic.TargetPosition)
-                  .updateValue(accessory.context.cTargetPos);
+               .updateValue(accessory.context.cTargetPos);
                service.getCharacteristic(Characteristic.PositionState)
-                  .updateValue(accessory.context.cMoveState);
+               .updateValue(accessory.context.cMoveState);
             } else {
                platform.log("Socket was closed. It will reconnect automatically; please retry your command");
                callback("Socket was closed. It will reconnect automatically; please retry your command");
@@ -1483,22 +1483,22 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
       callback();
       return false;
    }
-
+   
    if (accessory.context.lastPosition === pos) {
       platform.log("[%s] Current position already matches target position. There is nothing to do.", accessory.displayName);
       callback();
       return true;
    }
-
+   
    accessory.context.cTargetPos = pos;
    moveUp = (pos > accessory.context.lastPosition);
-
+   
    var withoutmarginetimeUP;
    var withoutmarginetimeDOWN;
    var duration;
    withoutmarginetimeUP = accessory.context.durationUp - accessory.context.durationBMU;
    withoutmarginetimeDOWN = accessory.context.durationDown - accessory.context.durationBMD;
-
+   
    if (moveUp) {
       if (accessory.context.lastPosition === 0) {
          duration = ((pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP) + accessory.context.durationBMU;
@@ -1514,30 +1514,30 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
    }
    if (pos === 0 || pos === 100) duration += accessory.context.fullOverdrive;
    if (pos === 0 || pos === 100) platform.log("[%s] add overdive: %s", accessory.displayName, accessory.context.fullOverdrive);
-
+   
    duration = Math.round(duration * 100) / 100;
-
+   
    platform.log("[%s] %s, Duration: %s", accessory.displayName, moveUp ? "Moving up" : "Moving down", duration);
-
+   
    accessory.context.startTimestamp = timestamp;
    accessory.context.targetTimestamp = timestamp + (duration * 1000);
    // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
    accessory.context.cMoveState = (moveUp ? 0 : 1);
    accessory.getService(Service.WindowCovering)
-      .setCharacteristic(Characteristic.PositionState, (moveUp ? 0 : 1));
-
+   .setCharacteristic(Characteristic.PositionState, (moveUp ? 0 : 1));
+   
    let payload = platform.prepareBlindPayload(accessory);
    let string = JSON.stringify(payload);
    if (platform.debugReqRes) platform.log.warn(payload);
-
+   
    if (platform.webSocketOpen) {
-
+      
       setTimeout(function () {
          platform.sendWebSocketMessage(string, function () {
             return;
          });
          platform.log("[%s] Request sent for %s", accessory.displayName, moveUp ? "moving up" : "moving down");
-
+         
          var interval = setInterval(function () {
             if (Date.now() >= accessory.context.targetTimestamp) {
                platform.prepareBlindFinalState(accessory);
@@ -1555,9 +1555,9 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
 };
 
 eWeLink.prototype.prepareBlindFinalState = function (accessory) {
-
+   
    let platform = this;
-
+   
    if (!platform.log) {
       return;
    }
@@ -1565,31 +1565,31 @@ eWeLink.prototype.prepareBlindFinalState = function (accessory) {
    let payload = platform.prepareBlindPayload(accessory);
    let string = JSON.stringify(payload);
    if (platform.debugReqRes) platform.log.warn(payload);
-
+   
    if (platform.webSocketOpen) {
-
+      
       setTimeout(function () {
          platform.sendWebSocketMessage(string, function () {
             return;
          });
          platform.log("[%s] Request sent to stop moving", accessory.displayName);
          accessory.context.cMoveState = 2;
-
+         
          let cTargetPos = accessory.context.cTargetPos;
          accessory.context.lastPosition = cTargetPos;
          let service = accessory.getService(Service.WindowCovering);
          // Using updateValue to avoid loop
          service.getCharacteristic(Characteristic.CurrentPosition)
-            .updateValue(cTargetPos);
+         .updateValue(cTargetPos);
          service.getCharacteristic(Characteristic.TargetPosition)
-            .updateValue(cTargetPos);
+         .updateValue(cTargetPos);
          service.setCharacteristic(Characteristic.PositionState, Characteristic.PositionState.STOPPED);
-
+         
          platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, cTargetPos);
          return true;
          // TODO Here we need to wait for the response to the socket
       }, 1);
-
+      
    } else {
       platform.log("Socket was closed. It will reconnect automatically; please retry your command");
       return false;
@@ -1597,7 +1597,7 @@ eWeLink.prototype.prepareBlindFinalState = function (accessory) {
 };
 
 eWeLink.prototype.prepareBlindPayload = function (accessory) {
-
+   
    let platform = this;
    if (!platform.log) {
       return;
@@ -1607,37 +1607,37 @@ eWeLink.prototype.prepareBlindPayload = function (accessory) {
    payload.userAgent = "app";
    payload.params = {};
    let deviceFromApi = platform.devicesInEwe.get(accessory.context.hbDeviceId);
-
+   
    payload.params.switches = deviceFromApi.params.switches;
-
+   
    // [0,0] = 0 => 2 Stopped
    // [0,1] = 1 => 1 Moving down
    // [1,0] = 2 => 0 Moving up
    // [1,1] = 3 => should not happen...
-
+   
    var switch0 = "off";
    var switch1 = "off";
-
+   
    let state = accessory.context.cMoveState;
-
+   
    switch (state) {
-   case 2:
+      case 2:
       switch0 = "off";
       switch1 = "off";
       break;
-   case 1:
+      case 1:
       switch0 = "off";
       switch1 = "on";
       break;
-   case 0:
+      case 0:
       switch0 = "on";
       switch1 = "off";
       break;
-   default:
+      default:
       platform.log("[%s] PositionState type error !", accessory.displayName);
       break;
    }
-
+   
    payload.params.switches[accessory.context.switchUp].switch = switch0;
    payload.params.switches[accessory.context.switchDown].switch = switch1;
    payload.apikey = accessory.context.eweApiKey;
@@ -1655,7 +1655,7 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
    let accessory = platform.devicesInHB.get(hbDeviceId);
    let switchUp = params.switches[accessory.context.switchUp].switch === "on" ? 1 : 0;
    let switchDown = params.switches[accessory.context.switchDown].switch === "on" ? 1 : 0;
-
+   
    const MAPPING = {
       0: 2, // [0,0] = 0 => 2 Stopped
       1: 1, // [0,1] = 1 => 1 Moving down
@@ -1675,13 +1675,13 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
       }
    }
    switch (state) {
-   case 3:
+      case 3:
       platform.log("[%s] Error with current movement state so resetting.", accessory.displayName);
       accessory.context.cTargetPos = aPos;
       accessory.context.targetTimestamp = Date.now() + 10;
       accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, aPos);
       break;
-   case 2:
+      case 2:
       if (accessory.context.cMoveState === 2) {
          platform.log("[%s] received request to stop moving. Nothing to do as blind is already stopped.", accessory.displayName);
          return;
@@ -1691,7 +1691,7 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
       accessory.context.targetTimestamp = Date.now() + 10;
       accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, aPos);
       break;
-   case 1:
+      case 1:
       if (accessory.context.cMoveState === 1) {
          platform.log("[%s] received request to move down. Nothing to do as blind is already moving down.", accessory.displayName);
          return;
@@ -1703,14 +1703,14 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, 0);
       }
       break;
-   case 0:
+      case 0:
       if (accessory.context.cMoveState === 0) {
          platform.log("[%s] received request to move up. Nothing to do as blind is already moving up.", accessory.displayName);
          return;
       }
       if (accessory.context.cTargetPos === 100) {
          platform.log("[%s] received request to move up but was already fully opening. Stopping.", accessory.displayName);
-
+         
       } else {
          platform.log("[%s] received request to move up so setting target position to 100.", accessory.displayName);
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, 100);
@@ -1733,27 +1733,27 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
       payload.params.switches = deviceFromEwe.params.switches;
       let switch0 = "off";
       let switch1 = "off";
-
+      
       let state = accessory.context.cMoveState;
-
+      
       switch (state) {
-      case 2:
+         case 2:
          switch0 = "off";
          switch1 = "off";
          break;
-      case 1:
+         case 1:
          switch0 = "off";
          switch1 = "on";
          break;
-      case 0:
+         case 0:
          switch0 = "on";
          switch1 = "off";
          break;
-      default:
+         default:
          platform.log("[%s] PositionState type error !", accessory.displayName);
          break;
       }
-
+      
       payload.params.switches[accessory.context.switchUp].switch = switch0;
       payload.params.switches[accessory.context.switchDown].switch = switch1;
       payload.apikey = accessory.context.eweApiKey;
@@ -1838,7 +1838,7 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
    } else if (params.hasOwnProperty("brightness")) {
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.brightness);
    }
-
+   
    //**************//
    // LED Strip L1 //
    //**************//
@@ -1847,7 +1847,7 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
    }
-
+   
    //*********//
    // Bulb B1 //
    //*********//
@@ -1861,6 +1861,14 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
       mode = 0;
    }
    if (mode === 1) {
+      
+      // between 25 and 255
+      // three "types" -> "cold" "middle" "warm"
+      
+      // cold -> channel0 = 25->255 channel1 = 0
+      // middle -> channel0 = channel1 = 25->255
+      // warm -> channel0 = 0 channel1 = 25->255
+      
       platform.log.warn("[%s] has been set to colour temperature mode which is not supported.", accessory.displayName);
    } else if (mode === 2) {
       if (parseInt(params.channel2) + parseInt(params.channel3) + parseInt(params.channel4) === 0) {
@@ -2281,10 +2289,10 @@ WebSocketClient.prototype.open = function (url) {
    });
    this.instance.on("close", (e) => {
       switch (e) {
-      case 1005: // CLOSE_NORMAL
+         case 1005: // CLOSE_NORMAL
          // console.log("WebSocketClient: Web socket closed [1005].");
          break;
-      default: // Abnormal closure
+         default: // Abnormal closure
          this.reconnect(e);
          break;
       }
@@ -2292,10 +2300,10 @@ WebSocketClient.prototype.open = function (url) {
    });
    this.instance.on("error", (e) => {
       switch (e.code) {
-      case "ECONNREFUSED":
+         case "ECONNREFUSED":
          this.reconnect(e);
          break;
-      default:
+         default:
          this.onerror(e);
          break;
       }
