@@ -1179,9 +1179,9 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
    } else {
       payload.params.switch = "on";
       payload.params.state = "on";
-      payload.params.bright = Math.max(newBrightness, 1);
       if (accessory.context.eweUIID === 59) // L1
       {
+         payload.params.bright = Math.max(newBrightness, 1);
          payload.params.colorR = newColour[0];
          payload.params.colorG = newColour[1];
          payload.params.colorB = newColour[2];
@@ -1192,10 +1192,12 @@ eWeLink.prototype.internalHSLUpdate = function (accessory, type, targetHSL, call
          payload.params.channel4 = newColour[2];
       }
    }
+   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newBrightness != 0);
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newHue);
    accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newSaturation);
-   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
-   accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newBrightness != 0);
+   if (accessory.context.eweUIID === 59) {
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, newBrightness);
+   }
    platform.sendWebSocketMessage(JSON.stringify(payload), callback);
 };
 
@@ -1730,6 +1732,8 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
       return;
    }
    let accessory = platform.devicesInHB.get(hbDeviceId);
+   let newColour;
+   let mode;
    if (params.hasOwnProperty("switch")) {
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switch === "on");
    } else if (params.hasOwnProperty("state")) {
@@ -1740,15 +1744,19 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
    } else if (params.hasOwnProperty("brightness")) {
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.brightness);
    }
-   let newColour;
-   if (params.hasOwnProperty("colorR")) { // LED Strip
+   
+   //**************//
+   // LED Strip L1 //
+   //**************//
+   if (params.hasOwnProperty("colorR")) {
       newColour = convert.rgb.hsl(params.colorR, params.colorG, params.colorB);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
    }
    
-   // B1 has a confusing set of attributes
-   let mode;
+   //*********//
+   // Bulb B1 //
+   //*********//
    if (params.hasOwnProperty("zyx_mode")) {
       mode = parseInt(params.zyx_mode);
    } else if (params.hasOwnProperty("channel0")) {
