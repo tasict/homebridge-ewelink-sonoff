@@ -10,8 +10,8 @@ Thanks :)
 #### 🟢 Switches
 The plugin **should** work with Sonoff switches (single and multi-channel).
 - **Supported:** BASIC, MINI, 4CH
-#### 🟠 Lights/Bulbs/Dimmers
-The plugin **should** work with LED strips, dimmers etc. Giving you control of the colour (🇬🇧!) and brightness of your device.
+#### 🟢 Light Bulbs
+The plugin **should** work with Sonoff bulbs and LED strips, giving you control of the brightness and colour (🇬🇧!) of your device.
 - **Supported:** L1, D1, B1 (colour mode only)
 - **Coming Soon:** SLAMPHER
 #### 🟢 Light Switches
