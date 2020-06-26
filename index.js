@@ -1747,15 +1747,27 @@ eWeLink.prototype.externalSingleLightUpdate = function (hbDeviceId, params) {
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
    }
    
-   if (params.hasOwnProperty("channel2") || (params.hasOwnProperty("zyx_mode") && params.zyx_mode === 2)) {
-      if (params.channel2 + params.channel3 + params.channel4 === "000") {
+   // B1 has a confusing set of attributes
+   let mode;
+   if (params.hasOwnProperty("zyx_mode")) {
+      mode = parseInt(params.zyx_mode);
+   } else if (params.hasOwnProperty("channel0")) {
+      mode = 1;
+   } else if (params.hasOwnProperty("channel2")) {
+      mode = 2;
+   } else {
+      mode = 0;
+   }
+   if (mode === 1) {
+      platform.log.warn("[%s] has been set to colour temperature mode which is not supported.", accessory.displayName);
+   } else if (mode === 2) {
+      if (parseInt(params.channel2) + parseInt(params.channel3) + parseInt(params.channel4) === 0) {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
       } else {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
          newColour = convert.rgb.hsl(params.channel2, params.channel3, params.channel4);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, Math.max(newColour[1], 1));
       }
    }
    return;
