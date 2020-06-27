@@ -162,7 +162,7 @@ class eWeLink {
                            // THERMOSTATS //
                            //*************//                                    
                            else if (platform.devicesThermostat.includes(accessory.context.eweUIID)) {
-                              if (device.params.hasOwnProperty("currentTemperature") || device.params.hasOwnProperty("currentHumidity")) {
+                              if (device.params.hasOwnProperty("currentTemperature") || device.params.hasOwnProperty("currentHumidity") || device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("masterSwitch")) {
                                  platform.externalThermostatUpdate(idToCheck + "SWX", device.params);
                                  return;
                               }
@@ -369,9 +369,9 @@ class eWeLink {
                            // THERMOSTATS //
                            //*************//                                                                              
                            else if (platform.devicesThermostat.includes(device.uiid)) {
-                              services.thermostat = true;
+                              services.thermostatSwitch = true;
                               services.temperature = true;
-                              services.humidity = true;
+                              if (device.params.sensorType != "DS18B20") services.humidity = true;
                               platform.addAccessory(device, idToCheck + "SWX", services);
                            }
                            //*********//
@@ -477,7 +477,7 @@ class eWeLink {
                            // THERMOSTATS //
                            //*************//                                    
                            else if (platform.devicesThermostat.includes(accessory.context.eweUIID)) {
-                              if (device.params.hasOwnProperty("currentTemperature") || device.params.hasOwnProperty("currentHumidity")) {
+                              if (device.params.hasOwnProperty("currentTemperature") || device.params.hasOwnProperty("currentHumidity") || device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("masterSwitch")) {
                                  platform.externalThermostatUpdate(idToCheck + "SWX", device.params);
                                  return;
                               }
@@ -590,7 +590,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
    accessory.context.isFan = false;
    accessory.context.isBridge = false;
    accessory.context.isBlind = false;
-   accessory.context.isThermostat = false;
+   accessory.context.isThermostatSwitch = false;
    accessory.context.isOutlet = false;
    accessory.context.channelCount = channelCount;
    accessory.reachable = device.online;
@@ -682,20 +682,11 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.Active, 1);
    }
    
-   if (services.thermostat) {
-      accessory.context.isThermostat = true;
-      accessory.addService(Service.Thermostat).getCharacteristic(Characteristic.TargetHeatingCoolingState)
+   if (services.thermostatSwitch) {
+      accessory.context.isThermostatSwitch = true;
+      accessory.addService(Service.Switch).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
-         platform.internalThermostatUpdate(accessory, "targetState", value, callback);
-      });
-      accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetTemperature)
-      .on("set", function (value, callback) {
-         platform.internalThermostatUpdate(accessory, "targetTemp", value, callback);
-      });
-      accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.TemperatureDisplayUnits, 0);
-      accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetRelativeHumidity)
-      .on("set", function (value, callback) {
-         platform.internalThermostatUpdate(accessory, "targetHumi", value, callback);
+         platform.internalThermostatUpdate(accessory, value, callback);
       });
    }
    if (services.temperature) {
@@ -806,7 +797,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
    if (!platform.log) {
       return;
    }
-   if (accessory.getService(Service.Switch)) {
+   if (accessory.getService(Service.Switch) && !accessory.context.isThermostatSwitch) {
       accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
          platform.internalSwitchUpdate(accessory, value, callback);
@@ -884,19 +875,10 @@ eWeLink.prototype.configureAccessory = function (accessory) {
    if (accessory.getService(Service.MotionSensor) && accessory.context.isBridge) {
       accessory.getService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);
    }
-   if (accessory.getService(Service.Thermostat)) {
-      accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetHeatingCoolingState)
+   if (accessory.context.isThermostatSwitch) {
+      accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
       .on("set", function (value, callback) {
-         platform.internalThermostatUpdate(accessory, "targetState", value, callback);
-      });
-      accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetTemperature)
-      .on("set", function (value, callback) {
-         platform.internalThermostatUpdate(accessory, "targetTemp", value, callback);
-      });
-      accessory.getService(Service.Thermostat).setCharacteristic(Characteristic.TemperatureDisplayUnits, 0);
-      accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.TargetRelativeHumidity)
-      .on("set", function (value, callback) {
-         platform.internalThermostatUpdate(accessory, "targetHumi", value, callback);
+         platform.internalThermostatUpdate(accessory, value, callback);
       });
    }
    if (accessory.getService(Service.WindowCovering)) {
@@ -1343,58 +1325,23 @@ eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, ca
    platform.sendWebSocketMessage(JSON.stringify(payload), callback);
 };
 
-eWeLink.prototype.internalThermostatUpdate = function (accessory, type, targetState, callback) {
+eWeLink.prototype.internalThermostatUpdate = function (accessory, targetState, callback) {
    let platform = this;
    if (!platform.log) {
       return;
    }
-   let newState;
-   let newTemp;
-   let newHumi;
-   switch (type) {
-      case "targetState":
-      newState = targetState;
-      newTemp = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentTemperature).value;
-      newHumi = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentRelativeHumidity).value;
-      break;
-      case "targetTemp":
-      newState = 0;
-      if (accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentTemperature).value < targetState) {
-         newState = 1;
-      } else if (accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentTemperature).value > targetState) {
-         newState = 2;
-      }
-      newTemp = targetState;
-      newHumi = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentRelativeHumidity).value;
-      break;
-      case "targetHumi":
-      newState = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentHeatingCoolingState).value;
-      newTemp = accessory.getService(Service.Thermostat).getCharacteristic(Characteristic.CurrentTemperature).value;
-      newHumi = targetState;
-      break;
-   }
-   switch (accessory.context.switchNumber) {
-      case "X":
-      accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.TargetHeatingCoolingState, newState);
-      accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.TargetTemperature, newTemp);
-      accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.TargetRelativeHumidity, newHumi);
-      break;
-   }
-   if (platform.debug) platform.log("[%s] requesting to change thermostat %s.", accessory.displayName, type);
-   let comment = false; // just to blank out the following lines
-   if (comment) {
-      let payload = {};
-      payload.params = {};
-      payload.action = "update";
-      payload.userAgent = "app";
-      payload.apikey = accessory.context.eweApiKey;
-      payload.deviceid = accessory.context.eweDeviceId;
-      payload.sequence = Math.floor(new Date());
-      payload.state = newState; // this will need to be changed
-      payload.targetHumidity = newHumi; // this will need to be changed
-      payload.targetTemperature = newTemp; // this will need to be changed
-      platform.sendWebSocketMessage(JSON.stringify(payload), callback);
-   }
+   if (platform.debug) platform.log("[%s] requesting to turn switch [%s].", accessory.displayName, targetState ? "on" : "off");
+   accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, targetState);
+   let payload = {};
+   payload.params = {};
+   payload.action = "update";
+   payload.userAgent = "app";
+   payload.apikey = accessory.context.eweApiKey;
+   payload.deviceid = accessory.context.eweDeviceId;
+   payload.sequence = Math.floor(new Date());
+   payload.params.switch = targetState ? "on" : "off";
+   payload.params.mainSwitch = targetState ? "on" : "off";
+   platform.sendWebSocketMessage(JSON.stringify(payload), callback);
 };
 
 eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
@@ -1797,14 +1744,21 @@ eWeLink.prototype.externalThermostatUpdate = function (hbDeviceId, params) {
       return;
    }
    let accessory = platform.devicesInHB.get(hbDeviceId);
-   if (params.hasOwnProperty("currentTemperature")) {
-      let currentTemp = params.currentTemperature;
-      accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.CurrentTemperature, currentTemp);
+   if (params.hasOwnProperty("switch") || params.hasOwnProperty("mainSwitch")) {
+      let newState;
+      if (params.hasOwnProperty("switch")) {
+         newState = params.switch === "on" ? true : false;
+      } else {
+         newState = params.mainSwitch === "on" ? true : false;
+      }
+      accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, newState);
+   }
+   if (params.hasOwnProperty("currentTemperature") && accessory.getService(Service.TemperatureSensor)) {
+      let currentTemp = params.currentTemperature != "unavailable" ? params.currentTemperature : 0;
       accessory.getService(Service.TemperatureSensor).updateCharacteristic(Characteristic.CurrentTemperature, currentTemp);
    }
-   if (params.hasOwnProperty("currentHumidity")) {
-      let currentHumi = params.currentHumidity;
-      accessory.getService(Service.Thermostat).updateCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumi);
+   if (params.hasOwnProperty("currentHumidity") && accessory.getService(Service.HumiditySensor)) {
+      let currentHumi = params.currentHumidity != "unavailable" ? params.currentHumidity : 0;
       accessory.getService(Service.HumiditySensor).updateCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumi);
    }
    return;
