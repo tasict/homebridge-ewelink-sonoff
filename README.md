@@ -45,8 +45,8 @@ Add the following to your Homebridge configuration file in the appropriate place
 > This plugin uses a single field for e-mail / phone number.
 ```json
 {
-   "platform" : "eWeLinkSonoff",
-   "name" : "eWeLinkSonoff",
+   "platform" : "eWeLink",
+   "name" : "eWeLink",
    "username" : "your-ewelink-username (either phone or email)",
    "password" : "your-ewelink-password",
    "countryCode" : "your-ewelink-country-code (eg 44 for UK, 1 for USA, 55 for Brazil)"
