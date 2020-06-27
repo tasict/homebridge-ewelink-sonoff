@@ -17,7 +17,7 @@ module.exports = function (homebridge) {
    Service = homebridge.hap.Service;
    Characteristic = homebridge.hap.Characteristic;
    UUIDGen = homebridge.hap.uuid;
-   homebridge.registerPlatform("homebridge-ewelink-sonoff", "eWeLinkSonoff", eWeLink, true);
+   homebridge.registerPlatform("homebridge-ewelink-sonoff", "eWeLink", eWeLink, true);
 };
 
 class eWeLink {
@@ -297,7 +297,7 @@ class eWeLink {
                   let primaryDeviceCount = Object.keys(eWeLinkDevices).length;
                   if (primaryDeviceCount === 0) {
                      platform.log("[0] primary devices were loaded from your eWeLink account. Devices will be removed from Homebridge.");
-                     platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLinkSonoff", Array.from(platform.devicesInHB.values()));
+                     platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", Array.from(platform.devicesInHB.values()));
                      platform.devicesInHB.clear();
                      return;
                   }
@@ -789,7 +789,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       platform.log.error("[%s] has not been added [%s].", accessory.displayName, e);
    }
    platform.devicesInHB.set(hbDeviceId, accessory);
-   platform.api.registerPlatformAccessories("homebridge-ewelink-sonoff", "eWeLinkSonoff", [accessory]);
+   platform.api.registerPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
    if (platform.debug) platform.log("[%s] has been added to Homebridge.", newDeviceName);
 };
 eWeLink.prototype.configureAccessory = function (accessory) {
@@ -970,7 +970,7 @@ eWeLink.prototype.removeAccessory = function (accessory) {
       return;
    }
    platform.devicesInHB.delete(accessory.context.hbDeviceId);
-   platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLinkSonoff", [accessory]);
+   platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
    if (platform.debug) platform.log("[%s] has been removed from Homebridge.", accessory.displayName);
 };
 
