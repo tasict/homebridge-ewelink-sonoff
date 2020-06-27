@@ -2278,3 +2278,7 @@ WebSocketClient.prototype.reconnect = function (e) {
       that.open(that.url);
    }, 5000);
 };
+WebSocketClient.prototype.onopen = function(e){ console.log("WebSocketClient: open", arguments);	}
+WebSocketClient.prototype.onmessage = function(data,flags,number){ console.log("WebSocketClient: message", arguments);	}
+WebSocketClient.prototype.onerror = function(e){ console.log("WebSocketClient: error", arguments);	}
+WebSocketClient.prototype.onclose = function(e){ console.log("WebSocketClient: closed", arguments);	}
