@@ -23,7 +23,7 @@ The plugin **should** work with Sonoff outlets.
 The plugin **should** work with the Sonoff Bridge, at the moment exposing motion sensors that will detect motion and notify Homebridge/HomeKit. Other devices connected to the RF bridge might cause issues.
 - **Supported:** RF_BRIDGE
 #### 🟢 Thermostats
-The plugin **should** work with Sonoff Thermostat devices, showing the current temperature and relative humidity in Homebridge/HomeKit. I am looking for ways to relay target temperature changes from HomeKit apps back to eWeLink for consistency.
+The plugin **should** work with Sonoff Thermostat devices, exposing a temperature sensor, a humidity sensor (if the device supports it) and a switch in Homebridge for the connected device.
 - **Supported:** TH10, TH16
 #### 🟠 Fans
 The plugin **might** work with Sonoff Fan devices. I need a kind person with the a device to assist!
