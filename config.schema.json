@@ -1,5 +1,5 @@
 {
-  "pluginAlias":"eWeLink",
+  "pluginAlias":"eWeLinkSonoff",
   "pluginType":"platform",
   "singular":true,
   "headerDisplay":"Homebridge plugin to control Sonoff relays with OEM firmware.",

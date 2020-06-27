@@ -17,7 +17,7 @@ module.exports = function (homebridge) {
    Service = homebridge.hap.Service;
    Characteristic = homebridge.hap.Characteristic;
    UUIDGen = homebridge.hap.uuid;
-   homebridge.registerPlatform("homebridge-eWeLink", "eWeLink", eWeLink, true);
+   homebridge.registerPlatform("homebridge-ewelink-sonoff", "eWeLinkSonoff", eWeLink, true);
 };
 
 class eWeLink {
