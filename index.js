@@ -759,7 +759,7 @@ eWeLink.prototype.addAccessory = function (device, hbDeviceId, services) {
       payload.deviceid = accessory.context.eweDeviceId;
       payload.sequence = Math.floor(new Date());
       if (platform.debugReqRes) platform.log.warn(payload);
-      platform.sendWebSocketMessage(JSON.stringify(payload), function () {
+      platform.sendWSMessage(JSON.stringify(payload), function () {
          return;
       });
       if (platform.debug) platform.log("[%s] initialising switches for correct start up.", accessory.displayName);
@@ -940,7 +940,7 @@ eWeLink.prototype.configureAccessory = function (accessory) {
       payload.deviceid = accessory.context.eweDeviceId;
       payload.sequence = Math.floor(new Date());
       if (platform.debugReqRes) platform.log.warn(payload);
-      platform.sendWebSocketMessage(JSON.stringify(payload), function () {
+      platform.sendWSMessage(JSON.stringify(payload), function () {
          return;
       });
       if (platform.debug) platform.log("[%s] initialising switches for correct start up.", accessory.displayName);
@@ -1032,7 +1032,7 @@ eWeLink.prototype.internalSwitchUpdate = function (accessory, isOn, callback) {
       otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, masterState === "on" ? true : false);
       break;
    }
-   platform.sendWebSocketMessage(JSON.stringify(payload), callback);
+   platform.sendWSMessage(JSON.stringify(payload), callback);
 };
 
 eWeLink.prototype.internalOutletUpdate = function (accessory, isOn, callback) {
@@ -1051,7 +1051,7 @@ eWeLink.prototype.internalOutletUpdate = function (accessory, isOn, callback) {
    if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
    payload.params.switch = targetState;
    accessory.getService(Service.Outlet).updateCharacteristic(Characteristic.On, isOn);
-   platform.sendWebSocketMessage(JSON.stringify(payload), callback);
+   platform.sendWSMessage(JSON.stringify(payload), callback);
 };
 
 eWeLink.prototype.internalLightbulbUpdate = function (accessory, isOn, callback) {
@@ -1113,7 +1113,7 @@ eWeLink.prototype.internalLightbulbUpdate = function (accessory, isOn, callback)
       otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, masterState === "on" ? true : false);
       break;
    }
-   platform.sendWebSocketMessage(JSON.stringify(payload), callback);
+   platform.sendWSMessage(JSON.stringify(payload), callback);
 };
 
 eWeLink.prototype.internalDimmerUpdate = function (accessory, targetBrightness, callback) {
@@ -1155,7 +1155,7 @@ eWeLink.prototype.internalDimmerUpdate = function (accessory, targetBrightness, 
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
       }
    }
-   platform.sendWebSocketMessage(JSON.stringify(payload), callback);
+   platform.sendWSMessage(JSON.stringify(payload), callback);
 };
 
 eWeLink.prototype.internalColourUpdate = function (accessory, newRGB, callback) {
@@ -1195,7 +1195,7 @@ eWeLink.prototype.internalColourUpdate = function (accessory, newRGB, callback) 
       payload.params.switch = newRGB ? "on" : "off";
       if (platform.debug) platform.log("[%s] requesting to change turn [%s].", accessory.displayName, payload.params.state);
    }
-   platform.sendWebSocketMessage(JSON.stringify(payload), callback);
+   platform.sendWSMessage(JSON.stringify(payload), callback);
 };
 
 eWeLink.prototype.internalDimmerAndColourUpdate = function (accessory, type, value, callback) {
@@ -1274,7 +1274,7 @@ eWeLink.prototype.internalDimmerAndColourUpdate = function (accessory, type, val
       if (platform.debug) platform.log("[%s] requesting to change colour to hue [%s].", accessory.displayName, newHSV[0]);
       break;
    }
-   platform.sendWebSocketMessage(JSON.stringify(payload), callback);
+   platform.sendWSMessage(JSON.stringify(payload), callback);
 };
 
 eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, callback) {
@@ -1322,7 +1322,7 @@ eWeLink.prototype.internalFanUpdate = function (accessory, type, targetState, ca
    payload.apikey = accessory.context.eweApiKey;
    payload.deviceid = accessory.context.eweDeviceId;
    payload.sequence = Math.floor(new Date());
-   platform.sendWebSocketMessage(JSON.stringify(payload), callback);
+   platform.sendWSMessage(JSON.stringify(payload), callback);
 };
 
 eWeLink.prototype.internalThermostatUpdate = function (accessory, targetState, callback) {
@@ -1341,7 +1341,7 @@ eWeLink.prototype.internalThermostatUpdate = function (accessory, targetState, c
    payload.sequence = Math.floor(new Date());
    payload.params.switch = targetState ? "on" : "off";
    payload.params.mainSwitch = targetState ? "on" : "off";
-   platform.sendWebSocketMessage(JSON.stringify(payload), callback);
+   platform.sendWSMessage(JSON.stringify(payload), callback);
 };
 
 eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
@@ -1407,7 +1407,7 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
             if (platform.debugReqRes) platform.log.warn(payload);
             
             if (platform.webSocketOpen) {
-               platform.sendWebSocketMessage(string, function () {
+               platform.sendWSMessage(string, function () {
                   return;
                });
                platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.cMoveState === 1 ? "moving up" : "moving down");
@@ -1480,7 +1480,7 @@ eWeLink.prototype.setBlindTargetPosition = function (accessory, pos, callback) {
    if (platform.webSocketOpen) {
       
       setTimeout(function () {
-         platform.sendWebSocketMessage(string, function () {
+         platform.sendWSMessage(string, function () {
             return;
          });
          platform.log("[%s] Request sent for %s", accessory.displayName, moveUp ? "moving up" : "moving down");
@@ -1516,7 +1516,7 @@ eWeLink.prototype.prepareBlindFinalState = function (accessory) {
    if (platform.webSocketOpen) {
       
       setTimeout(function () {
-         platform.sendWebSocketMessage(string, function () {
+         platform.sendWSMessage(string, function () {
             return;
          });
          platform.log("[%s] Request sent to stop moving", accessory.displayName);
@@ -1707,7 +1707,7 @@ eWeLink.prototype.externalBlindUpdate = function (hbDeviceId, params) {
       payload.deviceid = accessory.context.hbDeviceId;
       payload.sequence = Math.floor(new Date());
       let string = JSON.stringify(payload);
-      platform.sendWebSocketMessage(string, function () {
+      platform.sendWSMessage(string, function () {
          return;
       });
    }
@@ -1933,48 +1933,6 @@ eWeLink.prototype.externalBridgeUpdate = function (hbDeviceId, params) {
    }, platform.sensorTimeLength * 1000);
    return;
 }
-
-eWeLink.prototype.sendWebSocketMessage = function (string, callback) {
-   let platform = this;
-   if (!platform.log) {
-      return;
-   }
-   platform.delaySend = 0;
-   const delayOffset = 280;
-   let sendOperation = (string) => {
-      if (!platform.webSocketOpen) {
-         setTimeout(() => {
-            sendOperation(string);
-         }, delayOffset);
-         return;
-      }
-      if (platform.ws) {
-         platform.ws.send(string);
-         if (platform.debugReqRes && string !== "ping") platform.log.warn("Web socket message sent.\n" + JSON.stringify(JSON.parse(string), null, 2));
-         else if (platform.debug && string !== "ping") platform.log("Web socket message sent.");
-         callback();
-      }
-      if (platform.delaySend <= 0) {
-         platform.delaySend = 0;
-      } else {
-         platform.delaySend -= delayOffset;
-      }
-   };
-   if (!platform.webSocketOpen) {
-      if (platform.debug) platform.log("Socket was closed. It will reconnect automatically.");
-      let interval;
-      let waitToSend = (string) => {
-         if (platform.webSocketOpen) {
-            clearInterval(interval);
-            sendOperation(string);
-         }
-      };
-      interval = setInterval(waitToSend, 750, string);
-   } else {
-      setTimeout(sendOperation, platform.delaySend, string);
-      platform.delaySend += delayOffset;
-   }
-};
 
 eWeLink.prototype.login = function (callback) {
    let platform = this;
@@ -2225,9 +2183,50 @@ eWeLink.prototype.getSignature = function (string) {
    return crypto.createHmac("sha256", "6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM").update(string).digest("base64");
 };
 
+eWeLink.prototype.sendWSMessage = function (string, callback) {
+   let platform = this;
+   if (!platform.log) {
+      return;
+   }
+   platform.delaySend = 0;
+   const delayOffset = 280;
+   let sendOperation = (string) => {
+      if (!platform.webSocketOpen) {
+         setTimeout(() => {
+            sendOperation(string);
+         }, delayOffset);
+         return;
+      }
+      if (platform.ws) {
+         platform.ws.send(string);
+         if (platform.debugReqRes && string !== "ping") platform.log.warn("Web socket message sent.\n" + JSON.stringify(JSON.parse(string), null, 2));
+         else if (platform.debug && string !== "ping") platform.log("Web socket message sent.");
+         callback();
+      }
+      if (platform.delaySend <= 0) {
+         platform.delaySend = 0;
+      } else {
+         platform.delaySend -= delayOffset;
+      }
+   };
+   if (!platform.webSocketOpen) {
+      if (platform.debug) platform.log("Socket was closed. It will reconnect automatically.");
+      let interval;
+      let waitToSend = (string) => {
+         if (platform.webSocketOpen) {
+            clearInterval(interval);
+            sendOperation(string);
+         }
+      };
+      interval = setInterval(waitToSend, 750, string);
+   } else {
+      setTimeout(sendOperation, platform.delaySend, string);
+      platform.delaySend += delayOffset;
+   }
+};
+
 function WebSocketClient() {
-   this.number = 0; // Message number
-   this.autoReconnectInterval = 5 * 1000; // ms
+   this.number = 0;
    this.pendingReconnect = false;
 }
 
@@ -2242,11 +2241,10 @@ WebSocketClient.prototype.open = function (url) {
       this.onmessage(data, flags, this.number);
    });
    this.instance.on("close", (e) => {
-      switch (e) {
-         case 1005: // CLOSE_NORMAL
-         // console.log("WebSocketClient: Web socket closed [1005].");
+      switch (e.code) {
+         case 1000:
          break;
-         default: // Abnormal closure
+         default:
          this.reconnect(e);
          break;
       }
@@ -2274,22 +2272,9 @@ WebSocketClient.prototype.reconnect = function (e) {
    if (this.pendingReconnect) return;
    this.pendingReconnect = true;
    this.instance.removeAllListeners();
-   let platform = this;
+   let that = this;
    setTimeout(function () {
-      platform.pendingReconnect = false;
-      console.log("WebSocketClient: Reconnecting...");
-      platform.open(platform.url);
-   }, this.autoReconnectInterval);
-};
-WebSocketClient.prototype.onopen = function (e) {
-   // console.log("WebSocketClient: Web socket opened.", arguments);
-};
-WebSocketClient.prototype.onmessage = function (data, flags, number) {
-   // console.log("WebSocketClient: Message received.", arguments);
-};
-WebSocketClient.prototype.onerror = function (e) {
-   console.log("WebSocketClient: Error", arguments);
-};
-WebSocketClient.prototype.onclose = function (e) {
-   // console.log("WebSocketClient: Web socket closed.", arguments);
+      that.pendingReconnect = false;
+      that.open(that.url);
+   }, 5000);
 };
