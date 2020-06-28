@@ -175,7 +175,6 @@ class eWeLink {
                            group = platform.deviceGroups.get(idToCheck);
                            if (group.type === "blind" && Array.isArray(device.params.switches)) {
                               services.blind = true;
-                              services.group = group;
                               platform.addAccessory(device, idToCheck + "SWX", services);
                            }
                         }
@@ -380,12 +379,9 @@ class eWeLink {
                   payload.userAgent = "app";
                   payload.sequence = Math.floor(new Date());
                   payload.version = 8;
-                  if (platform.debugReqRes) {
-                     platform.log.warn("Sending web socket login request.\n" + JSON.stringify(payload, null, 2));
-                  } else if (platform.debug) {
-                     platform.log("Sending web socket login request.");
-                  }
-                  platform.ws.send(JSON.stringify(payload));
+                  platform.sendWSMessage(JSON.stringify(payload), function() {
+                     return;
+                  });
                };
                platform.ws.onerror = function (e) {
                   platform.log(e);
@@ -602,79 +598,19 @@ class eWeLink {
          .on("set", function (value, callback) {
             platform.setBlindTargetPosition(accessory, value, callback);
          });
-         let payload = {};
-         payload.action = "update";
-         payload.userAgent = "app";
-         payload.params = {
-            "lock": 0,
-            "zyx_clear_timers": false,
-            "configure": [{
-               "startup": "off",
-               "outlet": 0
-            }, {
-               "startup": "off",
-               "outlet": 1
-            }, {
-               "startup": "off",
-               "outlet": 2
-            }, {
-               "startup": "off",
-               "outlet": 3
-            }],
-            "pulses": [{
-               "pulse": "off",
-               "width": 1000,
-               "outlet": 0
-            }, {
-               "pulse": "off",
-               "width": 1000,
-               "outlet": 1
-            }, {
-               "pulse": "off",
-               "width": 1000,
-               "outlet": 2
-            }, {
-               "pulse": "off",
-               "width": 1000,
-               "outlet": 3
-            }],
-            "switches": [{
-               "switch": "off",
-               "outlet": 0
-            }, {
-               "switch": "off",
-               "outlet": 1
-            }, {
-               "switch": "off",
-               "outlet": 2
-            }, {
-               "switch": "off",
-               "outlet": 3
-            }]
-         };
-         payload.apikey = accessory.context.eweApiKey;
-         payload.deviceid = accessory.context.eweDeviceId;
-         payload.sequence = Math.floor(new Date());
-         if (platform.debugReqRes) platform.log.warn(payload);
-         platform.sendWSMessage(JSON.stringify(payload), function () {
-            return;
-         });
-         if (platform.debug) platform.log("[%s] initialising switches for correct start up.", accessory.displayName);
-         accessory.context.lastPosition = accessory.context.lastPosition >= 0 ? accessory.context.lastPosition : 0;
-         accessory.context.cTargetPos = accessory.context.lastPosition;
-         accessory.context.cMoveState = 2;
+         accessory.context.lastPos = 0;
+         accessory.context.targetPos = 0;
+         accessory.context.moveState = 2;
          let group = platform.deviceGroups.get(accessory.context.hbDeviceId);
-         if (group) {
-            accessory.context.switchUp = (group.switchUp || platform.groupDefaults["switchUp"]) - 1;
-            accessory.context.switchDown = (group.switchDown || platform.groupDefaults["switchDown"]) - 1;
-            accessory.context.durationUp = group.timeUp || platform.groupDefaults["timeUp"];
-            accessory.context.durationDown = group.timeDown || platform.groupDefaults["timeDown"];
-            accessory.context.durationBMU = group.timeBottomMarginUp || platform.groupDefaults["timeBottomMarginUp"];
-            accessory.context.durationBMD = group.timeBottomMarginDown || platform.groupDefaults["timeBottomMarginDown"];
-            accessory.context.fullOverdrive = platform.groupDefaults["fullOverdrive"];
-            accessory.context.percentDurationDown = accessory.context.durationDown * 10;
-            accessory.context.percentDurationUp = accessory.context.durationUp * 10;
-         }
+         accessory.context.switchUp = (group.switchUp || platform.groupDefaults["switchUp"]) - 1;
+         accessory.context.switchDown = (group.switchDown || platform.groupDefaults["switchDown"]) - 1;
+         accessory.context.durationUp = group.timeUp || platform.groupDefaults["timeUp"];
+         accessory.context.durationDown = group.timeDown || platform.groupDefaults["timeDown"];
+         accessory.context.durationBMU = group.timeBottomMarginUp || platform.groupDefaults["timeBottomMarginUp"];
+         accessory.context.durationBMD = group.timeBottomMarginDown || platform.groupDefaults["timeBottomMarginDown"];
+         accessory.context.fullOverdrive = platform.groupDefaults["fullOverdrive"];
+         accessory.context.percentDurationDown = accessory.context.durationDown * 10;
+         accessory.context.percentDurationUp = accessory.context.durationUp * 10;
       } else if (services.fan) {
          accessory.addService(Service.Fanv2).getCharacteristic(Characteristic.On)
          .on("set", function (value, callback) {
@@ -782,79 +718,6 @@ class eWeLink {
          .on("set", function (value, callback) {
             platform.setBlindTargetPosition(accessory, value, callback);
          });
-         let payload = {};
-         payload.action = "update";
-         payload.userAgent = "app";
-         payload.params = {
-            "lock": 0,
-            "zyx_clear_timers": false,
-            "configure": [{
-               "startup": "off",
-               "outlet": 0
-            }, {
-               "startup": "off",
-               "outlet": 1
-            }, {
-               "startup": "off",
-               "outlet": 2
-            }, {
-               "startup": "off",
-               "outlet": 3
-            }],
-            "pulses": [{
-               "pulse": "off",
-               "width": 1000,
-               "outlet": 0
-            }, {
-               "pulse": "off",
-               "width": 1000,
-               "outlet": 1
-            }, {
-               "pulse": "off",
-               "width": 1000,
-               "outlet": 2
-            }, {
-               "pulse": "off",
-               "width": 1000,
-               "outlet": 3
-            }],
-            "switches": [{
-               "switch": "off",
-               "outlet": 0
-            }, {
-               "switch": "off",
-               "outlet": 1
-            }, {
-               "switch": "off",
-               "outlet": 2
-            }, {
-               "switch": "off",
-               "outlet": 3
-            }]
-         };
-         payload.apikey = accessory.context.eweApiKey;
-         payload.deviceid = accessory.context.eweDeviceId;
-         payload.sequence = Math.floor(new Date());
-         if (platform.debugReqRes) platform.log.warn(payload);
-         platform.sendWSMessage(JSON.stringify(payload), function () {
-            return;
-         });
-         if (platform.debug) platform.log("[%s] initialising switches for correct start up.", accessory.displayName);
-         accessory.context.lastPosition = accessory.context.lastPosition >= 0 ? accessory.context.lastPosition : 0;
-         accessory.context.cTargetPos = accessory.context.lastPosition;
-         accessory.context.cMoveState = 2;
-         let group = platform.deviceGroups.get(accessory.context.hbDeviceId);
-         if (group) {
-            accessory.context.switchUp = (group.switchUp || platform.groupDefaults["switchUp"]) - 1;
-            accessory.context.switchDown = (group.switchDown || platform.groupDefaults["switchDown"]) - 1;
-            accessory.context.durationUp = group.timeUp || platform.groupDefaults["timeUp"];
-            accessory.context.durationDown = group.timeDown || platform.groupDefaults["timeDown"];
-            accessory.context.durationBMU = group.timeBottomMarginUp || platform.groupDefaults["timeBottomMarginUp"];
-            accessory.context.durationBMD = group.timeBottomMarginDown || platform.groupDefaults["timeBottomMarginDown"];
-            accessory.context.fullOverdrive = platform.groupDefaults["fullOverdrive"];
-            accessory.context.percentDurationDown = accessory.context.durationDown * 10;
-            accessory.context.percentDurationUp = accessory.context.durationUp * 10;
-         }
       } else if (accessory.getService(Service.Fanv2)) {
          accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.Active, 1);
          accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
@@ -1278,10 +1141,10 @@ class eWeLink {
    }
    
    setBlindTargetPosition (accessory, pos, callback) {
-      platform.log("Setting [%s] new target position from [%s] to [%s].", accessory.displayName, accessory.context.cTargetPos, pos, );
+      platform.log("Setting [%s] new target position from [%s] to [%s].", accessory.displayName, accessory.context.targetPos, pos, );
       let timestamp = Date.now();
-      if (accessory.context.cMoveState != 2) {
-         var diffPosition = Math.abs(pos - accessory.context.cTargetPos);
+      if (accessory.context.moveState != 2) {
+         var diffPosition = Math.abs(pos - accessory.context.targetPos);
          var actualPosition;
          var diffTime;
          var diff;
@@ -1291,27 +1154,27 @@ class eWeLink {
             diffTime = 0;
             diff = 0;
          } else {
-            if (accessory.context.cMoveState === 1) {
-               diffPosition = accessory.context.cTargetPos - pos;
+            if (accessory.context.moveState === 1) {
+               diffPosition = accessory.context.targetPos - pos;
                diffTime = Math.round(accessory.context.percentDurationDown * diffPosition);
             } else {
-               diffPosition = pos - accessory.context.cTargetPos;
+               diffPosition = pos - accessory.context.targetPos;
                diffTime = Math.round(accessory.context.percentDurationUp * diffPosition);
             }
             diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
             
             let timestamp = Date.now();
-            if (accessory.context.cMoveState === 1) {
-               actualPosition = Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
-            } else if (accessory.context.cMoveState === 0) {
-               actualPosition = Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
+            if (accessory.context.moveState === 1) {
+               actualPosition = Math.round(accessory.context.lastPos - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
+            } else if (accessory.context.moveState === 0) {
+               actualPosition = Math.round(accessory.context.lastPos + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
             } else {
-               actualPosition = accessory.context.lastPosition;
+               actualPosition = accessory.context.lastPos;
             }
             if (diff > 0) {
                accessory.context.targetTimestamp += diffTime;
                // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-               accessory.context.cTargetPos = pos;
+               accessory.context.targetPos = pos;
                platform.log("[%s] Blinds are moving. Current position: %s, new targuet: %s, adjusting target milliseconds: %s", accessory.displayName, actualPosition, pos, diffTime);
                callback();
                return false;
@@ -1321,9 +1184,9 @@ class eWeLink {
                accessory.context.startTimestamp = timestamp;
                accessory.context.targetTimestamp = timestamp + Math.abs(diff);
                // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-               accessory.context.lastPosition = actualPosition;
-               accessory.context.cTargetPos = pos;
-               accessory.context.cMoveState = accessory.context.cMoveState === 0 ? 1 : 0;
+               accessory.context.lastPos = actualPosition;
+               accessory.context.targetPos = pos;
+               accessory.context.moveState = accessory.context.moveState === 0 ? 1 : 0;
                
                let payload = platform.prepareBlindPayload(accessory);
                let string = JSON.stringify(payload);
@@ -1333,14 +1196,14 @@ class eWeLink {
                   platform.sendWSMessage(string, function () {
                      return;
                   });
-                  platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.cMoveState === 1 ? "moving up" : "moving down");
+                  platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.moveState === 1 ? "moving up" : "moving down");
                   let service = accessory.getService(Service.WindowCovering);
                   service.getCharacteristic(Characteristic.CurrentPosition)
-                  .updateValue(accessory.context.lastPosition);
+                  .updateValue(accessory.context.lastPos);
                   service.getCharacteristic(Characteristic.TargetPosition)
-                  .updateValue(accessory.context.cTargetPos);
+                  .updateValue(accessory.context.targetPos);
                   service.getCharacteristic(Characteristic.PositionState)
-                  .updateValue(accessory.context.cMoveState);
+                  .updateValue(accessory.context.moveState);
                } else {
                   platform.log("Socket was closed. It will reconnect automatically; please retry your command");
                   callback("Socket was closed. It will reconnect automatically; please retry your command");
@@ -1354,14 +1217,14 @@ class eWeLink {
          return false;
       }
       
-      if (accessory.context.lastPosition === pos) {
+      if (accessory.context.lastPos === pos) {
          platform.log("[%s] Current position already matches target position. There is nothing to do.", accessory.displayName);
          callback();
          return true;
       }
       
-      accessory.context.cTargetPos = pos;
-      moveUp = (pos > accessory.context.lastPosition);
+      accessory.context.targetPos = pos;
+      moveUp = (pos > accessory.context.lastPos);
       
       var withoutmarginetimeUP;
       var withoutmarginetimeDOWN;
@@ -1370,16 +1233,16 @@ class eWeLink {
       withoutmarginetimeDOWN = accessory.context.durationDown - accessory.context.durationBMD;
       
       if (moveUp) {
-         if (accessory.context.lastPosition === 0) {
-            duration = ((pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP) + accessory.context.durationBMU;
+         if (accessory.context.lastPos === 0) {
+            duration = ((pos - accessory.context.lastPos) / 100 * withoutmarginetimeUP) + accessory.context.durationBMU;
          } else {
-            duration = (pos - accessory.context.lastPosition) / 100 * withoutmarginetimeUP;
+            duration = (pos - accessory.context.lastPos) / 100 * withoutmarginetimeUP;
          }
       } else {
          if (pos === 0) {
-            duration = ((accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN) + accessory.context.durationBMD;
+            duration = ((accessory.context.lastPos - pos) / 100 * withoutmarginetimeDOWN) + accessory.context.durationBMD;
          } else {
-            duration = (accessory.context.lastPosition - pos) / 100 * withoutmarginetimeDOWN;
+            duration = (accessory.context.lastPos - pos) / 100 * withoutmarginetimeDOWN;
          }
       }
       if (pos === 0 || pos === 100) duration += accessory.context.fullOverdrive;
@@ -1392,7 +1255,7 @@ class eWeLink {
       accessory.context.startTimestamp = timestamp;
       accessory.context.targetTimestamp = timestamp + (duration * 1000);
       // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-      accessory.context.cMoveState = (moveUp ? 0 : 1);
+      accessory.context.moveState = (moveUp ? 0 : 1);
       accessory.getService(Service.WindowCovering)
       .setCharacteristic(Characteristic.PositionState, (moveUp ? 0 : 1));
       
@@ -1425,7 +1288,7 @@ class eWeLink {
    }
    
    prepareBlindFinalState (accessory) {
-      accessory.context.cMoveState = 2;
+      accessory.context.moveState = 2;
       let payload = platform.prepareBlindPayload(accessory);
       let string = JSON.stringify(payload);
       if (platform.debugReqRes) platform.log.warn(payload);
@@ -1437,19 +1300,19 @@ class eWeLink {
                return;
             });
             platform.log("[%s] Request sent to stop moving", accessory.displayName);
-            accessory.context.cMoveState = 2;
+            accessory.context.moveState = 2;
             
-            let cTargetPos = accessory.context.cTargetPos;
-            accessory.context.lastPosition = cTargetPos;
+            let targetPos = accessory.context.targetPos;
+            accessory.context.lastPos = targetPos;
             let service = accessory.getService(Service.WindowCovering);
             // Using updateValue to avoid loop
             service.getCharacteristic(Characteristic.CurrentPosition)
-            .updateValue(cTargetPos);
+            .updateValue(targetPos);
             service.getCharacteristic(Characteristic.TargetPosition)
-            .updateValue(cTargetPos);
+            .updateValue(targetPos);
             service.setCharacteristic(Characteristic.PositionState, Characteristic.PositionState.STOPPED);
             
-            platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, cTargetPos);
+            platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, targetPos);
             return true;
             // TODO Here we need to wait for the response to the socket
          }, 1);
@@ -1469,7 +1332,7 @@ class eWeLink {
       payload.params.switches = deviceFromApi.params.switches;
       let switch0 = "off";
       let switch1 = "off";
-      switch (accessory.context.cMoveState) {
+      switch (accessory.context.moveState) {
          case 2:
          switch0 = "off";
          switch1 = "off";
@@ -1509,37 +1372,37 @@ class eWeLink {
       let actualPosition;
       if (state === 2 || state === 3) {
          let timestamp = Date.now();
-         if (accessory.context.cMoveState === 1) {
-            aPos = Math.round(accessory.context.lastPosition - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
-         } else if (accessory.context.cMoveState === 0) {
-            aPos = Math.round(accessory.context.lastPosition + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
+         if (accessory.context.moveState === 1) {
+            aPos = Math.round(accessory.context.lastPos - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
+         } else if (accessory.context.moveState === 0) {
+            aPos = Math.round(accessory.context.lastPos + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
          } else {
-            aPos = accessory.context.lastPosition;
+            aPos = accessory.context.lastPos;
          }
       }
       switch (state) {
          case 3:
          platform.log("[%s] Error with current movement state so resetting.", accessory.displayName);
-         accessory.context.cTargetPos = aPos;
+         accessory.context.targetPos = aPos;
          accessory.context.targetTimestamp = Date.now() + 10;
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, aPos);
          break;
          case 2:
-         if (accessory.context.cMoveState === 2) {
+         if (accessory.context.moveState === 2) {
             platform.log("[%s] received request to stop moving. Nothing to do as blind is already stopped.", accessory.displayName);
             return;
          }
          platform.log("[%s] received request to stop moving. Updating new position [%s].", accessory.displayName, aPos);
-         accessory.context.cTargetPos = aPos;
+         accessory.context.targetPos = aPos;
          accessory.context.targetTimestamp = Date.now() + 10;
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, aPos);
          break;
          case 1:
-         if (accessory.context.cMoveState === 1) {
+         if (accessory.context.moveState === 1) {
             platform.log("[%s] received request to move down. Nothing to do as blind is already moving down.", accessory.displayName);
             return;
          }
-         if (accessory.context.cTargetPos === 0) {
+         if (accessory.context.targetPos === 0) {
             platform.log("[%s] received request to move down but was already fully closing. Stopping.", accessory.displayName);
          } else {
             platform.log("[%s] received request to move down so setting target position to 0.", accessory.displayName);
@@ -1547,11 +1410,11 @@ class eWeLink {
          }
          break;
          case 0:
-         if (accessory.context.cMoveState === 0) {
+         if (accessory.context.moveState === 0) {
             platform.log("[%s] received request to move up. Nothing to do as blind is already moving up.", accessory.displayName);
             return;
          }
-         if (accessory.context.cTargetPos === 100) {
+         if (accessory.context.targetPos === 100) {
             platform.log("[%s] received request to move up but was already fully opening. Stopping.", accessory.displayName);
             
          } else {
@@ -1560,14 +1423,14 @@ class eWeLink {
          }
          break;
       }
-      if ((state === 0 && accessory.context.cTargetPos === 0) || (state === 1 && accessory.context.cTargetPos === 100)) {
-         accessory.context.cMoveState = 2;
+      if ((state === 0 && accessory.context.targetPos === 0) || (state === 1 && accessory.context.targetPos === 100)) {
+         accessory.context.moveState = 2;
          platform.log("[%s] received a request to stop moving.", accessory.displayName);
-         let cTargetPos = accessory.context.cTargetPos;
-         accessory.context.lastPosition = cTargetPos;
-         accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).updateValue(cTargetPos);
-         accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).updateValue(cTargetPos);
-         platform.log("[%s] has new target position of %s%", accessory.displayName, cTargetPos);
+         let targetPos = accessory.context.targetPos;
+         accessory.context.lastPos = targetPos;
+         accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).updateValue(targetPos);
+         accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).updateValue(targetPos);
+         platform.log("[%s] has new target position of %s%", accessory.displayName, targetPos);
          let payload = {};
          payload.action = "update";
          payload.userAgent = "app";
@@ -1577,7 +1440,7 @@ class eWeLink {
          let switch0 = "off";
          let switch1 = "off";
          
-         let state = accessory.context.cMoveState;
+         let state = accessory.context.moveState;
          
          switch (state) {
             case 2:
@@ -1928,7 +1791,7 @@ class eWeLink {
    }
    
    getWebSocketHost(callback) {
-      var data = {};
+      let data = {};
       data.accept = "mqtt,ws";
       data.version = 8;
       data.ts = Math.floor(new Date().getTime() / 1000);
@@ -2082,9 +1945,6 @@ class eWeLink {
          platform.delaySend += delayOffset;
       }
    }
-   userActionableError(string) {
-      
-   }
 }
 
 class WebSocketClient {
@@ -2140,8 +2000,4 @@ class WebSocketClient {
          that.open(that.url);
       }, 5000);
    }
-   onopen () {}
-   onmessage () {}
-   onerror () {}
-   onclose () {}
 }
