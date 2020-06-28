@@ -210,9 +210,9 @@ class eWeLink {
                         else if (platform.devicesSingleSwitch.includes(device.uiid) && platform.devicesSingleSwitchLight.includes(device.productModel)) {
                            if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("state")) {
                               services.lightbulb = true;
-                              if (platform.devicesColourable.includes(device.uiid)) services.colourable = true;
                               if (platform.devicesDimmable.includes(device.uiid)) services.dimmable = true;
-                              if (platform.devicesDimmableAndColourable.includes(device.uiid)) services.dimmableAndColourable = true;
+                              else if (platform.devicesColourable.includes(device.uiid)) services.colourable = true;
+                              else if (platform.devicesDimmableAndColourable.includes(device.uiid)) services.dimmableAndColourable = true;
                               platform.addAccessory(device, idToCheck + "SWX", services);
                            }
                         }
@@ -261,7 +261,7 @@ class eWeLink {
                               }
                            }
                         } else {
-                           platform.log.warn("[%s] There has been a problem adding this device.", device.name);
+                           platform.log.warn("[%s] cannot be added as it is not supported by this plugin.", device.name);
                         }
                      }
                      //*****************************************//
@@ -358,9 +358,9 @@ class eWeLink {
                               platform.externalBridgeUpdate(idToCheck + "SW0", device.params);
                               return;
                            }
+                        } else {
+                           platform.log.warn("[%s] could not be refreshed as it wasn't found in Homebridge.", device.name);
                         }
-                     } else {
-                        platform.log.warn("[%s] There has been a problem refreshing this device.", device.name);
                      }
                   });
                }
@@ -511,7 +511,7 @@ class eWeLink {
                               return;
                            }
                            
-                           platform.log.warn("[%s] could not be refreshed due to a hiccup in the eWeLink message.", device.deviceid);
+                           platform.log.warn("[%s] could not be refreshed due as there was nothing to do.", device.deviceid);
                         } else {
                            platform.log.warn("[%s] Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.", device.deviceid);
                         }
@@ -561,18 +561,18 @@ class eWeLink {
    }
    addAccessory(device, hbDeviceId, services) {
       if (platform.devicesInHB.get(hbDeviceId)) {
-         platform.log("[%s] has not been added as it already exists in Homebridge.", hbDeviceId);
+         platform.log("[%s] cannot be added as it already exists in Homebridge.", hbDeviceId);
          return;
       }
       if (device.type != 10) {
-         platform.log.warn("[%s] is not currently compatible with this plugin.", hbDeviceId);
+         platform.log.warn("[%s] cannot be added as it is not supported by this plugin.", hbDeviceId);
          return;
       }
       let channelCount = services.bridge ? services.bridgeDeviceCount : platform.getChannelsByUIID(device.uiid);
       let switchNumber = hbDeviceId.substr(-1);
       let newDeviceName;
       if (switchNumber > channelCount) {
-         platform.log.warn("[%s] has not been added as the [%s] only has [%s] switches.", newDeviceName, device.productModel, channelCount);
+         platform.log.warn("[%s] cannot be added as the [%s] only has [%s] switches.", newDeviceName, device.productModel, channelCount);
          return;
       }
       if (switchNumber === "X" || switchNumber === "0") {
@@ -587,14 +587,6 @@ class eWeLink {
       accessory.context.eweModel = device.productModel;
       accessory.context.eweApiKey = device.apikey;
       accessory.context.switchNumber = switchNumber;
-      accessory.context.isDimmable = false;
-      accessory.context.isColourable = false;
-      accessory.context.isDimmableAndColourable = false;
-      accessory.context.isFan = false;
-      accessory.context.isBridge = false;
-      accessory.context.isBlind = false;
-      accessory.context.isThermostatSwitch = false;
-      accessory.context.isOutlet = false;
       accessory.context.channelCount = channelCount;
       accessory.reachable = device.online;
       
@@ -604,106 +596,8 @@ class eWeLink {
             callback();
          } catch (e) {}
       });
-      if (services.switch) {
-         accessory.addService(Service.Switch).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalSwitchUpdate(accessory, value, callback);
-         });
-      }
-      if (services.outlet) {
-         accessory.context.isOutlet = true;
-         accessory.addService(Service.Outlet).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalOutletUpdate(accessory, value, callback);
-         });
-         accessory.getService(Service.Outlet).setCharacteristic(Characteristic.OutletInUse, true);
-      }
-      if (services.lightbulb) {
-         accessory.addService(Service.Lightbulb);
-         if (services.dimmable) {
-            accessory.context.isDimmable = true;
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("set", function (value, callback) {
-               platform.internalDimmerUpdate(accessory, value, callback);
-            });
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
-            .on("set", function (value, callback) {
-               platform.internalDimmerUpdate(accessory, value, callback);
-            });
-         } else if (services.colourable) {
-            accessory.context.isColourable = true;
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("set", function (value, callback) {
-               platform.internalColourUpdate(accessory, value, callback);
-            });
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
-            .on("set", function (value, callback) {
-               platform.internalColourUpdate(accessory, convert.hsv.rgb(value, 100, 100), callback);
-            });
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
-            
-         } else if (services.dimmableAndColourable) {
-            accessory.context.isDimmableAndColourable = true;
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("set", function (value, callback) {
-               platform.internalDimmerAndColourUpdate(accessory, 'on', value, callback);
-            });
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
-            .on("set", function (value, callback) {
-               platform.internalDimmerAndColourUpdate(accessory, 'brightness', value, callback);
-            });
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
-            .on("set", function (value, callback) {
-               platform.internalDimmerAndColourUpdate(accessory, 'hue', value, callback);
-            });
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
-         } else {
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-            .on("set", function (value, callback) {
-               platform.internalLightbulbUpdate(accessory, value, callback);
-            });
-         }
-      }
-      if (services.fan) {
-         accessory.context.isFan = true;
-         accessory.addService(Service.Fanv2).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "power", value, callback);
-         })
-         accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed)
-         .setProps({
-            minStep: 3
-         })
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "speed", value, callback);
-         });
-         accessory.addService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "light", value, callback);
-         });
-         accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.Active, 1);
-      }
       
-      if (services.thermostatSwitch) {
-         accessory.context.isThermostatSwitch = true;
-         accessory.addService(Service.Switch).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalThermostatUpdate(accessory, value, callback);
-         });
-      }
-      if (services.temperature) {
-         accessory.addService(Service.TemperatureSensor);
-      }
-      if (services.humidity) {
-         accessory.addService(Service.HumiditySensor);
-      }
-      if (services.bridge) {
-         accessory.context.isBridge = true;
-         accessory.addService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);
-      }
       if (services.blind) {
-         accessory.context.isBlind = true;
          accessory.addService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
          .on("set", function (value, callback) {
             platform.setBlindTargetPosition(accessory, value, callback);
@@ -781,37 +675,43 @@ class eWeLink {
             accessory.context.percentDurationDown = accessory.context.durationDown * 10;
             accessory.context.percentDurationUp = accessory.context.durationUp * 10;
          }
-      }
-      try {
-         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.SerialNumber, hbDeviceId);
-         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Manufacturer, device.brandName);
-         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Model, device.productModel + " (" + device.extra.extra.model + ")");
-         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Identify, false);
-         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-      } catch (e) {
-         platform.log.error("[%s] has not been added [%s].", accessory.displayName, e);
-      }
-      platform.devicesInHB.set(hbDeviceId, accessory);
-      platform.api.registerPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
-      if (platform.debug) platform.log("[%s] has been added to Homebridge.", newDeviceName);
-   }
-   
-   configureAccessory (accessory) {
-      if (accessory.getService(Service.Switch) && !accessory.context.isThermostatSwitch) {
-         accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
+      } else if (services.fan) {
+         accessory.addService(Service.Fanv2).getCharacteristic(Characteristic.On)
          .on("set", function (value, callback) {
-            platform.internalSwitchUpdate(accessory, value, callback);
+            platform.internalFanUpdate(accessory, "power", value, callback);
+         })
+         accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed)
+         .setProps({
+            minStep: 3
+         })
+         .on("set", function (value, callback) {
+            platform.internalFanUpdate(accessory, "speed", value, callback);
          });
-      }
-      if (accessory.getService(Service.Outlet)) {
-         accessory.getService(Service.Outlet).getCharacteristic(Characteristic.On)
+         accessory.addService(Service.Lightbulb).getCharacteristic(Characteristic.On)
+         .on("set", function (value, callback) {
+            platform.internalFanUpdate(accessory, "light", value, callback);
+         });
+         accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.Active, 1);
+      } else if (services.thermostatSwitch) {
+         accessory.addService(Service.Switch).getCharacteristic(Characteristic.On)
+         .on("set", function (value, callback) {
+            platform.internalThermostatUpdate(accessory, value, callback);
+         });
+         if (services.temperature) {
+            accessory.addService(Service.TemperatureSensor);
+         }
+         if (services.humidity) {
+            accessory.addService(Service.HumiditySensor);
+         }
+      } else if (services.outlet) {
+         accessory.addService(Service.Outlet).getCharacteristic(Characteristic.On)
          .on("set", function (value, callback) {
             platform.internalOutletUpdate(accessory, value, callback);
          });
          accessory.getService(Service.Outlet).setCharacteristic(Characteristic.OutletInUse, true);
-      }
-      if (accessory.getService(Service.Lightbulb) && !accessory.context.isFan) {
-         if (accessory.context.isDimmable) {
+      } else if (services.lightbulb) {
+         accessory.addService(Service.Lightbulb);
+         if (platform.devicesDimmable.includes(device.uiid)) {
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
             .on("set", function (value, callback) {
                platform.internalDimmerUpdate(accessory, value, callback);
@@ -820,7 +720,7 @@ class eWeLink {
             .on("set", function (value, callback) {
                platform.internalDimmerUpdate(accessory, value, callback);
             });
-         } else if (accessory.context.isColourable) {
+         } else if (services.colourable) {
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
             .on("set", function (value, callback) {
                platform.internalColourUpdate(accessory, value, callback);
@@ -831,7 +731,8 @@ class eWeLink {
             });
             accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
             accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
-         } else if (accessory.context.isDimmableAndColourable) {
+            
+         } else if (services.dimmableAndColourable) {
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
             .on("set", function (value, callback) {
                platform.internalDimmerAndColourUpdate(accessory, 'on', value, callback);
@@ -851,36 +752,31 @@ class eWeLink {
                platform.internalLightbulbUpdate(accessory, value, callback);
             });
          }
-      }
-      if (accessory.getService(Service.Fanv2)) {
-         accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.Active, 1);
-         accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
+      } else if (services.switch) {
+         accessory.addService(Service.Switch).getCharacteristic(Characteristic.On)
          .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "power", value, callback);
+            platform.internalSwitchUpdate(accessory, value, callback);
          });
-         accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed)
-         .setProps({
-            minStep: 3
-         })
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "speed", value, callback);
-         });
+      } else if (services.bridge) {
+         accessory.addService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);
+      } else {
+         platform.log.warn("[%s] cannot be added as it is not supported by this plugin.", accessory.deviceName);
       }
-      if (accessory.getService(Service.Lightbulb) && accessory.context.isFan) {
-         accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "light", value, callback);
-         });
+      try {
+         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.SerialNumber, hbDeviceId);
+         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Manufacturer, device.brandName);
+         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Model, device.productModel + " (" + device.extra.extra.model + ")");
+         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Identify, false);
+         accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+      } catch (e) {
+         platform.log.error("[%s] cannot be added - [%s].", accessory.displayName, e);
       }
-      if (accessory.getService(Service.MotionSensor) && accessory.context.isBridge) {
-         accessory.getService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);
-      }
-      if (accessory.context.isThermostatSwitch) {
-         accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalThermostatUpdate(accessory, value, callback);
-         });
-      }
+      platform.devicesInHB.set(hbDeviceId, accessory);
+      platform.api.registerPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
+      if (platform.debug) platform.log("[%s] has been added to Homebridge.", newDeviceName);
+   }
+   
+   configureAccessory (accessory) {
       if (accessory.getService(Service.WindowCovering)) {
          accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
          .on("set", function (value, callback) {
@@ -959,6 +855,85 @@ class eWeLink {
             accessory.context.percentDurationDown = accessory.context.durationDown * 10;
             accessory.context.percentDurationUp = accessory.context.durationUp * 10;
          }
+      } else if (accessory.getService(Service.Fanv2)) {
+         accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.Active, 1);
+         accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
+         .on("set", function (value, callback) {
+            platform.internalFanUpdate(accessory, "power", value, callback);
+         });
+         accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed)
+         .setProps({
+            minStep: 3
+         })
+         .on("set", function (value, callback) {
+            platform.internalFanUpdate(accessory, "speed", value, callback);
+         });
+         accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
+         .on("set", function (value, callback) {
+            platform.internalFanUpdate(accessory, "light", value, callback);
+         });
+      } else if (platform.devicesThermostat.includes(accessory.context.eweUIID)) {
+         accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
+         .on("set", function (value, callback) {
+            platform.internalThermostatUpdate(accessory, value, callback);
+         });
+      } else if (accessory.getService(Service.Outlet)) {
+         accessory.getService(Service.Outlet).getCharacteristic(Characteristic.On)
+         .on("set", function (value, callback) {
+            platform.internalOutletUpdate(accessory, value, callback);
+         });
+         accessory.getService(Service.Outlet).setCharacteristic(Characteristic.OutletInUse, true);
+      } else if (accessory.getService(Service.Lightbulb)) {
+         if (platform.devicesDimmable.includes(accessory.context.eweUIID)) {
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
+            .on("set", function (value, callback) {
+               platform.internalDimmerUpdate(accessory, value, callback);
+            });
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
+            .on("set", function (value, callback) {
+               platform.internalDimmerUpdate(accessory, value, callback);
+            });
+         } else if (platform.devicesColourable.includes(accessory.context.eweUIID)) {
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
+            .on("set", function (value, callback) {
+               platform.internalColourUpdate(accessory, value, callback);
+            });
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
+            .on("set", function (value, callback) {
+               platform.internalColourUpdate(accessory, convert.hsv.rgb(value, 100, 100), callback);
+            });
+            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
+            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
+         } else if (platform.devicesDimmableAndColourable.includes(accessory.context.eweUIID)) {
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
+            .on("set", function (value, callback) {
+               platform.internalDimmerAndColourUpdate(accessory, 'on', value, callback);
+            });
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
+            .on("set", function (value, callback) {
+               platform.internalDimmerAndColourUpdate(accessory, 'brightness', value, callback);
+            });
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
+            .on("set", function (value, callback) {
+               platform.internalDimmerAndColourUpdate(accessory, 'hue', value, callback);
+            });
+            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
+         } else {
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
+            .on("set", function (value, callback) {
+               platform.internalLightbulbUpdate(accessory, value, callback);
+            });
+         }
+      } else if (accessory.getService(Service.Switch)) {
+         accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
+         .on("set", function (value, callback) {
+            platform.internalSwitchUpdate(accessory, value, callback);
+         });
+      } else if (accessory.getService(Service.MotionSensor)) {
+         accessory.getService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);
+      } else {
+         platform.log.warn("[%s] could not be refreshed due to unknown accessory type.", accessory.displayName);
+         return;
       }
       accessory.reachable = true;
       platform.devicesInHB.set(accessory.context.hbDeviceId, accessory);
