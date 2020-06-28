@@ -377,13 +377,21 @@ class eWeLink {
                   payload.userAgent = "app";
                   payload.sequence = Math.floor(new Date());
                   payload.version = 8;
-                  platform.sendWSMessage(JSON.stringify(payload), function() {
+                  platform.wsSendMessage(JSON.stringify(payload), function() {
                      return;
                   });
                };
                platform.ws.onerror = function (e) {
-                  platform.log(e);
+                  platform.log.error("Web socket error - [%s].", e);
                }
+               platform.ws.onclose = function (e) {
+                  if (platform.debug) platform.log("Web socket closed - [%s].", e);
+                  platform.wsIsOpen = false;
+                  if (platform.hbInterval) {
+                     clearInterval(platform.hbInterval);
+                     platform.hbInterval = null;
+                  }
+               };
                platform.ws.onmessage = function (message) {
                   if (message === "pong") return;
                   if (platform.debugReqRes) platform.log.warn("Web socket message received.\n" + JSON.stringify(JSON.parse(message), null, 2));
@@ -535,14 +543,6 @@ class eWeLink {
                      }
                   } else {
                      if (platform.debug) platform.log.warn("Unknown command received via web socket.");
-                  }
-               };
-               platform.ws.onclose = function (e) {
-                  if (platform.debug) platform.log("Web socket was closed [%s].", e);
-                  platform.wsIsOpen = false;
-                  if (platform.hbInterval) {
-                     clearInterval(platform.hbInterval);
-                     platform.hbInterval = null;
                   }
                };
                platform.log("Plugin initialisation has been successful.");
@@ -864,7 +864,7 @@ class eWeLink {
          otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, masterState === "on" ? true : false);
          break;
       }
-      platform.sendWSMessage(JSON.stringify(payload), callback);
+      platform.wsSendMessage(JSON.stringify(payload), callback);
    }
    
    internalOutletUpdate (accessory, isOn, callback) {
@@ -879,7 +879,7 @@ class eWeLink {
       if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
       payload.params.switch = targetState;
       accessory.getService(Service.Outlet).updateCharacteristic(Characteristic.On, isOn);
-      platform.sendWSMessage(JSON.stringify(payload), callback);
+      platform.wsSendMessage(JSON.stringify(payload), callback);
    }
    
    internalLightbulbUpdate (accessory, isOn, callback) {
@@ -937,7 +937,7 @@ class eWeLink {
          otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, masterState === "on" ? true : false);
          break;
       }
-      platform.sendWSMessage(JSON.stringify(payload), callback);
+      platform.wsSendMessage(JSON.stringify(payload), callback);
    }
    
    internalDimmerUpdate (accessory, targetBrightness, callback) {
@@ -975,7 +975,7 @@ class eWeLink {
             accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
          }
       }
-      platform.sendWSMessage(JSON.stringify(payload), callback);
+      platform.wsSendMessage(JSON.stringify(payload), callback);
    }
    
    internalColourUpdate (accessory, newRGB, callback) {
@@ -1012,7 +1012,7 @@ class eWeLink {
          if (platform.debug) platform.log("[%s] requesting to change turn [%s].", accessory.displayName, payload.params.state);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newRGB);
       }
-      platform.sendWSMessage(JSON.stringify(payload), callback);
+      platform.wsSendMessage(JSON.stringify(payload), callback);
    }
    
    internalDimmerAndColourUpdate (accessory, type, value, callback) {
@@ -1084,7 +1084,7 @@ class eWeLink {
          if (platform.debug) platform.log("[%s] requesting to change colour to hue [%s].", accessory.displayName, newHSV[0]);
          break;
       }
-      platform.sendWSMessage(JSON.stringify(payload), callback);
+      platform.wsSendMessage(JSON.stringify(payload), callback);
    }
    
    internalFanUpdate (accessory, type, targetState, callback) {
@@ -1124,7 +1124,7 @@ class eWeLink {
       payload.apikey = accessory.context.eweApiKey;
       payload.deviceid = accessory.context.eweDeviceId;
       payload.sequence = Math.floor(new Date());
-      platform.sendWSMessage(JSON.stringify(payload), callback);
+      platform.wsSendMessage(JSON.stringify(payload), callback);
    }
    
    internalThermostatUpdate (accessory, targetState, callback) {
@@ -1139,7 +1139,7 @@ class eWeLink {
       payload.sequence = Math.floor(new Date());
       payload.params.switch = targetState ? "on" : "off";
       payload.params.mainSwitch = targetState ? "on" : "off";
-      platform.sendWSMessage(JSON.stringify(payload), callback);
+      platform.wsSendMessage(JSON.stringify(payload), callback);
    }
    
    setBlindTargetPosition (accessory, pos, callback) {
@@ -1195,7 +1195,7 @@ class eWeLink {
                if (platform.debugReqRes) platform.log.warn(payload);
                
                if (platform.wsIsOpen) {
-                  platform.sendWSMessage(string, function () {
+                  platform.wsSendMessage(string, function () {
                      return;
                   });
                   platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.moveState === 1 ? "moving up" : "moving down");
@@ -1268,7 +1268,7 @@ class eWeLink {
       if (platform.wsIsOpen) {
          
          setTimeout(function () {
-            platform.sendWSMessage(string, function () {
+            platform.wsSendMessage(string, function () {
                return;
             });
             platform.log("[%s] Request sent for %s", accessory.displayName, moveUp ? "moving up" : "moving down");
@@ -1298,7 +1298,7 @@ class eWeLink {
       if (platform.wsIsOpen) {
          
          setTimeout(function () {
-            platform.sendWSMessage(string, function () {
+            platform.wsSendMessage(string, function () {
                return;
             });
             platform.log("[%s] Request sent to stop moving", accessory.displayName);
@@ -1467,7 +1467,7 @@ class eWeLink {
          payload.deviceid = accessory.context.hbDeviceId;
          payload.sequence = Math.floor(new Date());
          let string = JSON.stringify(payload);
-         platform.sendWSMessage(string, function () {
+         platform.wsSendMessage(string, function () {
             return;
          });
       }
@@ -1661,178 +1661,7 @@ class eWeLink {
       return;
    }
    
-   login (callback) {
-      var data = {};
-      if (platform.emailLogin) {
-         data.email = platform.config.username;
-      } else {
-         data.phoneNumber = platform.config.username;
-      }
-      data.password = platform.config.password;
-      data.version = 8;
-      data.ts = Math.floor(new Date().getTime() / 1000);
-      data.nonce = nonce();
-      data.appid = platform.appid;
-      if (platform.debugReqRes) platform.log.warn("Sending HTTPS login request.\n" + JSON.stringify(data, null, 2));
-      else if (platform.debug) platform.log("Sending HTTPS login request.");
-      let json = JSON.stringify(data);
-      let sign = platform.getSignature(json);
-      if (platform.debug) platform.log("Login signature [%s].", sign);
-      let wc = request.createClient("https://" + platform.apiHost);
-      wc.headers["Authorization"] = "Sign " + sign;
-      wc.headers["Content-Type"] = "application/json;charset=UTF-8";
-      wc.post("/api/user/login", data, function (err, res, body) {
-         if (err) {
-            if (err.code === "ENOTFOUND") {
-               platform.log.warn("****************************************************************************");
-               platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
-               platform.log.warn("Please verify that your Homebridge instance is connected to the internet....");
-               platform.log.warn("****************************************************************************");
-            } else {
-               platform.log.error("An error occurred while logging in. [%s].", err);
-            }
-            callback();
-            return;
-         }
-         if (body.hasOwnProperty("error") && body.error === 301 && body.hasOwnProperty("region")) {
-            let idx = platform.apiHost.indexOf("-");
-            if (idx === -1) {
-               platform.log.error("Received new region [%s]. However we cannot construct the new API host url.", body.region);
-               callback();
-               return;
-            }
-            let newApiHost = body.region + platform.apiHost.substring(idx);
-            if (platform.apiHost != newApiHost) {
-               if (platform.debug) platform.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
-               platform.apiHost = newApiHost;
-               platform.login(callback);
-               return;
-            }
-         }
-         if (!body.at) {
-            if (body.error === 401) {
-               platform.log.warn("****************************************************************************");
-               platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
-               platform.log.warn("Please double check your eWeLink username and password in the configuration.");
-               platform.log.warn("****************************************************************************");
-            } else {
-               platform.log.warn("\n" + JSON.stringify(body, null, 2));              
-            }
-            callback();
-            return;
-         }
-         platform.authenticationToken = body.at;
-         platform.apiKey = body.user.apikey;
-         platform.wc = request.createClient("https://" + platform.apiHost);
-         platform.wc.headers["Authorization"] = "Bearer " + body.at;
-         platform.getWebSocketHost(function () {
-            callback(body.at);
-         }.bind(this));
-      }.bind(this));
-   }
    
-   getRegion (callback) {
-      var data = {};
-      data.country_code = platform.config.countryCode;
-      data.version = 8;
-      data.ts = Math.floor(new Date().getTime() / 1000);
-      data.nonce = nonce();
-      data.appid = platform.appid;
-      let query = querystring.stringify(data);
-      if (platform.debug) platform.log("Info: getRegion query [%s].", query);
-      let dataToSign = [];
-      Object.keys(data).forEach(function (key) {
-         dataToSign.push({
-            key: key,
-            value: data[key]
-         });
-      });
-      dataToSign.sort(function (a, b) {
-         return a.key < b.key ? -1 : 1;
-      });
-      dataToSign = dataToSign.map(function (kv) {
-         return kv.key + "=" + kv.value;
-      }).join("&");
-      let sign = platform.getSignature(dataToSign);
-      if (platform.debug) platform.log("Info: getRegion signature [%s].", sign);
-      let wc = request.createClient("https://api.coolkit.cc:8080");
-      wc.headers["Authorization"] = "Sign " + sign;
-      wc.headers["Content-Type"] = "application/json;charset=UTF-8";
-      wc.get("/api/user/region?" + query, function (err, res, body) {
-         if (err) {
-            if (err.code === "ENOTFOUND") {
-               platform.log.warn("****************************************************************************");
-               platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
-               platform.log.warn("Please verify that your Homebridge instance is connected to the internet....");
-               platform.log.warn("****************************************************************************");
-            } else {
-               platform.log.error("An error occurred while getting region [%s].", err);
-            }
-            callback();
-            return;
-         }
-         if (!body.region) {
-            platform.log.error("Server did not response with a region [%s]", response);
-            platform.log.warn("\n" + JSON.stringify(body, null, 2));
-            callback();
-            return;
-         }
-         let idx = platform.apiHost.indexOf("-");
-         if (idx === -1) {
-            platform.log.error("Received region [%s]. However we cannot construct the new API host url.", body.region);
-            callback();
-            return;
-         }
-         let newApiHost = body.region + platform.apiHost.substring(idx);
-         if (platform.apiHost != newApiHost) {
-            if (platform.debug) platform.log("Received region [%s], updating API host to [%s].", body.region, newApiHost);
-            platform.apiHost = newApiHost;
-         }
-         callback(body.region);
-      }.bind(this));
-   }
-   
-   getWebSocketHost(callback) {
-      let data = {};
-      data.accept = "mqtt,ws";
-      data.version = 8;
-      data.ts = Math.floor(new Date().getTime() / 1000);
-      data.nonce = nonce();
-      data.appid = platform.appid;
-      let wc = request.createClient("https://" + platform.apiHost.replace("-api", "-disp"));
-      wc.headers["Authorization"] = "Bearer " + platform.authenticationToken;
-      wc.headers["Content-Type"] = "application/json;charset=UTF-8";
-      wc.post("/dispatch/app", data, function (err, res, body) {
-         if (err) {
-            platform.log.error("An error occurred while getting web socket host [%s].", err);
-            callback();
-            return;
-         }
-         if (!body.domain) {
-            platform.log.error("Server did not response with a web socket host [%s].", response)
-            platform.log.warn("\n" + JSON.stringify(body, null, 2));
-            callback();
-            return;
-         }
-         if (platform.debug) platform.log("Web socket host received [%s].", body.domain);
-         platform.wsHost = body.domain;
-         if (platform.ws) {
-            platform.ws.url = "wss://" + body.domain + ":8080/api/ws";
-         }
-         callback(body.domain);
-      }.bind(this));
-   }
-   
-   relogin (callback) {
-      platform.login(function () {
-         if (platform.wsIsOpen) {
-            platform.ws.instance.terminate();
-            platform.ws.onclose();
-            platform.ws.reconnect();
-         }
-         callback && callback();
-      });
-   }
    
    getChannelsByUIID (uiid) {
       const UIID_TO_CHAN = {
@@ -1910,7 +1739,169 @@ class eWeLink {
       return crypto.createHmac("sha256", "6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM").update(string).digest("base64");
    }
    
-   sendWSMessage (string, callback) {
+   getRegion (callback) {
+      var data = {};
+      data.country_code = platform.config.countryCode;
+      data.version = 8;
+      data.ts = Math.floor(new Date().getTime() / 1000);
+      data.nonce = nonce();
+      data.appid = platform.appid;
+      let query = querystring.stringify(data);
+      if (platform.debug) platform.log("Function getRegion() query [%s].", query);
+      let dataToSign = [];
+      Object.keys(data).forEach(function (key) {
+         dataToSign.push({
+            key: key,
+            value: data[key]
+         });
+      });
+      dataToSign.sort(function (a, b) {
+         return a.key < b.key ? -1 : 1;
+      });
+      dataToSign = dataToSign.map(function (kv) {
+         return kv.key + "=" + kv.value;
+      }).join("&");
+      let sign = platform.getSignature(dataToSign);
+      if (platform.debug) platform.log("Function getRegion() signature [%s].", sign);
+      let wc = request.createClient("https://api.coolkit.cc:8080");
+      wc.headers["Authorization"] = "Sign " + sign;
+      wc.headers["Content-Type"] = "application/json;charset=UTF-8";
+      wc.get("/api/user/region?" + query, function (err, res, body) {
+         if (err) {
+            if (err.code === "ENOTFOUND") {
+               platform.log.warn("****************************************************************************");
+               platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
+               platform.log.warn("Please verify that your Homebridge instance is connected to the internet....");
+               platform.log.warn("****************************************************************************");
+            } else {
+               platform.log.error("An error occurred while getting region [%s].", err);
+            }
+            callback();
+            return;
+         }
+         if (!body.region) {
+            platform.log.error("Server did not response with a region [%s]", response);
+            platform.log.warn("\n" + JSON.stringify(body, null, 2));
+            callback();
+            return;
+         }
+         let idx = platform.apiHost.indexOf("-");
+         if (idx === -1) {
+            platform.log.error("Received region [%s]. However we cannot construct the new API host url.", body.region);
+            callback();
+            return;
+         }
+         let newApiHost = body.region + platform.apiHost.substring(idx);
+         if (platform.apiHost != newApiHost) {
+            if (platform.debug) platform.log("Received region [%s], updating API host to [%s].", body.region, newApiHost);
+            platform.apiHost = newApiHost;
+         }
+         callback(body.region);
+      }.bind(this));
+   }
+   
+   login (callback) {
+      var data = {};
+      if (platform.emailLogin) {
+         data.email = platform.config.username;
+      } else {
+         data.phoneNumber = platform.config.username;
+      }
+      data.password = platform.config.password;
+      data.version = 8;
+      data.ts = Math.floor(new Date().getTime() / 1000);
+      data.nonce = nonce();
+      data.appid = platform.appid;
+      if (platform.debugReqRes) platform.log.warn("Sending HTTPS login request.\n" + JSON.stringify(data, null, 2));
+      else if (platform.debug) platform.log("Sending HTTPS login request.");
+      let json = JSON.stringify(data);
+      let sign = platform.getSignature(json);
+      if (platform.debug) platform.log("Login signature [%s].", sign);
+      let wc = request.createClient("https://" + platform.apiHost);
+      wc.headers["Authorization"] = "Sign " + sign;
+      wc.headers["Content-Type"] = "application/json;charset=UTF-8";
+      wc.post("/api/user/login", data, function (err, res, body) {
+         if (err) {
+            if (err.code === "ENOTFOUND") {
+               platform.log.warn("****************************************************************************");
+               platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
+               platform.log.warn("Please verify that your Homebridge instance is connected to the internet....");
+               platform.log.warn("****************************************************************************");
+            } else {
+               platform.log.error("An error occurred while logging in. [%s].", err);
+            }
+            callback();
+            return;
+         }
+         if (body.hasOwnProperty("error") && body.error === 301 && body.hasOwnProperty("region")) {
+            let idx = platform.apiHost.indexOf("-");
+            if (idx === -1) {
+               platform.log.error("Received new region [%s]. However we cannot construct the new API host url.", body.region);
+               callback();
+               return;
+            }
+            let newApiHost = body.region + platform.apiHost.substring(idx);
+            if (platform.apiHost != newApiHost) {
+               if (platform.debug) platform.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
+               platform.apiHost = newApiHost;
+               platform.login(callback);
+               return;
+            }
+         }
+         if (!body.at) {
+            if (body.error === 401) {
+               platform.log.warn("****************************************************************************");
+               platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
+               platform.log.warn("Please double check your eWeLink username and password in the configuration.");
+               platform.log.warn("****************************************************************************");
+            } else {
+               platform.log.warn("\n" + JSON.stringify(body, null, 2));              
+            }
+            callback();
+            return;
+         }
+         platform.authenticationToken = body.at;
+         platform.apiKey = body.user.apikey;
+         platform.wc = request.createClient("https://" + platform.apiHost);
+         platform.wc.headers["Authorization"] = "Bearer " + body.at;
+         platform.wsGetHost(function () {
+            callback(body.at);
+         }.bind(this));
+      }.bind(this));
+   }
+   
+   wsGetHost (callback) {
+      let data = {};
+      data.accept = "mqtt,ws";
+      data.version = 8;
+      data.ts = Math.floor(new Date().getTime() / 1000);
+      data.nonce = nonce();
+      data.appid = platform.appid;
+      let wc = request.createClient("https://" + platform.apiHost.replace("-api", "-disp"));
+      wc.headers["Authorization"] = "Bearer " + platform.authenticationToken;
+      wc.headers["Content-Type"] = "application/json;charset=UTF-8";
+      wc.post("/dispatch/app", data, function (err, res, body) {
+         if (err) {
+            platform.log.error("An error occurred while getting web socket host [%s].", err);
+            callback();
+            return;
+         }
+         if (!body.domain) {
+            platform.log.error("Server did not response with a web socket host [%s].", response)
+            platform.log.warn("\n" + JSON.stringify(body, null, 2));
+            callback();
+            return;
+         }
+         if (platform.debug) platform.log("Web socket host received [%s].", body.domain);
+         platform.wsHost = body.domain;
+         if (platform.ws) {
+            platform.ws.url = "wss://" + body.domain + ":8080/api/ws";
+         }
+         callback(body.domain);
+      }.bind(this));
+   }
+   
+   wsSendMessage (string, callback) {
       platform.delaySend = 0;
       const delayOffset = 280;
       let sendOperation = (string) => {
@@ -1951,7 +1942,6 @@ class eWeLink {
 
 class WebSocketClient {
    constructor() {
-      this.number = 0;
       this.pendingReconnect = false;
    }
    open (url) {
@@ -1960,9 +1950,8 @@ class WebSocketClient {
       this.instance.on("open", () => {
          this.onopen();
       });
-      this.instance.on("message", (data, flags) => {
-         this.number++;
-         this.onmessage(data, flags, this.number);
+      this.instance.on("message", (data) => {
+         this.onmessage(data);
       });
       this.instance.on("close", (e) => {
          switch (e.code) {
@@ -1985,9 +1974,9 @@ class WebSocketClient {
          }
       });
    }
-   send (data, option) {
+   send (data) {
       try {
-         this.instance.send(data, option);
+         this.instance.send(data);
       } catch (e) {
          this.instance.emit("error", e);
       }
