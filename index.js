@@ -3,16 +3,12 @@ let request = require("request-json");
 let nonce = require("nonce")();
 let crypto = require("crypto");
 let convert = require("color-convert");
-let ws;
-let wc;
-let sequence;
 let platform;
 let Accessory;
 let Service;
 let Characteristic;
 let UUIDGen;
 const querystring = require("querystring");
-
 module.exports = function (homebridge) {
    Accessory = homebridge.platformAccessory;
    Service = homebridge.hap.Service;
@@ -20,7 +16,6 @@ module.exports = function (homebridge) {
    UUIDGen = homebridge.hap.uuid;
    homebridge.registerPlatform("homebridge-ewelink-sonoff", "eWeLink", eWeLink, true);
 };
-
 class eWeLink {
    constructor(log, config, api) {
       if (!log || !api) {
@@ -42,12 +37,12 @@ class eWeLink {
       platform.emailLogin = platform.config.username.includes("@") ? true : false;
       platform.apiHost = (platform.config.apiHost || "eu-api.coolkit.cc") + ":8080";
       platform.wsHost = platform.config.wsHost || "eu-pconnect3.coolkit.cc";
+      platform.wsIsOpen = false;
       platform.debug = platform.config.debug || false;
       platform.debugReqRes = platform.config.debugReqRes || false;
       platform.debugInitial = platform.config.debugInitial || false;
       platform.sensorTimeLength = platform.config.sensorTimeLength || 2;
       platform.sensorTimeDifference = platform.config.sensorTimeDifference || 120;
-      platform.webSocketOpen = false;
       platform.devicesInHB = new Map();
       platform.devicesInEwe = new Map();
       platform.devicesUnsupported = [];
@@ -91,7 +86,6 @@ class eWeLink {
             platform.wc = request.createClient("https://" + platform.apiHost);
             platform.wc.headers["Authorization"] = "Bearer " + platform.authenticationToken;
             platform.wc.get("/api/user/device?" + platform.getArguments(platform.apiKey), function (err, res, body) {
-               
                if (err) {
                   platform.log.error("An error occurred requesting devices through the API.");
                   platform.log.error("[%s].", err);
@@ -120,8 +114,12 @@ class eWeLink {
                platform.log("[%s] eWeLink devices were loaded from the Homebridge cache and will be refreshed.", platform.devicesInHB.size);
                if (primaryDeviceCount === 0) {
                   platform.log("[0] primary devices were loaded from your eWeLink account. Any orphan devices will be removed from the Homebridge cache.");
-                  platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", Array.from(platform.devicesInHB.values()));
-                  platform.devicesInHB.clear();
+                  try {
+                     platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", Array.from(platform.devicesInHB.values()));
+                     platform.devicesInHB.clear();
+                  } catch (e) {
+                     platform.log.error("Devices could not me removed from the cache - [%s].");
+                  }
                   return;
                }
                // The eWeLink devices are stored in the "platform.devicesInEwe" map with the device ID as the key (without the SW*) part.
@@ -368,7 +366,7 @@ class eWeLink {
                platform.ws = new WebSocketClient();
                platform.ws.open("wss://" + platform.wsHost + ":8080/api/ws");
                platform.ws.onopen = function (e) {
-                  platform.webSocketOpen = true;
+                  platform.wsIsOpen = true;
                   let payload = {};
                   payload.action = "userOnline";
                   payload.at = platform.authenticationToken;
@@ -541,7 +539,7 @@ class eWeLink {
                };
                platform.ws.onclose = function (e) {
                   if (platform.debug) platform.log("Web socket was closed [%s].", e);
-                  platform.webSocketOpen = false;
+                  platform.wsIsOpen = false;
                   if (platform.hbInterval) {
                      clearInterval(platform.hbInterval);
                      platform.hbInterval = null;
@@ -704,12 +702,12 @@ class eWeLink {
          accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Model, device.productModel + " (" + device.extra.extra.model + ")");
          accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.Identify, false);
          accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+         platform.devicesInHB.set(hbDeviceId, accessory);
+         platform.api.registerPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
+         if (platform.debug) platform.log("[%s] has been added to Homebridge.", newDeviceName);
       } catch (e) {
          platform.log.error("[%s] cannot be added - [%s].", accessory.displayName, e);
       }
-      platform.devicesInHB.set(hbDeviceId, accessory);
-      platform.api.registerPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
-      if (platform.debug) platform.log("[%s] has been added to Homebridge.", newDeviceName);
    }
    
    configureAccessory (accessory) {
@@ -803,9 +801,13 @@ class eWeLink {
    }
    
    removeAccessory (accessory) {
-      platform.devicesInHB.delete(accessory.context.hbDeviceId);
-      platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
-      if (platform.debug) platform.log("[%s] has been removed from Homebridge.", accessory.displayName);
+      try {
+         platform.devicesInHB.delete(accessory.context.hbDeviceId);
+         platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
+         if (platform.debug) platform.log("[%s] has been removed from Homebridge.", accessory.displayName);
+      } catch (e) {
+         platform.log.error("[%s] has not been removed - [%s].", accessory.displayName, e);
+      }
    }
    
    internalSwitchUpdate (accessory, isOn, callback) {
@@ -1192,7 +1194,7 @@ class eWeLink {
                let string = JSON.stringify(payload);
                if (platform.debugReqRes) platform.log.warn(payload);
                
-               if (platform.webSocketOpen) {
+               if (platform.wsIsOpen) {
                   platform.sendWSMessage(string, function () {
                      return;
                   });
@@ -1263,7 +1265,7 @@ class eWeLink {
       let string = JSON.stringify(payload);
       if (platform.debugReqRes) platform.log.warn(payload);
       
-      if (platform.webSocketOpen) {
+      if (platform.wsIsOpen) {
          
          setTimeout(function () {
             platform.sendWSMessage(string, function () {
@@ -1293,7 +1295,7 @@ class eWeLink {
       let string = JSON.stringify(payload);
       if (platform.debugReqRes) platform.log.warn(payload);
       
-      if (platform.webSocketOpen) {
+      if (platform.wsIsOpen) {
          
          setTimeout(function () {
             platform.sendWSMessage(string, function () {
@@ -1823,7 +1825,7 @@ class eWeLink {
    
    relogin (callback) {
       platform.login(function () {
-         if (platform.webSocketOpen) {
+         if (platform.wsIsOpen) {
             platform.ws.instance.terminate();
             platform.ws.onclose();
             platform.ws.reconnect();
@@ -1912,7 +1914,7 @@ class eWeLink {
       platform.delaySend = 0;
       const delayOffset = 280;
       let sendOperation = (string) => {
-         if (!platform.webSocketOpen) {
+         if (!platform.wsIsOpen) {
             setTimeout(() => {
                sendOperation(string);
             }, delayOffset);
@@ -1930,11 +1932,11 @@ class eWeLink {
             platform.delaySend -= delayOffset;
          }
       };
-      if (!platform.webSocketOpen) {
+      if (!platform.wsIsOpen) {
          if (platform.debug) platform.log("Socket was closed. It will reconnect automatically.");
          let interval;
          let waitToSend = (string) => {
-            if (platform.webSocketOpen) {
+            if (platform.wsIsOpen) {
                clearInterval(interval);
                sendOperation(string);
             }
