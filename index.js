@@ -84,65 +84,206 @@ class eWeLink {
             let afterLogin = function () {
                if (platform.debug) platform.log("Authorisation token received [%s].", platform.authenticationToken);
                if (platform.debug) platform.log("User API key received [%s].", platform.apiKey);
-               // Let's open a web socket to the eWeLink server to receive real-time updates about external changes to devices.
-               // Reason for doing it before the initial HTTP request is to give just a little more time to set up.
-               if (platform.debug) platform.log("Opening web socket for real time updates.");
-               platform.ws = new WebSocketClient();
-               platform.ws.open("wss://" + platform.wsHost + ":8080/api/ws");
-               platform.ws.onopen = function (e) {
-                  platform.webSocketOpen = true;
-                  let payload = {};
-                  payload.action = "userOnline";
-                  payload.at = platform.authenticationToken;
-                  payload.apikey = platform.apiKey;
-                  payload.appid = platform.appid;
-                  payload.nonce = nonce();
-                  payload.ts = Math.floor(new Date() / 1000);
-                  payload.userAgent = "app";
-                  payload.sequence = Math.floor(new Date());
-                  payload.version = 8;
-                  if (platform.debugReqRes) platform.log.warn("Sending web socket login request.\n" + JSON.stringify(payload, null, 2));
-                  else if (platform.debug) platform.log("Sending web socket login request.");
-                  platform.ws.send(JSON.stringify(payload));
-               };
-               platform.ws.onmessage = function (message) {
-                  if (message === "pong") return;
-                  if (platform.debugReqRes) platform.log.warn("Web socket message received.\n" + JSON.stringify(JSON.parse(message), null, 2));
-                  else if (platform.debug) platform.log("Web socket message received.");
-                  let device;
-                  try {
-                     device = JSON.parse(message);
-                  } catch (e) {
-                     if (platform.debug) platform.log.warn("An error occured reading the web socket message.");
-                     if (platform.debug) platform.log.warn(e);
+               
+               // Get a list of all devices from eWeLink via the HTTPS API, and compare it to the list of Homebridge cached devices (and then vice versa).
+               // New devices will be added, existing devices will be refreshed and those in the Homebridge cache but not in the web list will be removed.
+               if (platform.debug) platform.log("Requesting a list of devices through the eWeLink HTTPS API.");
+               platform.webClient = request.createClient("https://" + platform.apiHost);
+               platform.webClient.headers["Authorization"] = "Bearer " + platform.authenticationToken;
+               platform.webClient.get("/api/user/device?" + platform.getArguments(platform.apiKey), function (err, res, body) {
+                  
+                  if (err) {
+                     platform.log.error("An error occurred requesting devices through the API.");
+                     platform.log.error("[%s].", err);
+                     return;
+                  } else if (!body) {
+                     platform.log.error("An error occurred requesting devices through the API.");
+                     platform.log.error("[No data in response].");
+                     return;
+                  } else if (body.hasOwnProperty("error") && body.error != 0) {
+                     let response = JSON.stringify(body);
+                     if (platform.debugReqRes) platform.log.warn(response);
+                     platform.log.error("An error occurred requesting devices through the API.");
+                     if (body.error === 401) {
+                        platform.log.error("[Authorisation token error].");
+                     } else if (body.error === 406) {
+                        platform.log.warn("****************************************************************************");
+                        platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
+                        platform.log.warn("Please double check your eWeLink username and password in the configuration.");
+                        platform.log.warn("****************************************************************************");
+                     } else {
+                        platform.log.error("[%s].", response);
+                     }
                      return;
                   }
-                  if (device.hasOwnProperty("action")) {
-                     let idToCheck = device.deviceid;
-                     let accessory;
-                     let channelCount;
-                     let group;
-                     let i;
-                     if (device.action === "update" && device.hasOwnProperty("params")) {
-                        if (platform.debug) platform.log("External update received via web socket.");
-                        if (platform.devicesInHB.has(idToCheck + "SW0") || platform.devicesInHB.has(idToCheck + "SWX")) {
-                           if (platform.devicesInHB.has(idToCheck + "SWX")) {
-                              accessory = platform.devicesInHB.get(idToCheck + "SWX");
-                           } else {
-                              accessory = platform.devicesInHB.get(idToCheck + "SW0");
+                  let eWeLinkDevices = body.devicelist;
+                  let primaryDeviceCount = Object.keys(eWeLinkDevices).length;
+                  platform.log("[%s] eWeLink devices were loaded from the Homebridge cache and will be refreshed.", platform.devicesInHB.size);
+                  if (primaryDeviceCount === 0) {
+                     platform.log("[0] primary devices were loaded from your eWeLink account. Any orphan devices will be removed from the Homebridge cache.");
+                     platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", Array.from(platform.devicesInHB.values()));
+                     platform.devicesInHB.clear();
+                     return;
+                  }
+                  // The eWeLink devices are stored in the "platform.devicesInEwe" map with the device ID as the key (without the SW*) part.
+                  if (platform.debugInitial) platform.log.warn(JSON.stringify(eWeLinkDevices, null, 2));
+                  eWeLinkDevices.forEach((device) => {
+                     if (!platform.devicesUnsupported.includes(device.uiid)) {
+                        platform.devicesInEwe.set(device.deviceid, device);
+                     }
+                  });
+                  // Blind groupings found in the configuration are set in the "platform.deviceGroups" map.
+                  if (platform.config["groups"] && Object.keys(platform.config.groups).length > 0) {
+                     platform.config.groups.forEach((group) => {
+                        if (typeof group.deviceId !== "undefined" && platform.devicesInEwe.has(group.deviceId + "SWX")) {
+                           platform.deviceGroups.set(group.deviceId + "SWX", group);
+                        }
+                     });
+                  }
+                  platform.log("[%s] primary devices were loaded from your eWeLink account.", primaryDeviceCount);
+                  platform.log("[%s] groups were loaded from the Homebridge configuration.", platform.deviceGroups.size);
+                  if (platform.debug) platform.log("Checking if devices need to be removed from the Homebridge cache.");
+                  // Check that each accessory in the cache appears in the API response [each device in platform.devicesInHB is in [platform.devicesInEwe].
+                  if (platform.devicesInHB.size > 0) {
+                     platform.devicesInHB.forEach((accessory) => {
+                        let hbDeviceId = accessory.context.hbDeviceId;
+                        let idToCheck = accessory.context.eweDeviceId;
+                        if (!platform.devicesInEwe.has(idToCheck)) {
+                           // The cached device wasn't found in the eWeLink response so remove.
+                           if (platform.debug) platform.log("[%s] was not present in the API response so removing from Homebridge.", accessory.displayName);
+                           platform.removeAccessory(accessory);
+                        }
+                     });
+                  }
+                  if (platform.debug) platform.log("Checking if devices need to be added/refreshed in the Homebridge cache.");
+                  //  Checking that each device from the API response exists in Homebridge [each device in platform.devicesInEwe is in "platform.devicesInHB"].
+                  if (platform.devicesInEwe.size > 0) {
+                     platform.devicesInEwe.forEach((device) => {
+                        let idToCheck = device.deviceid;
+                        let services = {};
+                        let accessory;
+                        let group;
+                        let channelCount;
+                        let i;
+                        //**************************//
+                        // ADD NON EXISTING DEVICES //
+                        //**************************//
+                        if (!platform.devicesInHB.has(idToCheck + "SWX") && !platform.devicesInHB.has(idToCheck + "SW0")) {
+                           //********//
+                           // BLINDS //
+                           //********//
+                           if (platform.deviceGroups.has(idToCheck)) {
+                              group = platform.deviceGroups.get(idToCheck);
+                              if (group.type === "blind" && Array.isArray(device.params.switches)) {
+                                 services.blind = true;
+                                 services.group = group;
+                                 platform.addAccessory(device, idToCheck + "SWX", services);
+                              }
                            }
-                           if (!accessory.reachable) {
+                           //******//
+                           // FANS //
+                           //******//                                  
+                           else if (platform.devicesFan.includes(device.uiid)) {
+                              if (Array.isArray(device.params.switches)) {
+                                 services.fan = true;
+                                 platform.addAccessory(device, idToCheck + "SWX", services);
+                              }
+                           }
+                           //*************//
+                           // THERMOSTATS //
+                           //*************//                                                                              
+                           else if (platform.devicesThermostat.includes(device.uiid)) {
+                              services.thermostatSwitch = true;
+                              services.temperature = true;
+                              if (device.params.sensorType != "DS18B20") services.humidity = true;
+                              platform.addAccessory(device, idToCheck + "SWX", services);
+                           }
+                           //*********//
+                           // OUTLETS //
+                           //*********//       
+                           else if (platform.devicesOutlets.includes(device.uiid)) {
+                              services.outlet = true;
+                              platform.addAccessory(device, idToCheck + "SWX", services);
+                           }
+                           //************************//
+                           // LIGHTS [SINGLE SWITCH] //
+                           //************************//
+                           else if (platform.devicesSingleSwitch.includes(device.uiid) && platform.devicesSingleSwitchLight.includes(device.productModel)) {
+                              if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("state")) {
+                                 services.lightbulb = true;
+                                 if (platform.devicesColourable.includes(device.uiid)) services.colourable = true;
+                                 if (platform.devicesDimmable.includes(device.uiid)) services.dimmable = true;
+                                 if (platform.devicesDimmableAndColourable.includes(device.uiid)) services.dimmableAndColourable = true;
+                                 platform.addAccessory(device, idToCheck + "SWX", services);
+                              }
+                           }
+                           //***********************//
+                           // LIGHTS [MULTI SWITCH] //
+                           //***********************//
+                           else if (platform.devicesMultiSwitch.includes(device.uiid) && platform.devicesMultiSwitchLight.includes(device.productModel)) {
+                              if (Array.isArray(device.params.switches)) {
+                                 services.lightbulb = true;
+                                 channelCount = platform.getChannelsByUIID(device.uiid);
+                                 for (i = 0; i <= channelCount; i++) {
+                                    platform.addAccessory(device, idToCheck + "SW" + i, services);
+                                 }
+                              }
+                           }
+                           //***********************//
+                           // OTHER SINGLE SWITCHES //
+                           //***********************//          
+                           else if (platform.devicesSingleSwitch.includes(device.uiid)) {
+                              if (device.params.hasOwnProperty("switch")) {
+                                 services.switch = true;
+                                 platform.addAccessory(device, idToCheck + "SWX", services);
+                              }
+                           }
+                           //**********************//
+                           // OTHER MULTI SWITCHES //
+                           //**********************//
+                           else if (platform.devicesMultiSwitch.includes(device.uiid)) {
+                              if (Array.isArray(device.params.switches)) {
+                                 services.switch = true;
+                                 channelCount = platform.getChannelsByUIID(device.uiid);
+                                 for (i = 0; i <= channelCount; i++) {
+                                    platform.addAccessory(device, idToCheck + "SW" + i, services);
+                                 }
+                              }
+                           }
+                           //*********//
+                           // BRIDGES //
+                           //*********//          
+                           else if (platform.devicesBridge.includes(device.uiid)) {
+                              if (device.params.hasOwnProperty("rfList")) {
+                                 services.bridge = true;
+                                 services.bridgeDeviceCount = Object.keys(device.params.rfList).length;
+                                 for (i = 0; i <= Object.keys(device.params.rfList).length; i++) {
+                                    platform.addAccessory(device, idToCheck + "SW" + i, services);
+                                 }
+                              }
+                           } else {
+                              platform.log.warn("[%s] There has been a problem adding this device.", device.name);
+                           }
+                        }
+                        //*****************************************//
+                        // REFRESH EXISTING AND JUST ADDED DEVICES //
+                        //*****************************************//
+                        if (platform.devicesInHB.has(idToCheck + "SWX") || platform.devicesInHB.has(idToCheck + "SW0")) {
+                           if (platform.devicesInHB.has(idToCheck + "SWX")) accessory = platform.devicesInHB.get(idToCheck + "SWX");
+                           else accessory = platform.devicesInHB.get(idToCheck + "SW0");
+                           if (!device.online) {
                               platform.log.warn("[%s] has been reported offline so cannot refresh.", accessory.displayName);
                               return;
                            }
                            if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
                            accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                           accessory.reachable = true;
                            //********//
                            // BLINDS //
                            //********//       
                            if (platform.deviceGroups.has(idToCheck + "SWX")) {
                               group = platform.deviceGroups.get(idToCheck + "SWX");
-                              if (group.type === "blind" && Array.isArray(device.params.switches)) {
+                              if (group.type === "blind" && Array.isArray(device.params)) {
                                  platform.externalBlindUpdate(idToCheck + "SWX", device.params);
                                  return;
                               }
@@ -214,258 +355,78 @@ class eWeLink {
                            // BRIDGES //
                            //*********//
                            else if (platform.devicesBridge.includes(accessory.context.eweUIID)) {
-                              if (device.params.hasOwnProperty("cmd") && device.params.cmd === "trigger") {
+                              if (Array.isArray(device.params)) {
                                  platform.externalBridgeUpdate(idToCheck + "SW0", device.params);
                                  return;
                               }
                            }
-                           //**********************//
-                           // CATCH OTHER MESSAGES //
-                           //**********************//
-                           if (device.params.hasOwnProperty("power") || device.params.hasOwnProperty("rssi") || device.params.hasOwnProperty("uiActive")) {
-                              return;
-                           }
-                           
-                           platform.log.warn("[%s] could not be refreshed due to a hiccup in the eWeLink message.", device.deviceid);
                         } else {
-                           platform.log.warn("[%s] Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.", device.deviceid);
-                        }
-                     } else if (device.action === "sysmsg") {
-                        if (platform.devicesInHB.has(device.deviceid + "SWX")) {
-                           accessory = platform.devicesInHB.get(device.deviceid + "SWX");
-                        } else if (platform.devicesInHB.has(device.deviceid + "SW0")) {
-                           accessory = platform.devicesInHB.get(device.deviceid + "SW0");
-                        } else {
-                           accessory = false;
-                        }
-                        if (accessory) {
-                           accessory.reachable = device.params.online;
-                           if (accessory.reachable) platform.log("[%s] has been reported online.", accessory.displayName);
-                           else platform.log.warn("[%s] has been reported offline.", accessory.displayName);
-                        } else {
-                           platform.log.warn("A device that you don't have in Homebridge has been reported [%s].", device.online ? "online" : "offline");
-                        }
-                     } else {
-                        if (platform.debug) platform.log.error("Unknown action property or no parameters received via web socket.");
-                     }
-                  } else if (device.hasOwnProperty("config") && device.config.hb && device.config.hbInterval) {
-                     if (!platform.hbInterval) {
-                        platform.hbInterval = setInterval(function () {
-                           platform.ws.send("ping");
-                        }, device.config.hbInterval * 1000);
-                     }
-                  } else {
-                     if (platform.debug) platform.log.warn("Unknown command received via web socket.");
-                  }
-               };
-               platform.ws.onclose = function (e) {
-                  if (platform.debug) platform.log("Web socket was closed [%s].", e);
-                  platform.webSocketOpen = false;
-                  if (platform.hbInterval) {
-                     clearInterval(platform.hbInterval);
-                     platform.hbInterval = null;
-                  }
-               };
-               // Get a list of all devices from eWeLink via the HTTPS API, and compare it to the list of Homebridge cached devices (and then vice versa).
-               // New devices will be added, existing devices will be refreshed and those in the Homebridge cache but not in the web list will be removed.
-               if (platform.webSocketOpen) {
-                  if (platform.debug) platform.log("Requesting a list of devices through the eWeLink HTTPS API.");
-                  platform.webClient = request.createClient("https://" + platform.apiHost);
-                  platform.webClient.headers["Authorization"] = "Bearer " + platform.authenticationToken;
-                  platform.webClient.get("/api/user/device?" + platform.getArguments(platform.apiKey), function (err, res, body) {
-                     
-                     if (err) {
-                        platform.log.error("An error occurred requesting devices through the API.");
-                        platform.log.error("[%s].", err);
-                        return;
-                     } else if (!body) {
-                        platform.log.error("An error occurred requesting devices through the API.");
-                        platform.log.error("[No data in response].");
-                        return;
-                     } else if (body.hasOwnProperty("error") && body.error != 0) {
-                        let response = JSON.stringify(body);
-                        if (platform.debugReqRes) platform.log.warn(response);
-                        platform.log.error("An error occurred requesting devices through the API.");
-                        if (body.error === 401) {
-                           platform.log.error("[Authorisation token error].");
-                        } else if (body.error === 406) {
-                           platform.log.warn("****************************************************************************");
-                           platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
-                           platform.log.warn("Please double check your eWeLink username and password in the configuration.");
-                           platform.log.warn("****************************************************************************");
-                        } else {
-                           platform.log.error("[%s].", response);
-                        }
-                        return;
-                     }
-                     let eWeLinkDevices = body.devicelist;
-                     let primaryDeviceCount = Object.keys(eWeLinkDevices).length;
-                     platform.log("[%s] eWeLink devices were loaded from the Homebridge cache and will be refreshed.", platform.devicesInHB.size);
-                     if (primaryDeviceCount === 0) {
-                        platform.log("[0] primary devices were loaded from your eWeLink account. Any orphan devices will be removed from the Homebridge cache.");
-                        platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", Array.from(platform.devicesInHB.values()));
-                        platform.devicesInHB.clear();
-                        return;
-                     }
-                     // The eWeLink devices are stored in the "platform.devicesInEwe" map with the device ID as the key (without the SW*) part.
-                     if (platform.debugInitial) platform.log.warn(JSON.stringify(eWeLinkDevices, null, 2));
-                     eWeLinkDevices.forEach((device) => {
-                        if (!platform.devicesUnsupported.includes(device.uiid)) {
-                           platform.devicesInEwe.set(device.deviceid, device);
+                           platform.log.warn("[%s] There has been a problem refreshing this device.", device.name);
                         }
                      });
-                     // Blind groupings found in the configuration are set in the "platform.deviceGroups" map.
-                     if (platform.config["groups"] && Object.keys(platform.config.groups).length > 0) {
-                        platform.config.groups.forEach((group) => {
-                           if (typeof group.deviceId !== "undefined" && platform.devicesInEwe.has(group.deviceId + "SWX")) {
-                              platform.deviceGroups.set(group.deviceId + "SWX", group);
-                           }
-                        });
+                  }
+                  
+                  // Let's open a web socket to the eWeLink server to receive real-time updates about external changes to devices.
+                  if (platform.debug) platform.log("Opening web socket for real time updates.");
+                  platform.ws = new WebSocketClient();
+                  platform.ws.open("wss://" + platform.wsHost + ":8080/api/ws");
+                  platform.ws.onopen = function (e) {
+                     platform.webSocketOpen = true;
+                     let payload = {};
+                     payload.action = "userOnline";
+                     payload.at = platform.authenticationToken;
+                     payload.apikey = platform.apiKey;
+                     payload.appid = platform.appid;
+                     payload.nonce = nonce();
+                     payload.ts = Math.floor(new Date() / 1000);
+                     payload.userAgent = "app";
+                     payload.sequence = Math.floor(new Date());
+                     payload.version = 8;
+                     if (platform.debugReqRes) platform.log.warn("Sending web socket login request.\n" + JSON.stringify(payload, null, 2));
+                     else if (platform.debug) platform.log("Sending web socket login request.");
+                     platform.ws.send(JSON.stringify(payload));
+                  };
+                  platform.ws.onerror = function (e) {
+                     platform.log(e);
+                  }
+                  platform.ws.onmessage = function (message) {
+                     if (message === "pong") return;
+                     if (platform.debugReqRes) platform.log.warn("Web socket message received.\n" + JSON.stringify(JSON.parse(message), null, 2));
+                     else if (platform.debug) platform.log("Web socket message received.");
+                     let device;
+                     try {
+                        device = JSON.parse(message);
+                     } catch (e) {
+                        if (platform.debug) platform.log.warn("An error occured reading the web socket message.");
+                        if (platform.debug) platform.log.warn(e);
+                        return;
                      }
-                     platform.log("[%s] primary devices were loaded from your eWeLink account.", primaryDeviceCount);
-                     platform.log("[%s] groups were loaded from the Homebridge configuration.", platform.deviceGroups.size);
-                     if (platform.debug) platform.log("Checking if devices need to be removed from the Homebridge cache.");
-                     // Check that each accessory in the cache appears in the API response [each device in platform.devicesInHB is in [platform.devicesInEwe].
-                     if (platform.devicesInHB.size > 0) {
-                        platform.devicesInHB.forEach((accessory) => {
-                           let hbDeviceId = accessory.context.hbDeviceId;
-                           let idToCheck = accessory.context.eweDeviceId;
-                           if (!platform.devicesInEwe.has(idToCheck)) {
-                              // The cached device wasn't found in the eWeLink response so remove.
-                              if (platform.debug) platform.log("[%s] was not present in the API response so removing from Homebridge.", accessory.displayName);
-                              platform.removeAccessory(accessory);
-                           }
-                        });
-                     }
-                     if (platform.debug) platform.log("Checking if devices need to be added/refreshed in the Homebridge cache.");
-                     //  Checking that each device from the API response exists in Homebridge [each device in platform.devicesInEwe is in "platform.devicesInHB"].
-                     if (platform.devicesInEwe.size > 0) {
-                        platform.devicesInEwe.forEach((device) => {
-                           let idToCheck = device.deviceid;
-                           let services = {};
-                           let accessory;
-                           let group;
-                           let channelCount;
-                           let i;
-                           //**************************//
-                           // ADD NON EXISTING DEVICES //
-                           //**************************//
-                           if (!platform.devicesInHB.has(idToCheck + "SWX") && !platform.devicesInHB.has(idToCheck + "SW0")) {
-                              //********//
-                              // BLINDS //
-                              //********//
-                              if (platform.deviceGroups.has(idToCheck)) {
-                                 group = platform.deviceGroups.get(idToCheck);
-                                 if (group.type === "blind" && Array.isArray(device.params.switches)) {
-                                    services.blind = true;
-                                    services.group = group;
-                                    platform.addAccessory(device, idToCheck + "SWX", services);
-                                 }
-                              }
-                              //******//
-                              // FANS //
-                              //******//                                  
-                              else if (platform.devicesFan.includes(device.uiid)) {
-                                 if (Array.isArray(device.params.switches)) {
-                                    services.fan = true;
-                                    platform.addAccessory(device, idToCheck + "SWX", services);
-                                 }
-                              }
-                              //*************//
-                              // THERMOSTATS //
-                              //*************//                                                                              
-                              else if (platform.devicesThermostat.includes(device.uiid)) {
-                                 services.thermostatSwitch = true;
-                                 services.temperature = true;
-                                 if (device.params.sensorType != "DS18B20") services.humidity = true;
-                                 platform.addAccessory(device, idToCheck + "SWX", services);
-                              }
-                              //*********//
-                              // OUTLETS //
-                              //*********//       
-                              else if (platform.devicesOutlets.includes(device.uiid)) {
-                                 services.outlet = true;
-                                 platform.addAccessory(device, idToCheck + "SWX", services);
-                              }
-                              //************************//
-                              // LIGHTS [SINGLE SWITCH] //
-                              //************************//
-                              else if (platform.devicesSingleSwitch.includes(device.uiid) && platform.devicesSingleSwitchLight.includes(device.productModel)) {
-                                 if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("state")) {
-                                    services.lightbulb = true;
-                                    if (platform.devicesColourable.includes(device.uiid)) services.colourable = true;
-                                    if (platform.devicesDimmable.includes(device.uiid)) services.dimmable = true;
-                                    if (platform.devicesDimmableAndColourable.includes(device.uiid)) services.dimmableAndColourable = true;
-                                    platform.addAccessory(device, idToCheck + "SWX", services);
-                                 }
-                              }
-                              //***********************//
-                              // LIGHTS [MULTI SWITCH] //
-                              //***********************//
-                              else if (platform.devicesMultiSwitch.includes(device.uiid) && platform.devicesMultiSwitchLight.includes(device.productModel)) {
-                                 if (Array.isArray(device.params.switches)) {
-                                    services.lightbulb = true;
-                                    channelCount = platform.getChannelsByUIID(device.uiid);
-                                    for (i = 0; i <= channelCount; i++) {
-                                       platform.addAccessory(device, idToCheck + "SW" + i, services);
-                                    }
-                                 }
-                              }
-                              //***********************//
-                              // OTHER SINGLE SWITCHES //
-                              //***********************//          
-                              else if (platform.devicesSingleSwitch.includes(device.uiid)) {
-                                 if (device.params.hasOwnProperty("switch")) {
-                                    services.switch = true;
-                                    platform.addAccessory(device, idToCheck + "SWX", services);
-                                 }
-                              }
-                              //**********************//
-                              // OTHER MULTI SWITCHES //
-                              //**********************//
-                              else if (platform.devicesMultiSwitch.includes(device.uiid)) {
-                                 if (Array.isArray(device.params.switches)) {
-                                    services.switch = true;
-                                    channelCount = platform.getChannelsByUIID(device.uiid);
-                                    for (i = 0; i <= channelCount; i++) {
-                                       platform.addAccessory(device, idToCheck + "SW" + i, services);
-                                    }
-                                 }
-                              }
-                              //*********//
-                              // BRIDGES //
-                              //*********//          
-                              else if (platform.devicesBridge.includes(device.uiid)) {
-                                 if (device.params.hasOwnProperty("rfList")) {
-                                    services.bridge = true;
-                                    services.bridgeDeviceCount = Object.keys(device.params.rfList).length;
-                                    for (i = 0; i <= Object.keys(device.params.rfList).length; i++) {
-                                       platform.addAccessory(device, idToCheck + "SW" + i, services);
-                                    }
-                                 }
+                     if (device.hasOwnProperty("action")) {
+                        let idToCheck = device.deviceid;
+                        let accessory;
+                        let channelCount;
+                        let group;
+                        let i;
+                        if (device.action === "update" && device.hasOwnProperty("params")) {
+                           if (platform.debug) platform.log("External update received via web socket.");
+                           if (platform.devicesInHB.has(idToCheck + "SW0") || platform.devicesInHB.has(idToCheck + "SWX")) {
+                              if (platform.devicesInHB.has(idToCheck + "SWX")) {
+                                 accessory = platform.devicesInHB.get(idToCheck + "SWX");
                               } else {
-                                 platform.log.warn("[%s] There has been a problem adding this device.", device.name);
+                                 accessory = platform.devicesInHB.get(idToCheck + "SW0");
                               }
-                           }
-                           //*****************************************//
-                           // REFRESH EXISTING AND JUST ADDED DEVICES //
-                           //*****************************************//
-                           if (platform.devicesInHB.has(idToCheck + "SWX") || platform.devicesInHB.has(idToCheck + "SW0")) {
-                              if (platform.devicesInHB.has(idToCheck + "SWX")) accessory = platform.devicesInHB.get(idToCheck + "SWX");
-                              else accessory = platform.devicesInHB.get(idToCheck + "SW0");
-                              if (!device.online) {
+                              if (!accessory.reachable) {
                                  platform.log.warn("[%s] has been reported offline so cannot refresh.", accessory.displayName);
                                  return;
                               }
                               if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
                               accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                              accessory.reachable = true;
                               //********//
                               // BLINDS //
                               //********//       
                               if (platform.deviceGroups.has(idToCheck + "SWX")) {
                                  group = platform.deviceGroups.get(idToCheck + "SWX");
-                                 if (group.type === "blind" && Array.isArray(device.params)) {
+                                 if (group.type === "blind" && Array.isArray(device.params.switches)) {
                                     platform.externalBlindUpdate(idToCheck + "SWX", device.params);
                                     return;
                                  }
@@ -537,19 +498,62 @@ class eWeLink {
                               // BRIDGES //
                               //*********//
                               else if (platform.devicesBridge.includes(accessory.context.eweUIID)) {
-                                 if (Array.isArray(device.params)) {
+                                 if (device.params.hasOwnProperty("cmd") && device.params.cmd === "trigger") {
                                     platform.externalBridgeUpdate(idToCheck + "SW0", device.params);
                                     return;
                                  }
                               }
+                              //**********************//
+                              // CATCH OTHER MESSAGES //
+                              //**********************//
+                              if (device.params.hasOwnProperty("power") || device.params.hasOwnProperty("rssi") || device.params.hasOwnProperty("uiActive")) {
+                                 return;
+                              }
+                              
+                              platform.log.warn("[%s] could not be refreshed due to a hiccup in the eWeLink message.", device.deviceid);
                            } else {
-                              platform.log.warn("[%s] There has been a problem refreshing this device.", device.name);
+                              platform.log.warn("[%s] Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.", device.deviceid);
                            }
-                        });
+                        } else if (device.action === "sysmsg") {
+                           if (platform.devicesInHB.has(device.deviceid + "SWX")) {
+                              accessory = platform.devicesInHB.get(device.deviceid + "SWX");
+                           } else if (platform.devicesInHB.has(device.deviceid + "SW0")) {
+                              accessory = platform.devicesInHB.get(device.deviceid + "SW0");
+                           } else {
+                              accessory = false;
+                           }
+                           if (accessory) {
+                              accessory.reachable = device.params.online;
+                              if (accessory.reachable) platform.log("[%s] has been reported online.", accessory.displayName);
+                              else platform.log.warn("[%s] has been reported offline.", accessory.displayName);
+                           } else {
+                              platform.log.warn("A device that you don't have in Homebridge has been reported [%s].", device.online ? "online" : "offline");
+                           }
+                        } else {
+                           if (platform.debug) platform.log.error("Unknown action property or no parameters received via web socket.");
+                        }
+                     } else if (device.hasOwnProperty("config") && device.config.hb && device.config.hbInterval) {
+                        if (!platform.hbInterval) {
+                           platform.hbInterval = setInterval(function () {
+                              platform.ws.send("ping");
+                           }, device.config.hbInterval * 1000);
+                        }
+                     } else {
+                        if (platform.debug) platform.log.warn("Unknown command received via web socket.");
                      }
-                     platform.log("Plugin initialisation has been successful.");
-                  });
-               }
+                  };
+                  platform.ws.onclose = function (e) {
+                     if (platform.debug) platform.log("Web socket was closed [%s].", e);
+                     platform.webSocketOpen = false;
+                     if (platform.hbInterval) {
+                        clearInterval(platform.hbInterval);
+                        platform.hbInterval = null;
+                     }
+                  };
+                  platform.log("Plugin initialisation has been successful.");
+               });
+               
+               
             };
             platform.getRegion(platform.config.countryCode, function () {
                platform.login(afterLogin.bind(platform));
@@ -1200,6 +1204,7 @@ class eWeLink {
          payload.params.state = newRGB ? "on" : "off";
          payload.params.switch = newRGB ? "on" : "off";
          if (platform.debug) platform.log("[%s] requesting to change turn [%s].", accessory.displayName, payload.params.state);
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newRGB);
       }
       platform.sendWSMessage(JSON.stringify(payload), callback);
    }
@@ -1966,7 +1971,14 @@ class eWeLink {
       webClient.headers["Content-Type"] = "application/json;charset=UTF-8";
       webClient.post("/api/user/login", data, function (err, res, body) {
          if (err) {
-            platform.log.error("An error occurred while logging in. [%s].", err);
+            if (err.code === "ENOTFOUND") {
+               platform.log.warn("****************************************************************************");
+               platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
+               platform.log.warn("Please verify that your Homebridge instance is connected to the internet....");
+               platform.log.warn("****************************************************************************");
+            } else {
+               platform.log.error("An error occurred while logging in. [%s].", err);
+            }
             callback();
             return;
          }
@@ -2040,7 +2052,14 @@ class eWeLink {
       webClient.headers["Content-Type"] = "application/json;charset=UTF-8";
       webClient.get("/api/user/region?" + query, function (err, res, body) {
          if (err) {
-            platform.log.error("An error occurred while getting region [%s].", err);
+            if (err.code === "ENOTFOUND") {
+               platform.log.warn("****************************************************************************");
+               platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
+               platform.log.warn("Please verify that your Homebridge instance is connected to the internet....");
+               platform.log.warn("****************************************************************************");
+            } else {
+               platform.log.error("An error occurred while getting region [%s].", err);
+            }
             callback();
             return;
          }
@@ -2268,8 +2287,11 @@ class WebSocketClient {
             case "ECONNREFUSED":
             this.reconnect(e);
             break;
+            case "ENOTFOUND":
+            return;
+            break;
             default:
-            this.onerror(e);
+            return;
             break;
          }
       });
@@ -2291,4 +2313,17 @@ class WebSocketClient {
          that.open(that.url);
       }, 5000);
    }
+   onopen (e) {
+      // console.log("WebSocketClient: open", arguments);
+   }
+   onmessage (data, flags, number) {
+      // console.log("WebSocketClient: message", arguments);
+   }
+   onerror (e) {
+      console.log("WebSocketClient: error", arguments);
+   }
+   onclose     (e) {
+      // console.log("WebSocketClient: closed", arguments);
+   }
+   
 }
