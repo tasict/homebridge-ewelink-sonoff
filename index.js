@@ -1661,49 +1661,56 @@ class eWeLink {
       let accessory = platform.devicesInHB.get(hbDeviceId);
       let newColour;
       let mode;
-      if (params.hasOwnProperty("switch")) {
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switch === "on");
-      } else if (params.hasOwnProperty("state")) {
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.state === "on");
-      }
-      if (params.hasOwnProperty("bright")) {
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.bright);
-      } else if (params.hasOwnProperty("brightness")) {
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.brightness);
-      }
-      if (params.hasOwnProperty("colorR")) { // L1
-         newColour = convert.rgb.hsl(params.colorR, params.colorG, params.colorB);
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
-      }
-      if (params.hasOwnProperty("zyx_mode")) { // B1
-         mode = parseInt(params.zyx_mode);
-      } else if (params.hasOwnProperty("channel0")) {
-         mode = 1;
-      } else if (params.hasOwnProperty("channel2")) {
-         mode = 2;
-      } else {
-         mode = 0;
-      }
-      if (mode === 1) {
-         
-         // between 25 and 255
-         // three "types" -> "cold" "middle" "warm"
-         
-         // cold -> channel0 = 25->255 channel1 = 0
-         // middle -> channel0 = channel1 = 25->255
-         // warm -> channel0 = 0 channel1 = 25->255
-         
-         platform.log.warn("[%s] has been set to colour temperature mode which is not supported.", accessory.displayName);
-      } else if (mode === 2) {
-         if (parseInt(params.channel2) + parseInt(params.channel3) + parseInt(params.channel4) === 0) {
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
-         } else {
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
-            newColour = convert.rgb.hsv(parseInt(params.channel2), parseInt(params.channel3), parseInt(params.channel4));
+      let isOn = false;
+      if (params.hasOwnProperty("state")) isOn = params.state === "on";
+      else if (params.hasOwnProperty("switch")) isOn = params.switch === "on";
+      
+      if (isOn) {
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
+         if (params.hasOwnProperty("bright")) {
+            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.bright);
+         } else if (params.hasOwnProperty("brightness")) {
+            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.brightness);
+         }
+         if (params.hasOwnProperty("colorR")) { // L1
+            newColour = convert.rgb.hsl(params.colorR, params.colorG, params.colorB);
             accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
+            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
+         }
+         if (params.hasOwnProperty("zyx_mode")) { // B1
+            mode = parseInt(params.zyx_mode);
+         } else if (params.hasOwnProperty("channel0")) {
+            mode = 1;
+         } else if (params.hasOwnProperty("channel2")) {
+            mode = 2;
+         } else {
+            mode = 0;
+         }
+         if (mode === 1) {
+            
+            // between 25 and 255
+            // three "types" -> "cold" "middle" "warm"
+            
+            // cold -> channel0 = 25->255 channel1 = 0
+            // middle -> channel0 = channel1 = 25->255
+            // warm -> channel0 = 0 channel1 = 25->255
+            
+            platform.log.warn("[%s] has been set to colour temperature mode which is not supported.", accessory.displayName);
+         } else if (mode === 2) {
+            if (parseInt(params.channel2) + parseInt(params.channel3) + parseInt(params.channel4) === 0) {
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
+            } else {
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
+               newColour = convert.rgb.hsv(parseInt(params.channel2), parseInt(params.channel3), parseInt(params.channel4));
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
+            }
+         }
+      } else {
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
+         if (params.hasOwnProperty("bright") || params.hasOwnProperty("brightness")) {
+            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 0);
          }
       }
       return;
