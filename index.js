@@ -1183,7 +1183,6 @@ class eWeLink {
       payload.deviceid = accessory.context.eweDeviceId;
       payload.sequence = Math.floor(new Date());
       payload.params = {};
-      
       switch (type) {
          case "on":
          if (value) {
@@ -1227,7 +1226,6 @@ class eWeLink {
             }
          }
          break;
-         
          case "hue":
          let newRGB = convert.hsv.rgb(value, 100, 100);
          let newHSV = convert.rgb.hsv(newRGB);
@@ -1270,13 +1268,9 @@ class eWeLink {
          newLight = targetState;
          break;
       }
-      switch (accessory.context.switchNumber) {
-         case "X":
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newLight);
-         accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, newPower);
-         accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, newSpeed);
-         break;
-      }
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newLight);
+      accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, newPower);
+      accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, newSpeed);
       if (platform.debug) platform.log("[%s] requesting to change fan %s.", accessory.displayName, type);
       let payload = {};
       payload.params = {};
@@ -1339,12 +1333,6 @@ class eWeLink {
             } else {
                actualPosition = accessory.context.lastPosition;
             }
-            
-            // platform.log("diffPosition:", diffPosition);
-            // platform.log("diffTime:", diffTime);
-            // platform.log("actualPosition:", actualPosition);
-            // platform.log("diff:", diff);
-            
             if (diff > 0) {
                accessory.context.targetTimestamp += diffTime;
                // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
@@ -1503,20 +1491,10 @@ class eWeLink {
       payload.userAgent = "app";
       payload.params = {};
       let deviceFromApi = platform.devicesInEwe.get(accessory.context.hbDeviceId);
-      
       payload.params.switches = deviceFromApi.params.switches;
-      
-      // [0,0] = 0 => 2 Stopped
-      // [0,1] = 1 => 1 Moving down
-      // [1,0] = 2 => 0 Moving up
-      // [1,1] = 3 => should not happen...
-      
-      var switch0 = "off";
-      var switch1 = "off";
-      
-      let state = accessory.context.cMoveState;
-      
-      switch (state) {
+      let switch0 = "off";
+      let switch1 = "off";
+      switch (accessory.context.cMoveState) {
          case 2:
          switch0 = "off";
          switch1 = "off";
@@ -1533,13 +1511,11 @@ class eWeLink {
          platform.log("[%s] PositionState type error !", accessory.displayName);
          break;
       }
-      
       payload.params.switches[accessory.context.switchUp].switch = switch0;
       payload.params.switches[accessory.context.switchDown].switch = switch1;
       payload.apikey = accessory.context.eweApiKey;
       payload.deviceid = accessory.context.hbDeviceId;
       payload.sequence = Math.floor(new Date());
-      // platform.log("Payload genretad:", JSON.stringify(payload))
       return payload;
    }
    
@@ -1645,7 +1621,6 @@ class eWeLink {
             platform.log("[%s] PositionState type error !", accessory.displayName);
             break;
          }
-         
          payload.params.switches[accessory.context.switchUp].switch = switch0;
          payload.params.switches[accessory.context.switchDown].switch = switch1;
          payload.apikey = accessory.context.eweApiKey;
@@ -1721,20 +1696,12 @@ class eWeLink {
       } else if (params.hasOwnProperty("brightness")) {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.brightness);
       }
-      
-      //**************//
-      // LED Strip L1 //
-      //**************//
-      if (params.hasOwnProperty("colorR")) {
+      if (params.hasOwnProperty("colorR")) { // L1
          newColour = convert.rgb.hsl(params.colorR, params.colorG, params.colorB);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
       }
-      
-      //*********//
-      // Bulb B1 //
-      //*********//
-      if (params.hasOwnProperty("zyx_mode")) {
+      if (params.hasOwnProperty("zyx_mode")) { // B1
          mode = parseInt(params.zyx_mode);
       } else if (params.hasOwnProperty("channel0")) {
          mode = 1;
