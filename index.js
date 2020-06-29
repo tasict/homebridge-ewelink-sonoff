@@ -1018,10 +1018,10 @@ class eWeLink {
          } else {
             accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetBrightness);
             if (platform.debug) platform.log("[%s] requesting to turn brightness to [%s%].", accessory.displayName, targetBrightness);
-            payload.params.switch = "on";
-            payload.params.state = "on";
-            payload.params.brightness = Math.max(targetBrightness, 1);
-            payload.params.bright = Math.max(targetBrightness, 1);
+            if (accessory.context.eweUIID == 36) payload.params.switch = "on";
+            else payload.params.state = "on";
+            if (accessory.context.eweUIID == 36) payload.params.bright = Math.max(targetBrightness, 10);
+            else payload.params.brightness = Math.max(targetBrightness, 1);
          }
       } else {
          if (targetBrightness) {
@@ -1590,6 +1590,7 @@ class eWeLink {
       let isOn = false;
       if (params.hasOwnProperty("state")) isOn = params.state === "on";
       else if (params.hasOwnProperty("switch")) isOn = params.switch === "on";
+      else isOn = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
       
       if (isOn) {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
@@ -1635,9 +1636,6 @@ class eWeLink {
          }
       } else {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
-         if (params.hasOwnProperty("bright") || params.hasOwnProperty("brightness")) {
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 0);
-         }
       }
       return;
    }
