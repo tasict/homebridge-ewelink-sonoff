@@ -72,4 +72,5 @@ Please feel free to submit - the more the merrier! As the name suggests, this is
 - @gmeiburg88 - for trusting my control of his baby's dimmer lamp to enable support for D1... and the heater too!
 - @victorcooper - for allowing me to turn his room into a disco with lights and colours of his B1))
 - @minws13 - for giving me remote access to his aquarium thermostat to add support for these devices.
-Thank you to all 😃. And of course to me too!
+
+Thank you to all 😃.
