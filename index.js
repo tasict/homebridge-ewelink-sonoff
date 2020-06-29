@@ -452,6 +452,7 @@ class eWeLink {
                   }
                });
                platform.ws.onmessage = function (m) {
+                  if (m.data === "pong") return;
                   if (platform.debugReqRes) platform.log.warn("Web socket message received.\n" + JSON.stringify(JSON.parse(m.data), null, 2));
                   else if (platform.debug) platform.log("Web socket message received.");
                   let device;
