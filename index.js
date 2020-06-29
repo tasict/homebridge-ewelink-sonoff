@@ -709,11 +709,19 @@ class eWeLink {
          if (platform.devicesDimmable.includes(device.uiid)) {
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
             .on("set", function (value, callback) {
-               platform.internalDimmerUpdate(accessory, value, callback);
+               if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value != value) {
+                  platform.internalDimmerUpdate(accessory, value, callback);
+               } else {
+                  callback();
+               }
             });
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
             .on("set", function (value, callback) {
-               platform.internalDimmerUpdate(accessory, value, callback);
+               if (value != 0) {
+                  platform.internalDimmerUpdate(accessory, value, callback);
+               } else {
+                  callback();
+               }
             });
          } else if (services.colourable) {
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
@@ -809,11 +817,19 @@ class eWeLink {
          if (platform.devicesDimmable.includes(accessory.context.eweUIID)) {
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
             .on("set", function (value, callback) {
-               platform.internalDimmerUpdate(accessory, value, callback);
+               if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value != value) {
+                  platform.internalDimmerUpdate(accessory, value, callback);
+               } else {
+                  callback();
+               }
             });
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
             .on("set", function (value, callback) {
-               platform.internalDimmerUpdate(accessory, value, callback);
+               if (value != 0) {
+                  platform.internalDimmerUpdate(accessory, value, callback);
+               } else {
+                  callback();
+               }
             });
          } else if (platform.devicesColourable.includes(accessory.context.eweUIID)) {
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
@@ -1009,34 +1025,30 @@ class eWeLink {
       payload.deviceid = accessory.context.eweDeviceId;
       payload.sequence = Math.floor(new Date());
       payload.params = {};
-      if (Number.isInteger(targetBrightness)) {
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, targetBrightness != 0);
-         if (targetBrightness === 0) {
-            if (platform.debug) platform.log("[%s] requesting to turn off.", accessory.displayName);
-            payload.params.switch = "off";
-            payload.params.state = "off";
-         } else {
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetBrightness);
-            if (platform.debug) platform.log("[%s] requesting to turn brightness to [%s%].", accessory.displayName, targetBrightness);
-            if (accessory.context.eweUIID == 36) payload.params.switch = "on";
-            else payload.params.state = "on";
-            if (accessory.context.eweUIID == 36) payload.params.bright = Math.max(targetBrightness, 10);
-            else payload.params.brightness = Math.max(targetBrightness, 1);
+      if (Number.isInteger(targetBrightness) && targetBrightness > 0) {
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetBrightness);
+         payload.params.switch = "on";
+         if (platform.debug) platform.log("[%s] requesting to turn brightness to [%s%].", accessory.displayName, targetBrightness);
+         if (accessory.context.eweUIID == 36) { // KING-M4
+            payload.params.bright = Math.max(targetBrightness, 10);
+            // @thepotterfamily HERE we need to amend the KING-M4 brightness which in Home app is between 0-100 and in ewelink api is between 10 and 100.
+         }
+         if (accessory.context.eweUIID == 44) { // D1
+            payload.params.brightness = Math.max(targetBrightness, 1);
+            payload.params.mode = 0;
          }
       } else {
-         if (targetBrightness) {
-            if (platform.debug) platform.log("[%s] requesting to turn on.", accessory.displayName);
-            payload.params.switch = "on";
-            payload.params.state = "on";
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
-         } else {
-            if (platform.debug) platform.log("[%s] requesting to turn off.", accessory.displayName);
-            payload.params.switch = "off";
-            payload.params.state = "off";
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
-         }
+         let text = targetBrightness ? "on" : "off";
+         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, text);
+         payload.params.switch = text;
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, targetBrightness);
       }
-      platform.wsSendMessage(JSON.stringify(payload), callback);
+      if (platform.wsIsOpen) {
+         platform.wsSendMessage(JSON.stringify(payload), callback);
+      } else {
+         platform.log.warn("WS Closed :(");
+      }
+      
    }
    
    internalColourUpdate (accessory, newRGB, callback) {
@@ -1588,17 +1600,23 @@ class eWeLink {
       let newColour;
       let mode;
       let isOn = false;
-      if (params.hasOwnProperty("state")) isOn = params.state === "on";
-      else if (params.hasOwnProperty("switch")) isOn = params.switch === "on";
-      else isOn = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
+      if ((accessory.context.eweUIID === 22 || accessory.context.eweUIID === 59) && params.hasOwnProperty("state")) {
+         isOn = params.state === "on";
+      } else if (accessory.context.eweUIID != 22 && accessory.context.eweUIID != 59 && params.hasOwnProperty("switch")) {
+         isOn = params.switch === "on";
+      } else {
+         isOn = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
+      }
       
       if (isOn) {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
-         if (params.hasOwnProperty("bright")) {
+         if (accessory.context.eweUIID === 36 && params.hasOwnProperty("bright")) {
             accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.bright);
-         } else if (params.hasOwnProperty("brightness")) {
+         }
+         if (accessory.context.eweUIID === 44 && params.hasOwnProperty("brightness")) {
             accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.brightness);
          }
+         
          if (params.hasOwnProperty("colorR")) { // L1
             newColour = convert.rgb.hsl(params.colorR, params.colorG, params.colorB);
             accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
