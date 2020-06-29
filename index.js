@@ -596,7 +596,9 @@ class eWeLink {
                   } else if (device.hasOwnProperty("config") && device.config.hb && device.config.hbInterval) {
                      if (!platform.hbInterval) {
                         platform.hbInterval = setInterval(function () {
-                           platform.wsSendMessage("ping");
+                           platform.wsSendMessage("ping", function() {
+                              return;
+                           });
                         }, device.config.hbInterval * 1000);
                      }
                   } else {
