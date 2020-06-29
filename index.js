@@ -47,26 +47,16 @@ class eWeLink {
       platform.devicesInHB = new Map();
       platform.devicesInEwe = new Map();
       platform.devicesUnsupported = [];
-      // Supported single-switch UIIDs:
       platform.devicesSingleSwitch = [1, 5, 6, 14, 15, 22, 24, 27, 32, 36, 44, 59];
-      // Supported single-switch models we can expose as lights:
       platform.devicesSingleSwitchLight = ["T1 1C", "L1", "B1", "B1_R2", "TX1C", "D1", "KING-M4", "Slampher"];
-      // Supported multi-switch UIIDs:
       platform.devicesMultiSwitch = [2, 3, 4, 7, 8, 9, 29, 30, 31, 34, 41, 77];
-      // Supported multi-switch models we can expose as lights:
       platform.devicesMultiSwitchLight = ["T1 2C", "T1 3C", "TX2C", "TX3C"];
-      // Supported UIIDs that have a dimmer function:
       platform.devicesDimmable = [36, 44];
-      // Supported UIIDs that can be changed colour (22:B1 and 59:L1):
       platform.devicesColourable = [22];
       platform.devicesDimmableAndColourable = [59];
-      // Supported UIIDs that have temperature and/or humidity sensors:
       platform.devicesThermostat = [15];
-      // Supported UIIDs that can be set up with a fan and light combination:
-      platform.devicesFan = [34]; //
-      // Supported UIIDs that are outlets:
+      platform.devicesFan = [34];
       platform.devicesOutlets = [32];
-      // Supported UIIDs that are RF Bridges:
       platform.devicesBridge = [28];
       platform.deviceGroups = new Map();
       platform.groupDefaults = {
@@ -383,81 +373,66 @@ class eWeLink {
                });
                
                platform.ws.on("error", (e) => {
-                  switch (e.code) {
-                     case "ECONNREFUSED":
-                     if (platform.wsToReconnect) return;
-                     platform.wsToReconnect = true;
-                     platform.ws.removeAllListeners();
-                     setTimeout(function () {
-                        platform.wsToReconnect = false;
-                        platform.wsIsOpen = true;
-                        let payload = {};
-                        payload.action = "userOnline";
-                        payload.at = platform.authenticationToken;
-                        payload.apikey = platform.apiKey;
-                        payload.appid = platform.appid;
-                        payload.nonce = nonce();
-                        payload.ts = Math.floor(new Date() / 1000);
-                        payload.userAgent = "app";
-                        payload.sequence = Math.floor(new Date());
-                        payload.version = 8;
-                        platform.wsSendMessage(JSON.stringify(payload), function() {
-                           return;
-                        });
-                     }, 5000);
-                     break;
-                     default:
-                     return;
-                     break;
-                  }
-                  platform.log.error("Web socket error - [%s].", e);
-               });
-               
-               platform.ws.on("pong", () => {
-                  return;
+                  platform.log.warn("Web socket was closed [%s].", e.error);
+                  platform.wsIsOpen = false;
+                  platform.wsToReconnect = true;
+                  platform.ws.removeAllListeners();
+                  setTimeout(function () {
+                     platform.wsToReconnect = false;
+                     platform.wsIsOpen = true;
+                     let payload = {};
+                     payload.action = "userOnline";
+                     payload.at = platform.authenticationToken;
+                     payload.apikey = platform.apiKey;
+                     payload.appid = platform.appid;
+                     payload.nonce = nonce();
+                     payload.ts = Math.floor(new Date() / 1000);
+                     payload.userAgent = "app";
+                     payload.sequence = Math.floor(new Date());
+                     payload.version = 8;
+                     platform.wsSendMessage(JSON.stringify(payload), function() {
+                        return;
+                     });
+                  }, 2500);
                });
                
                platform.ws.on("close", (e) => {
-                  switch (e.code) {
-                     case 1000:
-                     break;
-                     default:
-                     if (platform.wsToReconnect) return;
-                     platform.wsToReconnect = true;
-                     platform.ws.removeAllListeners();
-                     setTimeout(function () {
-                        platform.wsToReconnect = false;
-                        platform.wsIsOpen = true;
-                        let payload = {};
-                        payload.action = "userOnline";
-                        payload.at = platform.authenticationToken;
-                        payload.apikey = platform.apiKey;
-                        payload.appid = platform.appid;
-                        payload.nonce = nonce();
-                        payload.ts = Math.floor(new Date() / 1000);
-                        payload.userAgent = "app";
-                        payload.sequence = Math.floor(new Date());
-                        payload.version = 8;
-                        platform.wsSendMessage(JSON.stringify(payload), function() {
-                           return;
-                        });
-                     }, 5000);
-                     break;
-                  }
-                  if (platform.debug) platform.log("Web socket closed - [%s].", e);
+                  platform.log.warn("Web socket was closed [%s: %s].", e.code, e.reason);
                   platform.wsIsOpen = false;
+                  platform.wsToReconnect = true;
+                  platform.ws.removeAllListeners();
                   if (platform.hbInterval) {
                      clearInterval(platform.hbInterval);
                      platform.hbInterval = null;
                   }
+                  setTimeout(function () {
+                     platform.wsToReconnect = false;
+                     platform.wsIsOpen = true;
+                     let payload = {};
+                     payload.action = "userOnline";
+                     payload.at = platform.authenticationToken;
+                     payload.apikey = platform.apiKey;
+                     payload.appid = platform.appid;
+                     payload.nonce = nonce();
+                     payload.ts = Math.floor(new Date() / 1000);
+                     payload.userAgent = "app";
+                     payload.sequence = Math.floor(new Date());
+                     payload.version = 8;
+                     platform.wsSendMessage(JSON.stringify(payload), function() {
+                        return;
+                     });
+                  }, 2500);
                });
-               platform.ws.onmessage = function (m) {
-                  if (m.data === "pong") return;
-                  if (platform.debugReqRes) platform.log.warn("Web socket message received.\n" + JSON.stringify(JSON.parse(m.data), null, 2));
+               platform.ws.on("message", (m) => {
+                  if (m === "pong") {
+                     if (platform.debug) platform.log("Web socket received pong.");
+                     return;
+                  }
+                  if (platform.debugReqRes) platform.log.warn("Web socket message received.\n" + JSON.stringify(JSON.parse(m), null, 2));
                   else if (platform.debug) platform.log("Web socket message received.");
                   let device;
                   try {
-                     device = JSON.parse(m.data);
+                     device = JSON.parse(m);
                   } catch (e) {
                      if (platform.debug) platform.log.warn("An error occured reading the web socket message.");
                      if (platform.debug) platform.log.warn(e);
@@ -605,7 +580,7 @@ class eWeLink {
                   } else {
                      if (platform.debug) platform.log.warn("Unknown command received via web socket.");
                   }
-               };
+               });
                platform.log("Plugin initialisation has been successful.");
             });
          };
@@ -1994,8 +1969,9 @@ class eWeLink {
             } catch (e) {
                platform.ws.emit("error", e);
             }
-            if (platform.debugReqRes && string !== "ping") platform.log.warn("Web socket message sent.\n" + JSON.stringify(JSON.parse(string), null, 2));
-            else if (platform.debug && string !== "ping") platform.log("Web socket message sent.");
+            if (platform.debugReqRes && string != "ping") platform.log.warn("Web socket message sent.\n" + JSON.stringify(JSON.parse(string), null, 2));
+            else if (platform.debug && string != "ping") platform.log("Web socket message sent.");
+            if (platform.debug && string === "ping") platform.log("Web socket ping sent.")
             callback();
          }
          if (platform.delaySend <= 0) {
