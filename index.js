@@ -38,6 +38,7 @@ class eWeLink {
       platform.apiHost = (platform.config.apiHost || "eu-api.coolkit.cc") + ":8080";
       platform.wsHost = platform.config.wsHost || "eu-pconnect3.coolkit.cc";
       platform.wsIsOpen = false;
+      platform.wsToReconnect = false;
       platform.debug = platform.config.debug || false;
       platform.debugReqRes = platform.config.debugReqRes || false;
       platform.debugInitial = platform.config.debugInitial || false;
@@ -363,9 +364,8 @@ class eWeLink {
                }
                // Let's open a web socket to the eWeLink server to receive real-time updates about external changes to devices.
                if (platform.debug) platform.log("Opening web socket for real time updates.");
-               platform.ws = new WebSocketClient();
-               platform.ws.open("wss://" + platform.wsHost + ":8080/api/ws");
-               platform.ws.onopen = function (e) {
+               platform.ws = new WebSocket("wss://" + platform.wsHost + ":8080/api/ws");
+               platform.ws.on("open", () => {
                   platform.wsIsOpen = true;
                   let payload = {};
                   payload.action = "userOnline";
@@ -380,25 +380,83 @@ class eWeLink {
                   platform.wsSendMessage(JSON.stringify(payload), function() {
                      return;
                   });
-               };
-               platform.ws.onerror = function (e) {
+               });
+               
+               platform.ws.on("error", (e) => {
+                  switch (e.code) {
+                     case "ECONNREFUSED":
+                     if (platform.wsToReconnect) return;
+                     platform.wsToReconnect = true;
+                     platform.ws.removeAllListeners();
+                     setTimeout(function () {
+                        platform.wsToReconnect = false;
+                        platform.wsIsOpen = true;
+                        let payload = {};
+                        payload.action = "userOnline";
+                        payload.at = platform.authenticationToken;
+                        payload.apikey = platform.apiKey;
+                        payload.appid = platform.appid;
+                        payload.nonce = nonce();
+                        payload.ts = Math.floor(new Date() / 1000);
+                        payload.userAgent = "app";
+                        payload.sequence = Math.floor(new Date());
+                        payload.version = 8;
+                        platform.wsSendMessage(JSON.stringify(payload), function() {
+                           return;
+                        });
+                     }, 5000);
+                     break;
+                     default:
+                     return;
+                     break;
+                  }
                   platform.log.error("Web socket error - [%s].", e);
-               }
-               platform.ws.onclose = function (e) {
+               });
+               
+               platform.ws.on("pong", () => {
+                  return;
+               });
+               
+               platform.ws.on("close", (e) => {
+                  switch (e.code) {
+                     case 1000:
+                     break;
+                     default:
+                     if (platform.wsToReconnect) return;
+                     platform.wsToReconnect = true;
+                     platform.ws.removeAllListeners();
+                     setTimeout(function () {
+                        platform.wsToReconnect = false;
+                        platform.wsIsOpen = true;
+                        let payload = {};
+                        payload.action = "userOnline";
+                        payload.at = platform.authenticationToken;
+                        payload.apikey = platform.apiKey;
+                        payload.appid = platform.appid;
+                        payload.nonce = nonce();
+                        payload.ts = Math.floor(new Date() / 1000);
+                        payload.userAgent = "app";
+                        payload.sequence = Math.floor(new Date());
+                        payload.version = 8;
+                        platform.wsSendMessage(JSON.stringify(payload), function() {
+                           return;
+                        });
+                     }, 5000);
+                     break;
+                  }
                   if (platform.debug) platform.log("Web socket closed - [%s].", e);
                   platform.wsIsOpen = false;
                   if (platform.hbInterval) {
                      clearInterval(platform.hbInterval);
                      platform.hbInterval = null;
                   }
-               };
-               platform.ws.onmessage = function (message) {
-                  if (message === "pong") return;
-                  if (platform.debugReqRes) platform.log.warn("Web socket message received.\n" + JSON.stringify(JSON.parse(message), null, 2));
+               });
+               platform.ws.onmessage = function (m) {
+                  if (platform.debugReqRes) platform.log.warn("Web socket message received.\n" + JSON.stringify(JSON.parse(m.data), null, 2));
                   else if (platform.debug) platform.log("Web socket message received.");
                   let device;
                   try {
-                     device = JSON.parse(message);
+                     device = JSON.parse(m.data);
                   } catch (e) {
                      if (platform.debug) platform.log.warn("An error occured reading the web socket message.");
                      if (platform.debug) platform.log.warn(e);
@@ -538,7 +596,7 @@ class eWeLink {
                   } else if (device.hasOwnProperty("config") && device.config.hb && device.config.hbInterval) {
                      if (!platform.hbInterval) {
                         platform.hbInterval = setInterval(function () {
-                           platform.ws.send("ping");
+                           platform.wsSendMessage("ping");
                         }, device.config.hbInterval * 1000);
                      }
                   } else {
@@ -1912,7 +1970,11 @@ class eWeLink {
             return;
          }
          if (platform.ws) {
-            platform.ws.send(string);
+            try {
+               platform.ws.send(string);
+            } catch (e) {
+               platform.ws.emit("error", e);
+            }
             if (platform.debugReqRes && string !== "ping") platform.log.warn("Web socket message sent.\n" + JSON.stringify(JSON.parse(string), null, 2));
             else if (platform.debug && string !== "ping") platform.log("Web socket message sent.");
             callback();
@@ -1937,58 +1999,5 @@ class eWeLink {
          setTimeout(sendOperation, platform.delaySend, string);
          platform.delaySend += delayOffset;
       }
-   }
-}
-
-class WebSocketClient {
-   constructor() {
-      this.pendingReconnect = false;
-   }
-   open (url) {
-      this.url = url;
-      this.instance = new WebSocket(this.url);
-      this.instance.on("open", () => {
-         this.onopen();
-      });
-      this.instance.on("message", (data) => {
-         this.onmessage(data);
-      });
-      this.instance.on("close", (e) => {
-         switch (e.code) {
-            case 1000:
-            break;
-            default:
-            this.reconnect(e);
-            break;
-         }
-         this.onclose(e);
-      });
-      this.instance.on("error", (e) => {
-         switch (e.code) {
-            case "ECONNREFUSED":
-            this.reconnect(e);
-            break;
-            default:
-            return;
-            break;
-         }
-      });
-   }
-   send (data) {
-      try {
-         this.instance.send(data);
-      } catch (e) {
-         this.instance.emit("error", e);
-      }
-   }
-   reconnect (e) {
-      if (this.pendingReconnect) return;
-      this.pendingReconnect = true;
-      this.instance.removeAllListeners();
-      let that = this;
-      setTimeout(function () {
-         that.pendingReconnect = false;
-         that.open(that.url);
-      }, 5000);
    }
 }
