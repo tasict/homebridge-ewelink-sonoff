@@ -354,8 +354,9 @@ class eWeLink {
                }
                // Let's open a web socket to the eWeLink server to receive real-time updates about external changes to devices.
                if (platform.debug) platform.log("Opening web socket for real time updates.");
-               platform.ws = new WebSocket("wss://" + platform.wsHost + ":8080/api/ws");
-               platform.ws.on("open", () => {
+               platform.ws = new WSC();
+               platform.ws.open("wss://" + platform.wsHost + ":8080/api/ws");
+               platform.ws.onopen = function (e) {
                   platform.wsIsOpen = true;
                   let payload = {};
                   payload.action = "userOnline";
@@ -367,75 +368,34 @@ class eWeLink {
                   payload.userAgent = "app";
                   payload.sequence = Math.floor(new Date());
                   payload.version = 8;
-                  platform.wsSendMessage(JSON.stringify(payload), function() {
-                     return;
-                  });
-               });
+                  platform.ws.send(JSON.stringify(payload));
+                  if (platform.debugReqRes) platform.log.warn("Sending web socket login request.\n" + JSON.stringify(payload, null, 2));
+               };     
                
-               platform.ws.on("error", (e) => {
-                  platform.log.warn("Web socket was closed [%s].", e.error);
-                  platform.wsIsOpen = false;
-                  platform.wsToReconnect = true;
-                  platform.ws.removeAllListeners();
-                  setTimeout(function () {
-                     platform.wsToReconnect = false;
-                     platform.wsIsOpen = true;
-                     let payload = {};
-                     payload.action = "userOnline";
-                     payload.at = platform.authenticationToken;
-                     payload.apikey = platform.apiKey;
-                     payload.appid = platform.appid;
-                     payload.nonce = nonce();
-                     payload.ts = Math.floor(new Date() / 1000);
-                     payload.userAgent = "app";
-                     payload.sequence = Math.floor(new Date());
-                     payload.version = 8;
-                     platform.wsSendMessage(JSON.stringify(payload), function() {
-                        return;
-                     });
-                  }, 2500);
-               });
+               platform.ws.onerror = function(e) {
+                  platform.log.error("Web socket error - [%s].", e);
+                  platform.log.error("Please try restarting Homebridge.");
+               };
                
-               platform.ws.on("close", (e) => {
-                  platform.log.warn("Web socket was closed [%s: %s].", e.code, e.reason);
-                  platform.wsIsOpen = false;
-                  platform.wsToReconnect = true;
-                  platform.ws.removeAllListeners();
+               platform.ws.onclose = function (e) {
+                  platform.log.warn("Web socket was closed - [%s].", e);
+                  platform.log.warn("Web socket will try to reconnect in a few seconds.");
+                  platform.isSocketOpen = false;
                   if (platform.hbInterval) {
                      clearInterval(platform.hbInterval);
                      platform.hbInterval = null;
                   }
-                  setTimeout(function () {
-                     platform.wsToReconnect = false;
-                     platform.wsIsOpen = true;
-                     let payload = {};
-                     payload.action = "userOnline";
-                     payload.at = platform.authenticationToken;
-                     payload.apikey = platform.apiKey;
-                     payload.appid = platform.appid;
-                     payload.nonce = nonce();
-                     payload.ts = Math.floor(new Date() / 1000);
-                     payload.userAgent = "app";
-                     payload.sequence = Math.floor(new Date());
-                     payload.version = 8;
-                     platform.wsSendMessage(JSON.stringify(payload), function() {
-                        return;
-                     });
-                  }, 2500);
-               });
-               platform.ws.on("message", (m) => {
-                  if (m === "pong") {
-                     if (platform.debug) platform.log("Web socket received pong.");
-                     return;
-                  }
+               };
+               
+               platform.ws.onmessage = function (m) {
+                  if (m === "pong") return;
                   if (platform.debugReqRes) platform.log.warn("Web socket message received.\n" + JSON.stringify(JSON.parse(m), null, 2));
                   else if (platform.debug) platform.log("Web socket message received.");
                   let device;
                   try {
                      device = JSON.parse(m);
                   } catch (e) {
-                     if (platform.debug) platform.log.warn("An error occured reading the web socket message.");
-                     if (platform.debug) platform.log.warn(e);
+                     platform.log.warn("An error occured reading the web socket message [%s]", e);
                      return;
                   }
                   if (device.hasOwnProperty("action")) {
@@ -580,7 +540,7 @@ class eWeLink {
                   } else {
                      if (platform.debug) platform.log.warn("Unknown command received via web socket.");
                   }
-               });
+               };
                platform.log("Plugin initialisation has been successful.");
             });
          };
@@ -1018,12 +978,7 @@ class eWeLink {
          payload.params.switch = text;
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, targetBrightness);
       }
-      if (platform.wsIsOpen) {
-         platform.wsSendMessage(JSON.stringify(payload), callback);
-      } else {
-         platform.log.warn("WS Closed :(");
-      }
-      
+      platform.wsSendMessage(JSON.stringify(payload), callback);
    }
    
    internalColourUpdate (accessory, newRGB, callback) {
@@ -1241,24 +1196,17 @@ class eWeLink {
                let payload = platform.prepareBlindPayload(accessory);
                let string = JSON.stringify(payload);
                if (platform.debugReqRes) platform.log.warn(payload);
-               
-               if (platform.wsIsOpen) {
-                  platform.wsSendMessage(string, function () {
-                     return;
-                  });
-                  platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.moveState === 1 ? "moving up" : "moving down");
-                  let service = accessory.getService(Service.WindowCovering);
-                  service.getCharacteristic(Characteristic.CurrentPosition)
-                  .updateValue(accessory.context.lastPos);
-                  service.getCharacteristic(Characteristic.TargetPosition)
-                  .updateValue(accessory.context.targetPos);
-                  service.getCharacteristic(Characteristic.PositionState)
-                  .updateValue(accessory.context.moveState);
-               } else {
-                  platform.log("Socket was closed. It will reconnect automatically; please retry your command");
-                  callback("Socket was closed. It will reconnect automatically; please retry your command");
-                  return false;
-               }
+               platform.wsSendMessage(string, function () {
+                  return;
+               });
+               platform.log("[%s] Request sent for %s", accessory.displayName, accessory.context.moveState === 1 ? "moving up" : "moving down");
+               let service = accessory.getService(Service.WindowCovering);
+               service.getCharacteristic(Characteristic.CurrentPosition)
+               .updateValue(accessory.context.lastPos);
+               service.getCharacteristic(Characteristic.TargetPosition)
+               .updateValue(accessory.context.targetPos);
+               service.getCharacteristic(Characteristic.PositionState)
+               .updateValue(accessory.context.moveState);
             }
             callback();
             return false;
@@ -1313,28 +1261,21 @@ class eWeLink {
       let string = JSON.stringify(payload);
       if (platform.debugReqRes) platform.log.warn(payload);
       
-      if (platform.wsIsOpen) {
+      setTimeout(function () {
+         platform.wsSendMessage(string, function () {
+            return;
+         });
+         platform.log("[%s] Request sent for %s", accessory.displayName, moveUp ? "moving up" : "moving down");
          
-         setTimeout(function () {
-            platform.wsSendMessage(string, function () {
-               return;
-            });
-            platform.log("[%s] Request sent for %s", accessory.displayName, moveUp ? "moving up" : "moving down");
-            
-            var interval = setInterval(function () {
-               if (Date.now() >= accessory.context.targetTimestamp) {
-                  platform.prepareBlindFinalState(accessory);
-                  clearInterval(interval);
-                  return true;
-               }
-            }, 100);
-            callback();
-         }, 1);
-      } else {
-         platform.log("Socket was closed. It will reconnect automatically; please retry your command");
-         callback("Socket was closed. It will reconnect automatically; please retry your command");
-         return false;
-      }
+         var interval = setInterval(function () {
+            if (Date.now() >= accessory.context.targetTimestamp) {
+               platform.prepareBlindFinalState(accessory);
+               clearInterval(interval);
+               return true;
+            }
+         }, 100);
+         callback();
+      }, 1);
    }
    
    prepareBlindFinalState (accessory) {
@@ -1343,34 +1284,29 @@ class eWeLink {
       let string = JSON.stringify(payload);
       if (platform.debugReqRes) platform.log.warn(payload);
       
-      if (platform.wsIsOpen) {
+      
+      setTimeout(function () {
+         platform.wsSendMessage(string, function () {
+            return;
+         });
+         platform.log("[%s] Request sent to stop moving", accessory.displayName);
+         accessory.context.moveState = 2;
          
-         setTimeout(function () {
-            platform.wsSendMessage(string, function () {
-               return;
-            });
-            platform.log("[%s] Request sent to stop moving", accessory.displayName);
-            accessory.context.moveState = 2;
-            
-            let targetPos = accessory.context.targetPos;
-            accessory.context.lastPos = targetPos;
-            let service = accessory.getService(Service.WindowCovering);
-            // Using updateValue to avoid loop
-            service.getCharacteristic(Characteristic.CurrentPosition)
-            .updateValue(targetPos);
-            service.getCharacteristic(Characteristic.TargetPosition)
-            .updateValue(targetPos);
-            service.setCharacteristic(Characteristic.PositionState, Characteristic.PositionState.STOPPED);
-            
-            platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, targetPos);
-            return true;
-            // TODO Here we need to wait for the response to the socket
-         }, 1);
+         let targetPos = accessory.context.targetPos;
+         accessory.context.lastPos = targetPos;
+         let service = accessory.getService(Service.WindowCovering);
+         // Using updateValue to avoid loop
+         service.getCharacteristic(Characteristic.CurrentPosition)
+         .updateValue(targetPos);
+         service.getCharacteristic(Characteristic.TargetPosition)
+         .updateValue(targetPos);
+         service.setCharacteristic(Characteristic.PositionState, Characteristic.PositionState.STOPPED);
          
-      } else {
-         platform.log("Socket was closed. It will reconnect automatically; please retry your command");
-         return false;
-      }
+         platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, targetPos);
+         return true;
+         // TODO Here we need to wait for the response to the socket
+      }, 1);
+      
    }
    
    prepareBlindPayload (accessory) {
@@ -1969,19 +1905,14 @@ class eWeLink {
             } catch (e) {
                platform.ws.emit("error", e);
             }
-            if (platform.debugReqRes && string != "ping") platform.log.warn("Web socket message sent.\n" + JSON.stringify(JSON.parse(string), null, 2));
-            else if (platform.debug && string != "ping") platform.log("Web socket message sent.");
-            if (platform.debug && string === "ping") platform.log("Web socket ping sent.")
+            if (platform.debugReqRes && string !== "ping") platform.log.warn("Web socket message sent.\n" + JSON.stringify(JSON.parse(string), null, 2));
+            else if (platform.debug && string !== "ping") platform.log("Web socket message sent.");
             callback();
          }
-         if (platform.delaySend <= 0) {
-            platform.delaySend = 0;
-         } else {
-            platform.delaySend -= delayOffset;
-         }
+         platform.delaySend = platform.delaySend <= 0 ? 0 : platform.delaySend -= delayOffset;
       };
       if (!platform.wsIsOpen) {
-         if (platform.debug) platform.log("Socket was closed. It will reconnect automatically.");
+         if (platform.debug) platform.log("Web socket is pending reconnection and will try in a few seconds.");
          let interval;
          let waitToSend = (string) => {
             if (platform.wsIsOpen) {
@@ -1995,4 +1926,45 @@ class eWeLink {
          platform.delaySend += delayOffset;
       }
    }
+}
+function WSC () {
+   this.number = 0;
+}
+WSC.prototype.open = function (url) {
+   this.url = url;
+   this.instance = new WebSocket(this.url);
+   this.instance.on("open", () => {
+      this.onopen();
+   });
+   this.instance.on("message", (data, flags) => {
+      this.number ++;
+      this.onmessage(data, flags, this.number);
+   });
+   this.instance.on("close", (e) => {
+      if (e.code != 1000) {
+         this.reconnect(e);
+      }
+      this.onclose(e);
+   });
+   this.instance.on("error", (e) => {
+      if (e.code === "ECONNREFUSED") {
+         this.reconnect(e);
+      } else {
+         this.onerror(e);
+      }
+   });
+}
+WSC.prototype.send = function(data, option) {
+   try {
+      this.instance.send(data, option);
+   } catch (e) {
+      this.instance.emit("error", e);
+   }
+}
+WSC.prototype.reconnect = function (e) {
+   this.instance.removeAllListeners();
+   let that = this;
+   setTimeout(function() {
+      that.open(that.url);
+   }, 2500);
 }
