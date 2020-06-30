@@ -953,13 +953,12 @@ class eWeLink {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetBrightness);
          payload.params.switch = "on";
          if (platform.debug) platform.log("[%s] requesting to turn brightness to [%s%].", accessory.displayName, targetBrightness);
+         let nb = Math.round(targetBrightness * 9 / 10 + 10);
          if (accessory.context.eweUIID === 36) { // KING-M4
-            payload.params.bright = Math.max(targetBrightness, 10);
-            // @thepotterfamily
-            // we need to amend the KING-M4 brightness which in Home app is between 0-100 and in ewelink api is between 10 and 100.
+            payload.params.bright = nb;
          }
          if (accessory.context.eweUIID === 44) { // D1
-            payload.params.brightness = Math.max(targetBrightness, 1);
+            payload.params.brightness = nb;
             payload.params.mode = 0;
          }
       } else {
@@ -1492,10 +1491,12 @@ class eWeLink {
       if (isOn) {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
          if (accessory.context.eweUIID === 36 && params.hasOwnProperty("bright")) {
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.bright);
+            let nb = Math.round((params.bright - 10) * 10 / 9);
+            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, nb);
          }
          if (accessory.context.eweUIID === 44 && params.hasOwnProperty("brightness")) {
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.brightness);
+            let nb = Math.round((params.brightness - 10) * 10 / 9);
+            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, nb);
          }
          if (params.hasOwnProperty("colorR")) { // L1
             newColour = convert.rgb.hsl(params.colorR, params.colorG, params.colorB);
