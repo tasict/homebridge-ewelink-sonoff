@@ -34,7 +34,7 @@ class eWeLink {
       platform.apiKey = "UNCONFIGURED";
       platform.authenticationToken = "UNCONFIGURED";
       platform.appid = "oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq";
-      platform.emailLogin = platform.config.username.includes("@") ? true : false;
+      platform.emailLogin = platform.config.username.includes("@");
       platform.apiHost = (platform.config.apiHost || "eu-api.coolkit.cc") + ":8080";
       platform.wsHost = platform.config.wsHost || "eu-pconnect3.coolkit.cc";
       platform.wsIsOpen = false;
@@ -87,7 +87,7 @@ class eWeLink {
                let error = false;
                if (err) error = err;
                else if (!body) error = "No data in response";
-               else if (body.hasOwnProperty("error") && body.error != 0) {
+               else if (body.hasOwnProperty("error") && body.error !== 0) {
                   if (body.error === 401) error = "Authorisation token error";
                   else if (body.error === 406) error = "Incorrect eWeLink username, password and country code in the config.";
                   else error = JSON.stringify(body, null, 2);
@@ -176,7 +176,7 @@ class eWeLink {
                         else if (platform.devicesThermostat.includes(device.uiid)) {
                            services.thermostatSwitch = true;
                            services.temperature = true;
-                           if (device.params.sensorType != "DS18B20") services.humidity = true;
+                           if (device.params.sensorType !== "DS18B20") services.humidity = true;
                            platform.addAccessory(device, idToCheck + "SWX", services);
                         }
                         //*********//
@@ -541,7 +541,7 @@ class eWeLink {
       if (platform.devicesInHB.get(hbDeviceId)) {
          return; // device is already in Homebridge.
       }
-      if (device.type != 10) {
+      if (device.type !== 10) {
          platform.log.warn("[%s] cannot be added as it is not supported by this plugin.", device.name);
          return;
       }
@@ -629,7 +629,7 @@ class eWeLink {
          if (platform.devicesDimmable.includes(device.uiid)) {
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
             .on("set", function (value, callback) {
-               if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value != value) {
+               if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value !== value) {
                   platform.internalDimmerUpdate(accessory, value, callback);
                } else {
                   callback();
@@ -637,7 +637,7 @@ class eWeLink {
             });
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
             .on("set", function (value, callback) {
-               if (value != 0) {
+               if (value !== 0) {
                   platform.internalDimmerUpdate(accessory, value, callback);
                } else {
                   callback();
@@ -737,7 +737,7 @@ class eWeLink {
          if (platform.devicesDimmable.includes(accessory.context.eweUIID)) {
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
             .on("set", function (value, callback) {
-               if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value != value) {
+               if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value !== value) {
                   platform.internalDimmerUpdate(accessory, value, callback);
                } else {
                   callback();
@@ -745,7 +745,7 @@ class eWeLink {
             });
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
             .on("set", function (value, callback) {
-               if (value != 0) {
+               if (value !== 0) {
                   platform.internalDimmerUpdate(accessory, value, callback);
                } else {
                   callback();
@@ -858,7 +858,7 @@ class eWeLink {
             }
          }
          otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW0");
-         otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, masterState === "on" ? true : false);
+         otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, masterState === "on");
          break;
       }
       platform.wsSendMessage(JSON.stringify(payload), callback);
@@ -931,7 +931,7 @@ class eWeLink {
             }
          }
          otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW0");
-         otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, masterState === "on" ? true : false);
+         otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, masterState === "on");
          break;
       }
       platform.wsSendMessage(JSON.stringify(payload), callback);
@@ -949,12 +949,12 @@ class eWeLink {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, targetBrightness);
          payload.params.switch = "on";
          if (platform.debug) platform.log("[%s] requesting to turn brightness to [%s%].", accessory.displayName, targetBrightness);
-         if (accessory.context.eweUIID == 36) { // KING-M4
+         if (accessory.context.eweUIID === 36) { // KING-M4
             payload.params.bright = Math.max(targetBrightness, 10);
             // @thepotterfamily
             // we need to amend the KING-M4 brightness which in Home app is between 0-100 and in ewelink api is between 10 and 100.
          }
-         if (accessory.context.eweUIID == 44) { // D1
+         if (accessory.context.eweUIID === 44) { // D1
             payload.params.brightness = Math.max(targetBrightness, 1);
             payload.params.mode = 0;
          }
@@ -1027,7 +1027,7 @@ class eWeLink {
          break;
          case "brightness":
          if (Number.isInteger(targetBrightness)) {
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, targetBrightness != 0);
+            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, targetBrightness !== 0);
             if (targetBrightness === 0) {
                if (platform.debug) platform.log("[%s] requesting to turn off.", accessory.displayName);
                payload.params.switch = "off";
@@ -1132,7 +1132,7 @@ class eWeLink {
    setBlindTargetPosition(accessory, pos, callback) {
       platform.log("Setting [%s] new target position from [%s] to [%s].", accessory.displayName, accessory.context.targetPos, pos, );
       let timestamp = Date.now();
-      if (accessory.context.moveState != 2) {
+      if (accessory.context.moveState !== 2) {
          var diffPosition = Math.abs(pos - accessory.context.targetPos);
          var actualPosition;
          var diffTime;
@@ -1450,18 +1450,18 @@ class eWeLink {
       if (params.hasOwnProperty("switch") || params.hasOwnProperty("mainSwitch")) {
          let newState;
          if (params.hasOwnProperty("switch")) {
-            newState = params.switch === "on" ? true : false;
+            newState = params.switch === "on";
          } else {
-            newState = params.mainSwitch === "on" ? true : false;
+            newState = params.mainSwitch === "on";
          }
          accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, newState);
       }
       if (params.hasOwnProperty("currentTemperature") && accessory.getService(Service.TemperatureSensor)) {
-         let currentTemp = params.currentTemperature != "unavailable" ? params.currentTemperature : 0;
+         let currentTemp = params.currentTemperature !== "unavailable" ? params.currentTemperature : 0;
          accessory.getService(Service.TemperatureSensor).updateCharacteristic(Characteristic.CurrentTemperature, currentTemp);
       }
       if (params.hasOwnProperty("currentHumidity") && accessory.getService(Service.HumiditySensor)) {
-         let currentHumi = params.currentHumidity != "unavailable" ? params.currentHumidity : 0;
+         let currentHumi = params.currentHumidity !== "unavailable" ? params.currentHumidity : 0;
          accessory.getService(Service.HumiditySensor).updateCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumi);
       }
       return;
@@ -1480,7 +1480,7 @@ class eWeLink {
       let isOn = false;
       if ((accessory.context.eweUIID === 22 || accessory.context.eweUIID === 59) && params.hasOwnProperty("state")) {
          isOn = params.state === "on";
-      } else if (accessory.context.eweUIID != 22 && accessory.context.eweUIID != 59 && params.hasOwnProperty("switch")) {
+      } else if (accessory.context.eweUIID !== 22 && accessory.context.eweUIID !== 59 && params.hasOwnProperty("switch")) {
          isOn = params.switch === "on";
       } else {
          isOn = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
@@ -1727,7 +1727,7 @@ class eWeLink {
             return;
          }
          let newApiHost = body.region + platform.apiHost.substring(idx);
-         if (platform.apiHost != newApiHost) {
+         if (platform.apiHost !== newApiHost) {
             if (platform.debug) platform.log("Received region [%s], updating API host to [%s].", body.region, newApiHost);
             platform.apiHost = newApiHost;
          }
@@ -1773,7 +1773,7 @@ class eWeLink {
                return;
             }
             let newApiHost = body.region + platform.apiHost.substring(idx);
-            if (platform.apiHost != newApiHost) {
+            if (platform.apiHost !== newApiHost) {
                if (platform.debug) platform.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
                platform.apiHost = newApiHost;
                platform.login(callback);
@@ -1885,7 +1885,7 @@ WSC.prototype.open = function (url) {
       this.onmessage(data, flags, this.number);
    });
    this.instance.on("close", (e) => {
-      if (e.code != 1000) {
+      if (e.code !== 1000) {
          this.reconnect(e);
       }
       this.onclose(e);
