@@ -248,21 +248,24 @@ class eWeLink {
                      }
                      // Refresh existing devices and also those that have just been added.
                      if (platform.devicesInHB.has(idToCheck + "SWX") || platform.devicesInHB.has(idToCheck + "SW0")) {
-                        if (platform.devicesInHB.has(idToCheck + "SWX")) accessory = platform.devicesInHB.get(idToCheck + "SWX");
-                        else accessory = platform.devicesInHB.get(idToCheck + "SW0");
+                        if (platform.devicesInHB.has(idToCheck + "SWX")) {
+                           accessory = platform.devicesInHB.get(idToCheck + "SWX");
+                        } else {
+                           accessory = platform.devicesInHB.get(idToCheck + "SW0");
+                        }
                         if (!device.online) {
                            platform.log.warn("[%s] has been reported offline so cannot refresh.", accessory.displayName);
                            return;
                         }
                         if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
-                        accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                        accessory.getService(Service.AccessoryInformation).updateCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
                         accessory.reachable = true;
                         //********//
                         // BLINDS //
                         //********//       
                         if (platform.deviceGroups.has(idToCheck + "SWX")) {
                            group = platform.deviceGroups.get(idToCheck + "SWX");
-                           if (group.type === "blind" && Array.isArray(device.params)) {
+                           if (group.type === "blind" && Array.isArray(device.params.switches)) {
                               platform.externalBlindUpdate(idToCheck + "SWX", device.params);
                               return;
                            }
@@ -396,7 +399,7 @@ class eWeLink {
                      let i;
                      if (device.action === "update" && device.hasOwnProperty("params")) {
                         if (platform.debug) platform.log("External update received via web socket.");
-                        if (platform.devicesInHB.has(idToCheck + "SW0") || platform.devicesInHB.has(idToCheck + "SWX")) {
+                        if (platform.devicesInHB.has(idToCheck + "SWX") || platform.devicesInHB.has(idToCheck + "SW0")) {
                            if (platform.devicesInHB.has(idToCheck + "SWX")) {
                               accessory = platform.devicesInHB.get(idToCheck + "SWX");
                            } else {
@@ -407,7 +410,7 @@ class eWeLink {
                               return;
                            }
                            if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
-                           accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
+                           accessory.getService(Service.AccessoryInformation).updateCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
                            //********//
                            // BLINDS //
                            //********//       
@@ -532,11 +535,12 @@ class eWeLink {
                platform.log("Plugin initialisation has been successful.");
             });
          };
-         platform.getRegion(function () {
-            platform.login(afterLogin.bind(platform));
+         platform.httpRegion(function () {
+            platform.httpLogin(afterLogin.bind(platform));
          }.bind(platform));
       }.bind(platform));
    }
+   
    addAccessory(device, hbDeviceId, services) {
       if (platform.devicesInHB.get(hbDeviceId)) {
          return; // device is already in Homebridge.
@@ -1677,7 +1681,7 @@ class eWeLink {
       return crypto.createHmac("sha256", "6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM").update(string).digest("base64");
    }
    
-   getRegion(callback) {
+   httpRegion(callback) {
       let data = {
          "country_code": platform.config.countryCode,
          "version": 8,
@@ -1735,7 +1739,7 @@ class eWeLink {
       }.bind(platform));
    }
    
-   login(callback) {
+   httpLogin(callback) {
       let data = {};
       if (platform.emailLogin) {
          data.email = platform.config.username;
@@ -1776,7 +1780,7 @@ class eWeLink {
             if (platform.apiHost !== newApiHost) {
                if (platform.debug) platform.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
                platform.apiHost = newApiHost;
-               platform.login(callback);
+               platform.httpLogin(callback);
                return;
             }
          }
