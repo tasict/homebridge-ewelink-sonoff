@@ -10,8 +10,7 @@ The plugin **should** work with Sonoff switches (single and multi-channel).
 - **Supported:** BASIC, MINI, 4CH
 #### 🟢 Light Bulbs
 The plugin **should** work with Sonoff bulbs and LED strips, giving you control of the brightness and colour (🇬🇧!) of your device.
-- **Supported:** B1 (colour mode only)
-- **Needs Retesting:** L1
+- **Supported:** B1, L1
 #### 🟢 Light Switches
 The plugin **should** work with Sonoff light and dimmer switches, and will be exposed as lights in Homebridge.
 - **Supported:** T1-1C, T1-2C, T1-3C, TX-1C, TX-2C, TX-3C, KING-M4, SLAMPHER, D1
