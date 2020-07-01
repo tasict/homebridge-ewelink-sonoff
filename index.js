@@ -1004,13 +1004,14 @@ class eWeLink {
       }
       setTimeout(function() {
          platform.wsSendMessage(JSON.stringify(payload), callback);
-      }, 500);
+      }, 250);
    }
    
    internalHSBUpdate(accessory, type, value, callback) {
       let newRGB;
       let curHue;
       let curSat;
+      let wsDelay = 0;
       let payload = {};
       payload.action = "update";
       payload.userAgent = "app";
@@ -1020,10 +1021,11 @@ class eWeLink {
       payload.params = {};
       switch (type) {
          case "hue":
+         wsDelay = 500;
          curSat = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
          newRGB = convert.hsv.rgb(value, curSat, 100);
          if (accessory.context.eweUIID === 59) { // L1
-            payload.params.mode = 0;
+            payload.params.mode = 1;
             payload.params.colorR = newRGB[0];
             payload.params.colorG = newRGB[1];
             payload.params.colorB = newRGB[2];
@@ -1037,10 +1039,11 @@ class eWeLink {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, value);
          break;
          case "sat":
+         wsDelay = 250;
          curHue = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value;
          newRGB = convert.hsv.rgb(curHue, value, 100);
          if (accessory.context.eweUIID === 59) { // L1
-            payload.params.mode = 0;
+            payload.params.mode = 1;
             payload.params.colorR = newRGB[0];
             payload.params.colorG = newRGB[1];
             payload.params.colorB = newRGB[2];
@@ -1054,27 +1057,28 @@ class eWeLink {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, value);
          break;
          case "bri":
+         wsDelay = 250;
          curHue = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value;
          curSat = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
-         newRGB = convert.hsv.rgb(curHue, curSat, value);
-         if (accessory.context.eweUIID === 59) { // L1
-            payload.params.mode = 0;
-            payload.params.colorR = newRGB[0];
-            payload.params.colorG = newRGB[1];
-            payload.params.colorB = newRGB[2];
-         } else { // B1
+         if (accessory.context.eweUIID === 22) { // B1
+            newRGB = convert.hsv.rgb(curHue, curSat, value);
             payload.params.zyx_mode = 2;
             payload.params.channel2 = newRGB[0];
             payload.params.channel3 = newRGB[1];
             payload.params.channel4 = newRGB[2];
          }
+         if (accessory.context.eweUIID === 59) { // L1
+            payload.params.mode = 1;
+            payload.params.bright = value;
+         }
+         
          if (platform.debug) platform.log("[%s] requesting to change brightness to [%s%].", accessory.displayName, value);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, value);
          break;
       }
       setTimeout(function() {
          platform.wsSendMessage(JSON.stringify(payload), callback);
-      }, 500);
+      }, wsDelay);
    }
    
    internalFanUpdate(accessory, type, targetState, callback) {
@@ -1490,37 +1494,54 @@ class eWeLink {
       }
       if (isOn) {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
-         if (accessory.context.eweUIID === 36 && params.hasOwnProperty("bright")) {
-            // Case KING-M4 - which has a eWeLink scale of 10-100 and HomeKit scale is 0-100.
-            let nb = Math.round((params.bright - 10) * 10 / 9);
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, nb);
-         }
-         if (accessory.context.eweUIID === 44 && params.hasOwnProperty("brightness")) {
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.brightness);
-         }
-         if (params.hasOwnProperty("colorR")) { // L1
-            newColour = convert.rgb.hsv(params.colorR, params.colorG, params.colorB);
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
-         }
-         if (params.hasOwnProperty("zyx_mode")) { // B1
-            mode = parseInt(params.zyx_mode);
-         } else if (params.hasOwnProperty("channel0")) {
-            mode = 1;
-         } else if (params.hasOwnProperty("channel2")) {
-            mode = 2;
-         } else {
-            mode = 0;
-         }
-         if (mode === 1) {
-            platform.log.warn("[%s] has been set to 'white mode' which is not supported by this plugin.", accessory.displayName);
-         } else if (mode === 2) {
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
-            newColour = convert.rgb.hsv(parseInt(params.channel2), parseInt(params.channel3), parseInt(params.channel4));
-            // The eWeLink app only supports hue change in app so set saturation and brightness to 100.
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
-            accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
+         
+         switch (accessory.context.eweUIID) {
+            case 36: // KING-M4
+            if (params.hasOwnProperty("bright")) {
+               // Device brightness has a eWeLink scale of 10-100 and HomeKit scale is 0-100.
+               let nb = Math.round((params.bright - 10) * 10 / 9);
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, nb);
+            }
+            break;
+            case 44: // D1
+            if (params.hasOwnProperty("brightness")) {
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.brightness);
+            }
+            break;
+            case 22: // B1
+            if (params.hasOwnProperty("zyx_mode")) { // B1
+               mode = parseInt(params.zyx_mode);
+            } else if (params.hasOwnProperty("channel0")) {
+               mode = 1;
+            } else if (params.hasOwnProperty("channel2")) {
+               mode = 2;
+            } else {
+               mode = 0;
+            }
+            if (mode === 2) {
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
+               newColour = convert.rgb.hsv(parseInt(params.channel2), parseInt(params.channel3), parseInt(params.channel4));
+               // The eWeLink app only supports hue change in app so set saturation and brightness to 100.
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, 100);
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, 100);
+            } else {
+               platform.log.warn("[%s] has been set to 'white mode' which is not supported by this plugin.", accessory.displayName);
+            }
+            break;
+            case 59: // L1
+            if (params.hasOwnProperty("bright")) {
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.bright);
+            }
+            if (params.hasOwnProperty("colorR")) {
+               newColour = convert.rgb.hsv(params.colorR, params.colorG, params.colorB);
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, newColour[0]);
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
+            }
+            break;
+            default:
+            return;
+            break;
          }
       } else {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
