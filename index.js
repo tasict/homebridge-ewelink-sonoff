@@ -195,7 +195,7 @@ class eWeLink {
                         //***********************//
                         else if (platform.devicesMultiSwitch.includes(device.uiid) && platform.devicesMultiSwitchLight.includes(device.productModel)) {
                            if (Array.isArray(device.params.switches)) {
-                              for (i = 0; i <= platform.getChannelsByUIID(device.uiid); i++) {
+                              for (i = 0; i <= platform.helperChannelsByUIID(device.uiid); i++) {
                                  platform.addAccessory(device, device.deviceid + "SW" + i, "light");
                               }
                            }
@@ -213,7 +213,7 @@ class eWeLink {
                         //**********************//
                         else if (platform.devicesMultiSwitch.includes(device.uiid)) {
                            if (Array.isArray(device.params.switches)) {
-                              for (i = 0; i <= platform.getChannelsByUIID(device.uiid); i++) {
+                              for (i = 0; i <= platform.helperChannelsByUIID(device.uiid); i++) {
                                  platform.addAccessory(device, device.deviceid + "SW" + i, "switch");
                               }
                            }
@@ -522,7 +522,7 @@ class eWeLink {
                platform.log("Plugin initialisation has been successful.");
             });
          };
-         platform.httpRegion(function () {
+         platform.httpGetRegion(function () {
             platform.httpLogin(afterLogin.bind(platform));
          }.bind(platform));
       }.bind(platform));
@@ -536,7 +536,7 @@ class eWeLink {
          platform.log.warn("[%s] cannot be added as it is not supported by this plugin.", device.name);
          return;
       }
-      let channelCount = service === "bridge" ? Object.keys(device.params.rfList).length : platform.getChannelsByUIID(device.uiid);
+      let channelCount = service === "bridge" ? Object.keys(device.params.rfList).length : platform.helperChannelsByUIID(device.uiid);
       let switchNumber = hbDeviceId.substr(-1);
       if (switchNumber > channelCount) {
          platform.log.warn("[%s] cannot be added as the [%s] only has [%s] switches.", device.name, device.productModel, channelCount);
@@ -875,7 +875,7 @@ class eWeLink {
                accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, value);
                accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, cSte === 0 ? 1 : 0);
                
-               let payload = platform.prepareBlindPayload(accessory);
+               let payload = platform.helperBlindPayload(accessory);
                platform.wsSendMessage(JSON.stringify(payload), function () {
                   return;
                });
@@ -909,14 +909,14 @@ class eWeLink {
       accessory.context.startTimestamp = timestamp;
       accessory.context.targetTimestamp = timestamp + (duration * 1000);
       accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, moveUp ? 0 : 1);
-      let payload = platform.prepareBlindPayload(accessory);
+      let payload = platform.helperBlindPayload(accessory);
       platform.wsSendMessage(JSON.stringify(payload), function () {
          return;
       });
       let interval = setInterval(function () {
          if (Date.now() >= accessory.context.targetTimestamp) {
             accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, 2);
-            let payload = platform.prepareBlindPayload(accessory);
+            let payload = platform.helperBlindPayload(accessory);
             setTimeout(function () {
                platform.wsSendMessage(JSON.stringify(payload), function () {
                   return;
@@ -929,40 +929,6 @@ class eWeLink {
          }
       }, 100);
       callback();
-   }
-
-   prepareBlindPayload(accessory) {
-      let payload = {};
-      payload.action = "update";
-      payload.userAgent = "app";
-      payload.params = {};
-      let deviceFromApi = platform.devicesInEwe.get(accessory.context.hbDeviceId);
-      payload.params.switches = deviceFromApi.params.switches;
-      let switch0 = "off";
-      let switch1 = "off";
-      switch (accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value) {
-         case 2:
-         switch0 = "off";
-         switch1 = "off";
-         break;
-         case 1:
-         switch0 = "off";
-         switch1 = "on";
-         break;
-         case 0:
-         switch0 = "on";
-         switch1 = "off";
-         break;
-         default:
-         platform.log("[%s] PositionState type error.", accessory.displayName);
-         break;
-      }
-      payload.params.switches[accessory.context.switchUp].switch = switch0;
-      payload.params.switches[accessory.context.switchDown].switch = switch1;
-      payload.apikey = accessory.context.eweApiKey;
-      payload.deviceid = accessory.context.hbDeviceId;
-      payload.sequence = Math.floor(new Date());
-      return payload;
    }
    
    internalFanUpdate(accessory, type, targetState, callback) {
@@ -1495,7 +1461,38 @@ class eWeLink {
       return;
    }
    
-   getChannelsByUIID(uiid) {
+   helperBlindPayload(accessory) {
+      let payload = {};
+      payload.action = "update";
+      payload.userAgent = "app";
+      payload.params = {};
+      payload.params.switches = platform.devicesInEwe.get(accessory.context.hbDeviceId).params.switches;
+      let switch0 = "off";
+      let switch1 = "off";
+      switch (accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value) {
+         case 2:
+         default:
+         switch0 = "off";
+         switch1 = "off";
+         break;
+         case 1:
+         switch0 = "off";
+         switch1 = "on";
+         break;
+         case 0:
+         switch0 = "on";
+         switch1 = "off";
+         break;
+      }
+      payload.params.switches[accessory.context.switchUp].switch = switch0;
+      payload.params.switches[accessory.context.switchDown].switch = switch1;
+      payload.apikey = accessory.context.eweApiKey;
+      payload.deviceid = accessory.context.hbDeviceId;
+      payload.sequence = Math.floor(new Date());
+      return payload;
+   }
+   
+   helperChannelsByUIID(uiid) {
       const UIID_TO_CHAN = {
          1: 1, // "SOCKET"                                 \\ 20, MINI, BASIC, S26
          2: 2, // "SOCKET_2"                               \\ 
@@ -1557,11 +1554,11 @@ class eWeLink {
       return UIID_TO_CHAN[uiid] || 0;
    }
    
-   getSignature(string) {
+   helperGetSignature(string) {
       return crypto.createHmac("sha256", "6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM").update(string).digest("base64");
    }
    
-   httpRegion(callback) {
+   httpGetRegion(callback) {
       let data = {
          "country_code": platform.config.countryCode,
          "version": 8,
@@ -1583,7 +1580,7 @@ class eWeLink {
          return kv.key + "=" + kv.value;
       }).join("&");
       let wc = request.createClient("https://api.coolkit.cc:8080");
-      wc.headers["Authorization"] = "Sign " + platform.getSignature(dataToSign);
+      wc.headers["Authorization"] = "Sign " + platform.helperGetSignature(dataToSign);
       wc.headers["Content-Type"] = "application/json;charset=UTF-8";
       wc.get("/api/user/region?" + querystring.stringify(data), function (err, res, body) {
          if (err) {
@@ -1634,7 +1631,7 @@ class eWeLink {
       if (platform.debugReqRes) platform.log.warn("Sending HTTPS login request.\n" + JSON.stringify(data, null, 2));
       else if (platform.debug) platform.log("Sending HTTPS login request.");
       let wc = request.createClient("https://" + platform.apiHost);
-      wc.headers["Authorization"] = "Sign " + platform.getSignature(JSON.stringify(data));
+      wc.headers["Authorization"] = "Sign " + platform.helperGetSignature(JSON.stringify(data));
       wc.headers["Content-Type"] = "application/json;charset=UTF-8";
       wc.post("/api/user/login", data, function (err, res, body) {
          if (err) {
