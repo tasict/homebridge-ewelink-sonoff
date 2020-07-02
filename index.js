@@ -840,278 +840,6 @@ class eWeLink {
       }
    }
    
-   internalSwitchUpdate(accessory, isOn, callback) {
-      let targetState = isOn ? "on" : "off";
-      let otherAccessory;
-      let i;
-      let payload = {};
-      payload.action = "update";
-      payload.userAgent = "app";
-      payload.apikey = accessory.context.eweApiKey;
-      payload.deviceid = accessory.context.eweDeviceId;
-      payload.sequence = Math.floor(new Date());
-      payload.params = {};
-      switch (accessory.context.switchNumber) {
-         case "X":
-         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
-         payload.params.switch = targetState;
-         accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
-         break;
-         case "0":
-         if (platform.debug) platform.log("[%s] requesting to turn group [%s].", accessory.displayName, targetState);
-         payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
-         payload.params.switches[0].switch = targetState;
-         payload.params.switches[1].switch = targetState;
-         payload.params.switches[2].switch = targetState;
-         payload.params.switches[3].switch = targetState;
-         accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
-         for (i = 1; i <= 4; i++) {
-            if (platform.devicesInHB.has(accessory.context.eweDeviceId + "SW" + i)) {
-               otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW" + i);
-               otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
-            }
-         }
-         break;
-         case "1":
-         case "2":
-         case "3":
-         case "4":
-         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
-         payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
-         payload.params.switches[parseInt(accessory.context.switchNumber) - 1].switch = targetState;
-         accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
-         let ch;
-         let masterState = "off";
-         for (i = 1; i <= 4; i++) {
-            if (platform.devicesInHB.has(accessory.context.eweDeviceId + "SW" + i)) {
-               ch = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW" + i).getService(Service.Switch).getCharacteristic(Characteristic.On).value;
-               if (ch) {
-                  masterState = "on";
-               }
-            }
-         }
-         otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW0");
-         otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, masterState === "on");
-         break;
-      }
-      platform.wsSendMessage(JSON.stringify(payload), callback);
-   }
-   
-   internalOutletUpdate(accessory, isOn, callback) {
-      let targetState = isOn ? "on" : "off";
-      let payload = {};
-      payload.action = "update";
-      payload.userAgent = "app";
-      payload.apikey = accessory.context.eweApiKey;
-      payload.deviceid = accessory.context.eweDeviceId;
-      payload.sequence = Math.floor(new Date());
-      payload.params = {};
-      if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
-      payload.params.switch = targetState;
-      accessory.getService(Service.Outlet).updateCharacteristic(Characteristic.On, isOn);
-      platform.wsSendMessage(JSON.stringify(payload), callback);
-   }
-   
-   internalLightbulbUpdate(accessory, isOn, callback) {
-      let targetState = isOn ? "on" : "off";
-      let otherAccessory;
-      let i;
-      let payload = {};
-      payload.action = "update";
-      payload.userAgent = "app";
-      payload.apikey = accessory.context.eweApiKey;
-      payload.deviceid = accessory.context.eweDeviceId;
-      payload.sequence = Math.floor(new Date());
-      payload.params = {};
-      switch (accessory.context.switchNumber) {
-         case "X":
-         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
-         if (platform.devicesColourable.includes(accessory.context.eweUIID)) { // The B1 and L1 use state instead of switch.
-            payload.params.state = targetState;
-         } else {
-            payload.params.switch = targetState;
-         }
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, isOn);
-         break;
-         case "0":
-         if (platform.debug) platform.log("[%s] requesting to turn group [%s].", accessory.displayName, targetState);
-         payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
-         payload.params.switches[0].switch = targetState;
-         payload.params.switches[1].switch = targetState;
-         payload.params.switches[2].switch = targetState;
-         payload.params.switches[3].switch = targetState;
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, isOn);
-         for (i = 1; i <= 4; i++) {
-            if (platform.devicesInHB.has(accessory.context.eweDeviceId + "SW" + i)) {
-               otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW" + i);
-               otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, isOn);
-            }
-         }
-         break;
-         case "1":
-         case "2":
-         case "3":
-         case "4":
-         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
-         payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
-         payload.params.switches[parseInt(accessory.context.switchNumber) - 1].switch = targetState;
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, isOn);
-         let ch;
-         let masterState = "off";
-         for (i = 1; i <= 4; i++) {
-            if (platform.devicesInHB.has(accessory.context.eweDeviceId + "SW" + i)) {
-               ch = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW" + i).getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
-               if (ch) {
-                  masterState = "on";
-               }
-            }
-         }
-         otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW0");
-         otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, masterState === "on");
-         break;
-      }
-      platform.wsSendMessage(JSON.stringify(payload), callback);
-   }
-   
-   internalBrightnessUpdate(accessory, value, callback) {
-      let payload = {};
-      payload.action = "update";
-      payload.userAgent = "app";
-      payload.apikey = accessory.context.eweApiKey;
-      payload.deviceid = accessory.context.eweDeviceId;
-      payload.sequence = Math.floor(new Date());
-      payload.params = {};
-      
-      if (value === 0) {
-         payload.params.switch = "off";
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
-      } else {
-         if (!accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) payload.params.switch = "on";
-         if (platform.debug) platform.log("[%s] requesting to turn brightness to [%s%].", accessory.displayName, value);
-         
-         if (accessory.context.eweUIID === 36) { // KING-M4
-            let scaled = Math.round(value * 9 / 10 + 10);
-            payload.params.bright = scaled;
-         }
-         if (accessory.context.eweUIID === 44) { // D1
-            payload.params.brightness = value;
-            payload.params.mode = 0;
-         }
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, value);
-      }
-      setTimeout(function() {
-         platform.wsSendMessage(JSON.stringify(payload), callback);
-      }, 250);
-   }
-   
-   internalHSBUpdate(accessory, type, value, callback) {
-      let newRGB;
-      let curHue;
-      let curSat;
-      let payload = {};
-      payload.action = "update";
-      payload.userAgent = "app";
-      payload.apikey = accessory.context.eweApiKey;
-      payload.deviceid = accessory.context.eweDeviceId;
-      payload.sequence = Math.floor(new Date());
-      payload.params = {};
-      switch (type) {
-         case "hue":
-         curSat = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
-         newRGB = convert.hsv.rgb(value, curSat, 100);
-         if (accessory.context.eweUIID === 59) { // L1
-            payload.params.mode = 1;
-            payload.params.colorR = newRGB[0];
-            payload.params.colorG = newRGB[1];
-            payload.params.colorB = newRGB[2];
-         } else { // B1
-            payload.params.zyx_mode = 2;
-            payload.params.channel2 = newRGB[0];
-            payload.params.channel3 = newRGB[1];
-            payload.params.channel4 = newRGB[2];
-         }
-         if (platform.debug) platform.log("[%s] requesting to change hue to [%s].", accessory.displayName, value);
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, value);
-         break;
-         case "bri":
-         curHue = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value;
-         curSat = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
-         if (accessory.context.eweUIID === 22) { // B1
-            newRGB = convert.hsv.rgb(curHue, curSat, value);
-            payload.params.zyx_mode = 2;
-            payload.params.channel2 = newRGB[0];
-            payload.params.channel3 = newRGB[1];
-            payload.params.channel4 = newRGB[2];
-         }
-         if (accessory.context.eweUIID === 59) { // L1
-            payload.params.mode = 1;
-            payload.params.bright = value;
-         }
-         
-         if (platform.debug) platform.log("[%s] requesting to change brightness to [%s%].", accessory.displayName, value);
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, value);
-         break;
-      }
-      setTimeout(function() {
-         platform.wsSendMessage(JSON.stringify(payload), callback);
-      }, 250);
-   }
-   
-   internalFanUpdate(accessory, type, targetState, callback) {
-      let newPower;
-      let newSpeed;
-      let newLight;
-      switch (type) {
-         case "power":
-         newPower = targetState;
-         newSpeed = targetState ? 33 : 0;
-         newLight = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
-         break;
-         case "speed":
-         newPower = targetState >= 33;
-         newSpeed = targetState;
-         newLight = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
-         break;
-         case "light":
-         newPower = accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On).value;
-         newSpeed = accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed).value;
-         newLight = targetState;
-         break;
-      }
-      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newLight);
-      accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, newPower);
-      accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, newSpeed);
-      if (platform.debug) platform.log("[%s] requesting to change fan %s.", accessory.displayName, type);
-      let payload = {};
-      payload.params = {};
-      payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
-      payload.params.switches[0].switch = newLight ? "on" : "off";
-      payload.params.switches[1].switch = newSpeed >= 33 ? "on" : "off";
-      payload.params.switches[2].switch = newSpeed >= 66 && newSpeed < 99 ? "on" : "off";
-      payload.params.switches[3].switch = newSpeed >= 99 ? "on" : "off";
-      payload.action = "update";
-      payload.userAgent = "app";
-      payload.apikey = accessory.context.eweApiKey;
-      payload.deviceid = accessory.context.eweDeviceId;
-      payload.sequence = Math.floor(new Date());
-      platform.wsSendMessage(JSON.stringify(payload), callback);
-   }
-   
-   internalThermostatUpdate(accessory, targetState, callback) {
-      if (platform.debug) platform.log("[%s] requesting to turn switch [%s].", accessory.displayName, targetState ? "on" : "off");
-      accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, targetState);
-      let payload = {};
-      payload.params = {};
-      payload.action = "update";
-      payload.userAgent = "app";
-      payload.apikey = accessory.context.eweApiKey;
-      payload.deviceid = accessory.context.eweDeviceId;
-      payload.sequence = Math.floor(new Date());
-      payload.params.switch = targetState ? "on" : "off";
-      payload.params.mainSwitch = targetState ? "on" : "off";
-      platform.wsSendMessage(JSON.stringify(payload), callback);
-   }
-   
    setBlindTargetPosition(accessory, pos, callback) {
       platform.log("Setting [%s] new target position from [%s] to [%s].", accessory.displayName, accessory.context.targetPos, pos, );
       let timestamp = Date.now();
@@ -1294,6 +1022,278 @@ class eWeLink {
       payload.deviceid = accessory.context.hbDeviceId;
       payload.sequence = Math.floor(new Date());
       return payload;
+   }
+   
+   internalFanUpdate(accessory, type, targetState, callback) {
+      let newPower;
+      let newSpeed;
+      let newLight;
+      switch (type) {
+         case "power":
+         newPower = targetState;
+         newSpeed = targetState ? 33 : 0;
+         newLight = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
+         break;
+         case "speed":
+         newPower = targetState >= 33;
+         newSpeed = targetState;
+         newLight = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
+         break;
+         case "light":
+         newPower = accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On).value;
+         newSpeed = accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed).value;
+         newLight = targetState;
+         break;
+      }
+      accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newLight);
+      accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, newPower);
+      accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, newSpeed);
+      if (platform.debug) platform.log("[%s] requesting to change fan %s.", accessory.displayName, type);
+      let payload = {};
+      payload.params = {};
+      payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
+      payload.params.switches[0].switch = newLight ? "on" : "off";
+      payload.params.switches[1].switch = newSpeed >= 33 ? "on" : "off";
+      payload.params.switches[2].switch = newSpeed >= 66 && newSpeed < 99 ? "on" : "off";
+      payload.params.switches[3].switch = newSpeed >= 99 ? "on" : "off";
+      payload.action = "update";
+      payload.userAgent = "app";
+      payload.apikey = accessory.context.eweApiKey;
+      payload.deviceid = accessory.context.eweDeviceId;
+      payload.sequence = Math.floor(new Date());
+      platform.wsSendMessage(JSON.stringify(payload), callback);
+   }
+   
+   internalThermostatUpdate(accessory, targetState, callback) {
+      if (platform.debug) platform.log("[%s] requesting to turn switch [%s].", accessory.displayName, targetState ? "on" : "off");
+      accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, targetState);
+      let payload = {};
+      payload.params = {};
+      payload.action = "update";
+      payload.userAgent = "app";
+      payload.apikey = accessory.context.eweApiKey;
+      payload.deviceid = accessory.context.eweDeviceId;
+      payload.sequence = Math.floor(new Date());
+      payload.params.switch = targetState ? "on" : "off";
+      payload.params.mainSwitch = targetState ? "on" : "off";
+      platform.wsSendMessage(JSON.stringify(payload), callback);
+   }
+   
+   internalOutletUpdate(accessory, isOn, callback) {
+      let targetState = isOn ? "on" : "off";
+      let payload = {};
+      payload.action = "update";
+      payload.userAgent = "app";
+      payload.apikey = accessory.context.eweApiKey;
+      payload.deviceid = accessory.context.eweDeviceId;
+      payload.sequence = Math.floor(new Date());
+      payload.params = {};
+      if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
+      payload.params.switch = targetState;
+      accessory.getService(Service.Outlet).updateCharacteristic(Characteristic.On, isOn);
+      platform.wsSendMessage(JSON.stringify(payload), callback);
+   }
+   
+   internalLightbulbUpdate(accessory, isOn, callback) {
+      let targetState = isOn ? "on" : "off";
+      let otherAccessory;
+      let i;
+      let payload = {};
+      payload.action = "update";
+      payload.userAgent = "app";
+      payload.apikey = accessory.context.eweApiKey;
+      payload.deviceid = accessory.context.eweDeviceId;
+      payload.sequence = Math.floor(new Date());
+      payload.params = {};
+      switch (accessory.context.switchNumber) {
+         case "X":
+         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
+         if (platform.devicesColourable.includes(accessory.context.eweUIID)) { // The B1 and L1 use state instead of switch.
+            payload.params.state = targetState;
+         } else {
+            payload.params.switch = targetState;
+         }
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, isOn);
+         break;
+         case "0":
+         if (platform.debug) platform.log("[%s] requesting to turn group [%s].", accessory.displayName, targetState);
+         payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
+         payload.params.switches[0].switch = targetState;
+         payload.params.switches[1].switch = targetState;
+         payload.params.switches[2].switch = targetState;
+         payload.params.switches[3].switch = targetState;
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, isOn);
+         for (i = 1; i <= 4; i++) {
+            if (platform.devicesInHB.has(accessory.context.eweDeviceId + "SW" + i)) {
+               otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW" + i);
+               otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, isOn);
+            }
+         }
+         break;
+         case "1":
+         case "2":
+         case "3":
+         case "4":
+         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
+         payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
+         payload.params.switches[parseInt(accessory.context.switchNumber) - 1].switch = targetState;
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, isOn);
+         let ch;
+         let masterState = "off";
+         for (i = 1; i <= 4; i++) {
+            if (platform.devicesInHB.has(accessory.context.eweDeviceId + "SW" + i)) {
+               ch = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW" + i).getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
+               if (ch) {
+                  masterState = "on";
+               }
+            }
+         }
+         otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW0");
+         otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, masterState === "on");
+         break;
+      }
+      platform.wsSendMessage(JSON.stringify(payload), callback);
+   }
+   
+   internalBrightnessUpdate(accessory, value, callback) {
+      let payload = {};
+      payload.action = "update";
+      payload.userAgent = "app";
+      payload.apikey = accessory.context.eweApiKey;
+      payload.deviceid = accessory.context.eweDeviceId;
+      payload.sequence = Math.floor(new Date());
+      payload.params = {};
+      
+      if (value === 0) {
+         payload.params.switch = "off";
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
+      } else {
+         if (!accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) payload.params.switch = "on";
+         if (platform.debug) platform.log("[%s] requesting to turn brightness to [%s%].", accessory.displayName, value);
+         
+         if (accessory.context.eweUIID === 36) { // KING-M4
+            let scaled = Math.round(value * 9 / 10 + 10);
+            payload.params.bright = scaled;
+         }
+         if (accessory.context.eweUIID === 44) { // D1
+            payload.params.brightness = value;
+            payload.params.mode = 0;
+         }
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, value);
+      }
+      setTimeout(function() {
+         platform.wsSendMessage(JSON.stringify(payload), callback);
+      }, 250);
+   }
+   
+   internalHSBUpdate(accessory, type, value, callback) {
+      let newRGB;
+      let curHue;
+      let curSat;
+      let payload = {};
+      payload.action = "update";
+      payload.userAgent = "app";
+      payload.apikey = accessory.context.eweApiKey;
+      payload.deviceid = accessory.context.eweDeviceId;
+      payload.sequence = Math.floor(new Date());
+      payload.params = {};
+      switch (type) {
+         case "hue":
+         curSat = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
+         newRGB = convert.hsv.rgb(value, curSat, 100);
+         if (accessory.context.eweUIID === 59) { // L1
+            payload.params.mode = 1;
+            payload.params.colorR = newRGB[0];
+            payload.params.colorG = newRGB[1];
+            payload.params.colorB = newRGB[2];
+         } else { // B1
+            payload.params.zyx_mode = 2;
+            payload.params.channel2 = newRGB[0];
+            payload.params.channel3 = newRGB[1];
+            payload.params.channel4 = newRGB[2];
+         }
+         if (platform.debug) platform.log("[%s] requesting to change hue to [%s].", accessory.displayName, value);
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, value);
+         break;
+         case "bri":
+         curHue = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value;
+         curSat = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
+         if (accessory.context.eweUIID === 22) { // B1
+            newRGB = convert.hsv.rgb(curHue, curSat, value);
+            payload.params.zyx_mode = 2;
+            payload.params.channel2 = newRGB[0];
+            payload.params.channel3 = newRGB[1];
+            payload.params.channel4 = newRGB[2];
+         }
+         if (accessory.context.eweUIID === 59) { // L1
+            payload.params.mode = 1;
+            payload.params.bright = value;
+         }
+         
+         if (platform.debug) platform.log("[%s] requesting to change brightness to [%s%].", accessory.displayName, value);
+         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, value);
+         break;
+      }
+      setTimeout(function() {
+         platform.wsSendMessage(JSON.stringify(payload), callback);
+      }, 250);
+   }
+   
+   internalSwitchUpdate(accessory, isOn, callback) {
+      let targetState = isOn ? "on" : "off";
+      let otherAccessory;
+      let i;
+      let payload = {};
+      payload.action = "update";
+      payload.userAgent = "app";
+      payload.apikey = accessory.context.eweApiKey;
+      payload.deviceid = accessory.context.eweDeviceId;
+      payload.sequence = Math.floor(new Date());
+      payload.params = {};
+      switch (accessory.context.switchNumber) {
+         case "X":
+         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
+         payload.params.switch = targetState;
+         accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
+         break;
+         case "0":
+         if (platform.debug) platform.log("[%s] requesting to turn group [%s].", accessory.displayName, targetState);
+         payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
+         payload.params.switches[0].switch = targetState;
+         payload.params.switches[1].switch = targetState;
+         payload.params.switches[2].switch = targetState;
+         payload.params.switches[3].switch = targetState;
+         accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
+         for (i = 1; i <= 4; i++) {
+            if (platform.devicesInHB.has(accessory.context.eweDeviceId + "SW" + i)) {
+               otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW" + i);
+               otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
+            }
+         }
+         break;
+         case "1":
+         case "2":
+         case "3":
+         case "4":
+         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
+         payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
+         payload.params.switches[parseInt(accessory.context.switchNumber) - 1].switch = targetState;
+         accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, isOn);
+         let ch;
+         let masterState = "off";
+         for (i = 1; i <= 4; i++) {
+            if (platform.devicesInHB.has(accessory.context.eweDeviceId + "SW" + i)) {
+               ch = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW" + i).getService(Service.Switch).getCharacteristic(Characteristic.On).value;
+               if (ch) {
+                  masterState = "on";
+               }
+            }
+         }
+         otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW0");
+         otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, masterState === "on");
+         break;
+      }
+      platform.wsSendMessage(JSON.stringify(payload), callback);
    }
    
    externalBlindUpdate(hbDeviceId, params) {
