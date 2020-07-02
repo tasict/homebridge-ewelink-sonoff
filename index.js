@@ -1,7 +1,7 @@
-let ws = require("ws");
-let nonce = require("nonce")();
-let crypto = require("crypto");
-let convert = require("color-convert");
+const ws = require("ws");
+const nonce = require("nonce")();
+const crypto = require("crypto");
+const convert = require("color-convert");
 const axios = require('axios');
 let platform;
 let Accessory;
@@ -527,7 +527,7 @@ class eWeLink {
          }.bind(platform));
       }.bind(platform));
    }
-
+   
    addAccessory(device, hbDeviceId, service) {
       if (platform.devicesInHB.get(hbDeviceId)) {
          return; // device is already in Homebridge.
@@ -711,7 +711,7 @@ class eWeLink {
          platform.log.warn("[%s] cannot be added - [%s].", accessory.displayName, e);
       }
    }
-
+   
    configureAccessory(accessory) {
       if (accessory.getService(Service.WindowCovering)) {
          accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
@@ -826,7 +826,7 @@ class eWeLink {
       accessory.reachable = true;
       platform.devicesInHB.set(accessory.context.hbDeviceId, accessory);
    }
-
+   
    removeAccessory(accessory) {
       try {
          platform.devicesInHB.delete(accessory.context.hbDeviceId);
@@ -836,7 +836,7 @@ class eWeLink {
          platform.log.warn("[%s] has not been removed - [%s].", accessory.displayName, e);
       }
    }
-
+   
    internalBlindUpdate(accessory, value, callback) {
       platform.log("[%s] setting new target position to [%s].", accessory.displayName, value);
       let cPos = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value;
@@ -873,7 +873,7 @@ class eWeLink {
                accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.CurrentPosition, actualPosition);
                accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, value);
                accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, cSte === 0 ? 1 : 0);
-
+               
                let payload = platform.helperBlindPayload(accessory);
                platform.wsSendMessage(JSON.stringify(payload), function () {
                   return;
@@ -929,7 +929,7 @@ class eWeLink {
       }, 100);
       callback();
    }
-
+   
    internalFanUpdate(accessory, type, targetState, callback) {
       let newPower;
       let newSpeed;
@@ -969,7 +969,7 @@ class eWeLink {
       payload.sequence = Math.floor(new Date());
       platform.wsSendMessage(JSON.stringify(payload), callback);
    }
-
+   
    internalThermostatUpdate(accessory, targetState, callback) {
       if (platform.debug) platform.log("[%s] requesting to turn switch [%s].", accessory.displayName, targetState ? "on" : "off");
       accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, targetState);
@@ -984,7 +984,7 @@ class eWeLink {
       payload.params.mainSwitch = targetState ? "on" : "off";
       platform.wsSendMessage(JSON.stringify(payload), callback);
    }
-
+   
    internalOutletUpdate(accessory, isOn, callback) {
       let targetState = isOn ? "on" : "off";
       let payload = {};
@@ -999,7 +999,7 @@ class eWeLink {
       accessory.getService(Service.Outlet).updateCharacteristic(Characteristic.On, isOn);
       platform.wsSendMessage(JSON.stringify(payload), callback);
    }
-
+   
    internalLightbulbUpdate(accessory, isOn, callback) {
       let targetState = isOn ? "on" : "off";
       let otherAccessory;
@@ -1014,7 +1014,7 @@ class eWeLink {
       switch (accessory.context.switchNumber) {
       case "X":
          if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, targetState);
-         if (platform.devicesColourable.includes(accessory.context.eweUIID)) { // The B1 and L1 use state instead of switch.
+         if (accessory.context.eweUIID === 22) { // The L1 use state instead of switch.
             payload.params.state = targetState;
          } else {
             payload.params.switch = targetState;
@@ -1060,7 +1060,7 @@ class eWeLink {
       }
       platform.wsSendMessage(JSON.stringify(payload), callback);
    }
-
+   
    internalBrightnessUpdate(accessory, value, callback) {
       let payload = {};
       payload.action = "update";
@@ -1069,14 +1069,14 @@ class eWeLink {
       payload.deviceid = accessory.context.eweDeviceId;
       payload.sequence = Math.floor(new Date());
       payload.params = {};
-
+      
       if (value === 0) {
          payload.params.switch = "off";
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
       } else {
          if (!accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) payload.params.switch = "on";
          if (platform.debug) platform.log("[%s] requesting to turn brightness to [%s%].", accessory.displayName, value);
-
+         
          if (accessory.context.eweUIID === 36) { // KING-M4
             let scaled = Math.round(value * 9 / 10 + 10);
             payload.params.bright = scaled;
@@ -1091,7 +1091,7 @@ class eWeLink {
          platform.wsSendMessage(JSON.stringify(payload), callback);
       }, 250);
    }
-
+   
    internalHSBUpdate(accessory, type, value, callback) {
       let newRGB;
       let curHue;
@@ -1135,7 +1135,7 @@ class eWeLink {
             payload.params.mode = 1;
             payload.params.bright = value;
          }
-
+         
          if (platform.debug) platform.log("[%s] requesting to change brightness to [%s%].", accessory.displayName, value);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, value);
          break;
@@ -1144,7 +1144,7 @@ class eWeLink {
          platform.wsSendMessage(JSON.stringify(payload), callback);
       }, 250);
    }
-
+   
    internalSwitchUpdate(accessory, isOn, callback) {
       let targetState = isOn ? "on" : "off";
       let otherAccessory;
@@ -1201,7 +1201,7 @@ class eWeLink {
       }
       platform.wsSendMessage(JSON.stringify(payload), callback);
    }
-
+   
    externalBlindUpdate(hbDeviceId, params) {
       let accessory = platform.devicesInHB.get(hbDeviceId);
       let cPos = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value;
@@ -1262,7 +1262,7 @@ class eWeLink {
       }
       return;
    }
-
+   
    externalFanUpdate(hbDeviceId, params) {
       let accessory = platform.devicesInHB.get(hbDeviceId);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switches[0].switch === "on");
@@ -1282,7 +1282,7 @@ class eWeLink {
       accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, speed);
       return;
    }
-
+   
    externalThermostatUpdate(hbDeviceId, params) {
       let accessory = platform.devicesInHB.get(hbDeviceId);
       if (params.hasOwnProperty("switch") || params.hasOwnProperty("mainSwitch")) {
@@ -1304,28 +1304,28 @@ class eWeLink {
       }
       return;
    }
-
+   
    externalOutletUpdate(hbDeviceId, params) {
       let accessory = platform.devicesInHB.get(hbDeviceId);
       accessory.getService(Service.Outlet).updateCharacteristic(Characteristic.On, params.switch === "on");
       return;
    }
-
+   
    externalSingleLightUpdate(hbDeviceId, params) {
       let accessory = platform.devicesInHB.get(hbDeviceId);
       let newColour;
       let mode;
       let isOn = false;
-      if ((accessory.context.eweUIID === 22 || accessory.context.eweUIID === 59) && params.hasOwnProperty("state")) {
+      if ((accessory.context.eweUIID === 22) && params.hasOwnProperty("state")) {
          isOn = params.state === "on";
-      } else if (accessory.context.eweUIID !== 22 && accessory.context.eweUIID !== 59 && params.hasOwnProperty("switch")) {
+      } else if (accessory.context.eweUIID !== 22 && params.hasOwnProperty("switch")) {
          isOn = params.switch === "on";
       } else {
          isOn = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
       }
       if (isOn) {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
-
+         
          switch (accessory.context.eweUIID) {
          case 36: // KING-M4
             if (params.hasOwnProperty("bright")) {
@@ -1378,7 +1378,7 @@ class eWeLink {
       }
       return;
    }
-
+   
    externalMultiLightUpdate(hbDeviceId, params) {
       let accessory = platform.devicesInHB.get(hbDeviceId);
       let idToCheck = hbDeviceId.slice(0, -1);
@@ -1398,13 +1398,13 @@ class eWeLink {
       }
       return;
    }
-
+   
    externalSingleSwitchUpdate(hbDeviceId, params) {
       let accessory = platform.devicesInHB.get(hbDeviceId);
       accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, params.switch === "on");
       return;
    }
-
+   
    externalMultiSwitchUpdate(hbDeviceId, params) {
       let accessory = platform.devicesInHB.get(hbDeviceId);
       let idToCheck = hbDeviceId.slice(0, -1);
@@ -1423,7 +1423,7 @@ class eWeLink {
       }
       return;
    }
-
+   
    externalBridgeUpdate(hbDeviceId, params) {
       let accessory = platform.devicesInHB.get(hbDeviceId);
       let idToCheck = hbDeviceId.slice(0, -1);
@@ -1458,7 +1458,7 @@ class eWeLink {
       }, platform.sensorTimeLength * 1000);
       return;
    }
-
+   
    helperBlindPayload(accessory) {
       let payload = {};
       payload.action = "update";
@@ -1489,7 +1489,7 @@ class eWeLink {
       payload.sequence = Math.floor(new Date());
       return payload;
    }
-
+   
    helperChannelsByUIID(uiid) {
       const UIID_TO_CHAN = {
          1: 1, // "SOCKET"                                 \\ 20, MINI, BASIC, S26
@@ -1551,11 +1551,11 @@ class eWeLink {
       };
       return UIID_TO_CHAN[uiid] || 0;
    }
-
+   
    helperGetSignature(string) {
       return crypto.createHmac("sha256", "6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM").update(string).digest("base64");
    }
-
+   
    httpGetRegion(callback) {
       let data = {
          "country_code": platform.config.countryCode,
@@ -1577,7 +1577,7 @@ class eWeLink {
       dataToSign = dataToSign.map(function (kv) {
          return kv.key + "=" + kv.value;
       }).join("&");
-
+      
       axios.get("https://api.coolkit.cc:8080/api/user/region", {
          params: data,
          headers: {
@@ -1586,7 +1586,7 @@ class eWeLink {
          }
       }).then((res) => {
          let body = res.data;
-
+         
          if (!body.region) {
             platform.log.error("Server did not response with a region.");
             platform.log.warn("\n" + JSON.stringify(body, null, 2));
@@ -1615,7 +1615,7 @@ class eWeLink {
          return;
       }.bind(platform));
    }
-
+   
    httpLogin(callback) {
       let data = {};
       if (platform.emailLogin) {
@@ -1664,7 +1664,7 @@ class eWeLink {
          return;
       }.bind(platform));
    }
-
+   
    wsGetHost(callback) {
       axios({
          method: "post",
@@ -1697,7 +1697,7 @@ class eWeLink {
          return;
       }.bind(platform));
    }
-
+   
    wsSendMessage(string, callback) {
       platform.delaySend = 0;
       const delayOffset = 280;
