@@ -1,14 +1,14 @@
 let ws = require("ws");
-let request = require("request-json");
 let nonce = require("nonce")();
 let crypto = require("crypto");
 let convert = require("color-convert");
+const querystring = require("querystring");
+const axios = require('axios');
 let platform;
 let Accessory;
 let Service;
 let Characteristic;
 let UUIDGen;
-const querystring = require("querystring");
 module.exports = function (homebridge) {
    Accessory = homebridge.platformAccessory;
    Service = homebridge.hap.Service;
@@ -69,35 +69,36 @@ class eWeLink {
       };
       platform.api.on("didFinishLaunching", function () {
          let afterLogin = function () {
-            if (platform.debug) platform.log("Authorisation token received [%s].", platform.authenticationToken);
-            if (platform.debug) platform.log("User API key received [%s].", platform.apiKey);
-            // Get a list of all devices from eWeLink via the HTTPS API, and compare it to the list of Homebridge cached devices (and then vice versa).
-            if (platform.debug) platform.log("Requesting a list of devices through the eWeLink HTTPS API.");
-            let args = {
-               "apiKey": platform.apiKey,
-               "version": 8,
-               "ts": Math.floor(new Date().getTime() / 1000),
-               "nonce": nonce(),
-               "appid": platform.appid
-            };
-            platform.wc = request.createClient("https://" + platform.apiHost);
-            platform.wc.headers.Authorization = "Bearer " + platform.authenticationToken;
-            platform.wc.get("/api/user/device?" + querystring.stringify(args), function (err, res, body) {
-               let error = false;
-               if (err) error = err;
-               else if (!body) error = "No data in response";
-               else if (body.hasOwnProperty("error") && body.error !== 0) {
-                  if (body.error === 401) error = "Authorisation token error";
-                  else if (body.error === 406) error = "Incorrect eWeLink username, password and country code in the config.";
-                  else error = JSON.stringify(body, null, 2);
-               }
-               if (error) {
-                  platform.log.error("An error occurred connecting to the HTTPS API");
-                  platform.log.warn("%s.", error);
-                  platform.log.error("This plugin will stop loading due to this error.");
+            if (platform.apiKey === "UNCONFIGURED") return;
+            let eWeLinkDevices;
+            axios.get("https://" + platform.apiHost + "/api/user/device", {
+               params: {
+                  apiKey: platform.apiKey,
+                  version: 8,
+                  ts: Math.floor(new Date().getTime() / 1000),
+                  nonce: nonce(),
+                  appid: platform.appid
+               },
+               headers: {"Authorization": "Bearer " + platform.authenticationToken}
+            }).then((res) => {
+               let body = res.data;
+               if (platform.debug) platform.log("Authorisation token received [%s].", platform.authenticationToken);
+               if (platform.debug) platform.log("User API key received [%s].", platform.apiKey);
+               if (platform.debug) platform.log("Requesting a list of devices through the eWeLink HTTPS API.");
+               if (body.hasOwnProperty("error") && body.error !== 0) {
+                  if (body.error === 401) throw "Authorisation token error";
+                  else if (body.error === 406) throw "Incorrect eWeLink username, password and country code in the config.";
+                  else throw JSON.stringify(body, null, 2);
                   return;
                }
-               let eWeLinkDevices = body.devicelist;
+               eWeLinkDevices = body.devicelist;
+            }).catch(function (error) {
+               platform.log.error("****** An error occurred connecting to the HTTPS API ******");
+               platform.log.warn("%s.", error);
+               platform.log.error("****** This plugin will stop loading due to this error. ******");
+               return;
+            }).then(function () {
+               if (eWeLinkDevices === undefined) return;
                let primaryDeviceCount = Object.keys(eWeLinkDevices).length;
                if (primaryDeviceCount === 0) {
                   platform.log("[0] primary devices were loaded from your eWeLink account.");
@@ -1575,22 +1576,17 @@ class eWeLink {
       dataToSign = dataToSign.map(function (kv) {
          return kv.key + "=" + kv.value;
       }).join("&");
-      let wc = request.createClient("https://api.coolkit.cc:8080");
-      wc.headers.Authorization = "Sign " + platform.helperGetSignature(dataToSign);
-      wc.headers["Content-Type"] = "application/json;charset=UTF-8";
-      wc.get("/api/user/region?" + querystring.stringify(data), function (err, res, body) {
-         if (err) {
-            if (err.code === "ENOTFOUND") {
-               platform.log.warn("****************************************************************************");
-               platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
-               platform.log.warn("Please verify that your Homebridge instance is connected to the internet....");
-               platform.log.warn("****************************************************************************");
-            } else {
-               platform.log.error("An error occurred while getting region [%s].", err);
-            }
-            callback();
-            return;
+      
+      
+      axios.get("https://api.coolkit.cc:8080/api/user/region", {
+         params: data,
+         headers: {
+            "Authorization": "Sign " + platform.helperGetSignature(dataToSign),
+            "Content-Type": "application/json;charset=UTF-8"
          }
+      }).then((res) => {
+         let body = res.data;
+         
          if (!body.region) {
             platform.log.error("Server did not response with a region.");
             platform.log.warn("\n" + JSON.stringify(body, null, 2));
@@ -1609,6 +1605,14 @@ class eWeLink {
             platform.apiHost = newApiHost;
          }
          callback(body.region);
+         return;
+      }).catch(function (error) {
+         platform.log.error("****************************************************************************");
+         platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
+         platform.log.warn("Please verify that your Homebridge instance is connected to the internet....");
+         platform.log.error("****************************************************************************");
+         callback();
+         return;
       }.bind(platform));
    }
    
@@ -1626,29 +1630,20 @@ class eWeLink {
       data.appid = platform.appid;
       if (platform.debugReqRes) platform.log.warn("Sending HTTPS login request.\n" + JSON.stringify(data, null, 2));
       else if (platform.debug) platform.log("Sending HTTPS login request.");
-      let wc = request.createClient("https://" + platform.apiHost);
-      wc.headers.Authorization = "Sign " + platform.helperGetSignature(JSON.stringify(data));
-      wc.headers["Content-Type"] = "application/json;charset=UTF-8";
-      wc.post("/api/user/login", data, function (err, res, body) {
-         if (err) {
-            if (err.code === "ENOTFOUND") {
-               platform.log.warn("****************************************************************************");
-               platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
-               platform.log.warn("Please verify that your Homebridge instance is connected to the internet....");
-               platform.log.warn("****************************************************************************");
-            } else {
-               platform.log.error("An error occurred while logging in. [%s].", err);
-            }
-            callback();
-            return;
+      axios({
+         method: "post",
+         url: "https://" + platform.apiHost + "/api/user/login",
+         data: data,
+         headers: {
+            "Authorization": "Sign " + platform.helperGetSignature(JSON.stringify(data)),
+            "Content-Type": "application/json;charset=UTF-8"
          }
+      }).then((res) => {
+         let body = res.data;
+         if (!body.at) throw JSON.stringify(body, null, 2);
          if (body.hasOwnProperty("error") && body.error === 301 && body.hasOwnProperty("region")) {
             let idx = platform.apiHost.indexOf("-");
-            if (idx === -1) {
-               platform.log.error("Received new region [%s]. However we cannot construct the new API host url.", body.region);
-               callback();
-               return;
-            }
+            if (idx === -1) throw "Cannot construct the new API host url.";
             let newApiHost = body.region + platform.apiHost.substring(idx);
             if (platform.apiHost !== newApiHost) {
                if (platform.debug) platform.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
@@ -1657,56 +1652,49 @@ class eWeLink {
                return;
             }
          }
-         if (!body.at) {
-            if (body.error === 401) {
-               platform.log.warn("****************************************************************************");
-               platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
-               platform.log.warn("Please double check your eWeLink username and password in the configuration.");
-               platform.log.warn("****************************************************************************");
-            } else {
-               platform.log.warn("\n" + JSON.stringify(body, null, 2));
-            }
-            callback();
-            return;
-         }
          platform.authenticationToken = body.at;
          platform.apiKey = body.user.apikey;
-         platform.wc = request.createClient("https://" + platform.apiHost);
-         platform.wc.headers.Authorization = "Bearer " + body.at;
          platform.wsGetHost(function () {
             callback(body.at);
          }.bind(platform));
+      }).catch(function (error) {
+         platform.log.error("****** An error occurred while logging in. ******");
+         platform.log.warn("[%s].", error);
+         callback()
+         return;
       }.bind(platform));
    }
    
    wsGetHost(callback) {
-      let data = {};
-      data.accept = "mqtt,ws";
-      data.version = 8;
-      data.ts = Math.floor(new Date().getTime() / 1000);
-      data.nonce = nonce();
-      data.appid = platform.appid;
-      let wc = request.createClient("https://" + platform.apiHost.replace("-api", "-disp"));
-      wc.headers.Authorization = "Bearer " + platform.authenticationToken;
-      wc.headers["Content-Type"] = "application/json;charset=UTF-8";
-      wc.post("/dispatch/app", data, function (err, res, body) {
-         if (err) {
-            platform.log.error("An error occurred while getting web socket host [%s].", err);
-            callback();
-            return;
+      axios({
+         method: "post",
+         url: "https://" + platform.apiHost.replace("-api", "-disp") + "/dispatch/app",
+         data: {
+            accept: "mqtt,ws",
+            version: 8,
+            ts: Math.floor(new Date().getTime() / 1000),
+            nonce: nonce(),
+            appid: platform.appid
+         },
+         headers: {
+            "Authorization": "Bearer " + platform.authenticationToken,
+            "Content-Type": "application/json;charset=UTF-8"
          }
-         if (!body.domain) {
-            platform.log.error("Server did not response with a web socket host.");
-            platform.log.warn("\n" + JSON.stringify(body, null, 2));
-            callback();
-            return;
-         }
+      }).then((res) => {
+         let body = res.data;
+         if (!body.domain) throw "Server did not response with a web socket host.";
          if (platform.debug) platform.log("Web socket host received [%s].", body.domain);
          platform.wsHost = body.domain;
          if (platform.ws) {
             platform.ws.url = "wss://" + body.domain + ":8080/api/ws";
          }
          callback(body.domain);
+         return;
+      }).catch(function (error) {
+         platform.log.error("****** An error occurred while getting web socket host. ******");
+         platform.log.warn("[%s].", error);
+         callback()
+         return;
       }.bind(platform));
    }
    
