@@ -57,8 +57,8 @@ class eWeLink {
       platform.devicesFan = [34];
       platform.devicesOutlet = [32];
       platform.devicesBridge = [28];
-      platform.deviceGroup = new Map();
-      platform.groupDefaults = {
+      platform.customGroup = new Map();
+      platform.customGroupDefs = {
          "switchUp": 1,
          "switchDown": 2,
          "timeUp": 40,
@@ -118,17 +118,17 @@ class eWeLink {
                      platform.devicesInEwe.set(device.deviceid, device);
                   }
                });
-               // Blind groupings found in the configuration are set in the "platform.deviceGroup" map.
+               // Blind groupings found in the configuration are set in the "platform.customGroup" map.
                if (platform.config["groups"] && Object.keys(platform.config.groups).length > 0) {
                   platform.config.groups.forEach((group) => {
                      if (typeof group.deviceId !== "undefined" && platform.devicesInEwe.has(group.deviceId + "SWX")) {
-                        platform.deviceGroup.set(group.deviceId + "SWX", group);
+                        platform.customGroup.set(group.deviceId + "SWX", group);
                      }
                   });
                }
                platform.log("[%s] eWeLink devices were loaded from the Homebridge cache..", platform.devicesInHB.size);
                platform.log("[%s] primary devices were loaded from your eWeLink account.", primaryDeviceCount);
-               platform.log("[%s] groups were loaded from the Homebridge configuration.", platform.deviceGroup.size);
+               platform.log("[%s] groups were loaded from the Homebridge configuration.", platform.customGroup.size);
                platform.log("The Homebridge configuration for these devices will be refreshed.");
                if (platform.debug) platform.log("Checking if devices need to be removed from the Homebridge cache.");
                if (platform.devicesInHB.size > 0) {
@@ -146,11 +146,11 @@ class eWeLink {
                      let i;
                      // Add non-existing devices
                      if (!platform.devicesInHB.has(device.deviceid + "SWX") && !platform.devicesInHB.has(device.deviceid + "SW0")) {
-                        //********//
-                        // BLINDS //
-                        //********//
-                        if (platform.deviceGroup.has(device.deviceid) && platform.deviceGroup.get(device.deviceid).type === "blind") {
-                           if (Array.isArray(device.params.switches)) {
+                        //***************//
+                        // CUSTOM GROUPS //
+                        //***************//
+                        if (platform.customGroup.has(device.deviceid)) {
+                           if (platform.customGroup.get(device.deviceid).type === "blind" && Array.isArray(device.params.switches)) {
                               platform.addAccessory(device, device.deviceid + "SWX", "blind");
                            }
                         }
@@ -250,12 +250,11 @@ class eWeLink {
                         if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
                         accessory.getService(Service.AccessoryInformation).updateCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
                         accessory.reachable = device.online;
-                        //********//
-                        // BLINDS //
-                        //********//       
-                        if (platform.deviceGroup.has(device.deviceid + "SWX")) {
-                           group = platform.deviceGroup.get(device.deviceid + "SWX");
-                           if (group.type === "blind" && Array.isArray(device.params.switches)) {
+                        //***************//
+                        // CUSTOM GROUPS //
+                        //***************//     
+                        if (platform.customGroup.has(device.deviceid + "SWX")) {
+                           if (platform.customGroup.get(device.deviceid + "SWX").type === "blind" && Array.isArray(device.params.switches)) {
                               platform.externalBlindUpdate(device.deviceid + "SWX", device.params);
                               return;
                            }
@@ -385,7 +384,6 @@ class eWeLink {
                   if (device.hasOwnProperty("action")) {
                      let idToCheck = device.deviceid;
                      let accessory;
-                     let group;
                      let i;
                      if (device.action === "update" && device.hasOwnProperty("params")) {
                         if (platform.debug) platform.log("External update received via web socket.");
@@ -401,12 +399,11 @@ class eWeLink {
                            }
                            if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
                            accessory.getService(Service.AccessoryInformation).updateCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                           //********//
-                           // BLINDS //
-                           //********//       
-                           if (platform.deviceGroup.has(idToCheck + "SWX")) {
-                              group = platform.deviceGroup.get(idToCheck + "SWX");
-                              if (group.type === "blind" && Array.isArray(device.params.switches)) {
+                           //***************//
+                           // CUSTOM GROUPS //
+                           //***************//         
+                           if (platform.customGroup.has(idToCheck + "SWX")) {
+                              if (platform.customGroup.get(idToCheck + "SWX").type === "blind" && Array.isArray(device.params.switches)) {
                                  platform.externalBlindUpdate(idToCheck + "SWX", device.params);
                                  return;
                               }
@@ -568,6 +565,7 @@ class eWeLink {
       });
       switch (service) {
          case "blind":
+         let group = platform.customGroup.get(accessory.context.hbDeviceId);
          accessory.addService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
          .on("set", function (value, callback) {
             platform.setBlindTargetPosition(accessory, value, callback);
@@ -575,14 +573,13 @@ class eWeLink {
          accessory.context.lastPos = 0;
          accessory.context.targetPos = 0;
          accessory.context.moveState = 2;
-         let group = platform.deviceGroup.get(accessory.context.hbDeviceId);
-         accessory.context.switchUp = (group.switchUp || platform.groupDefaults["switchUp"]) - 1;
-         accessory.context.switchDown = (group.switchDown || platform.groupDefaults["switchDown"]) - 1;
-         accessory.context.durationUp = group.timeUp || platform.groupDefaults["timeUp"];
-         accessory.context.durationDown = group.timeDown || platform.groupDefaults["timeDown"];
-         accessory.context.durationBMU = group.timeBottomMarginUp || platform.groupDefaults["timeBottomMarginUp"];
-         accessory.context.durationBMD = group.timeBottomMarginDown || platform.groupDefaults["timeBottomMarginDown"];
-         accessory.context.fullOverdrive = platform.groupDefaults["fullOverdrive"];
+         accessory.context.switchUp = (group.switchUp || platform.customGroupDefs["switchUp"]) - 1;
+         accessory.context.switchDown = (group.switchDown || platform.customGroupDefs["switchDown"]) - 1;
+         accessory.context.durationUp = group.timeUp || platform.customGroupDefs["timeUp"];
+         accessory.context.durationDown = group.timeDown || platform.customGroupDefs["timeDown"];
+         accessory.context.durationBMU = group.timeBottomMarginUp || platform.customGroupDefs["timeBottomMarginUp"];
+         accessory.context.durationBMD = group.timeBottomMarginDown || platform.customGroupDefs["timeBottomMarginDown"];
+         accessory.context.fullOverdrive = platform.customGroupDefs["fullOverdrive"];
          accessory.context.percentDurationDown = accessory.context.durationDown * 10;
          accessory.context.percentDurationUp = accessory.context.durationUp * 10;
          break;
