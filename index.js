@@ -2,7 +2,6 @@ let ws = require("ws");
 let nonce = require("nonce")();
 let crypto = require("crypto");
 let convert = require("color-convert");
-const querystring = require("querystring");
 const axios = require('axios');
 let platform;
 let Accessory;
@@ -1660,7 +1659,7 @@ class eWeLink {
       }).catch(function (error) {
          platform.log.error("****** An error occurred while logging in. ******");
          platform.log.warn("[%s].", error);
-         callback()
+         callback();
          return;
       }.bind(platform));
    }
@@ -1693,7 +1692,7 @@ class eWeLink {
       }).catch(function (error) {
          platform.log.error("****** An error occurred while getting web socket host. ******");
          platform.log.warn("[%s].", error);
-         callback()
+         callback();
          return;
       }.bind(platform));
    }
