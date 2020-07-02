@@ -94,6 +94,7 @@ class eWeLink {
                if (error) {
                   platform.log.error("An error occurred connecting to the HTTPS API");
                   platform.log.warn("%s.", error);
+                  platform.log.error("This plugin will stop loading due to this error.");
                   return;
                }
                let eWeLinkDevices = body.devicelist;
@@ -101,11 +102,12 @@ class eWeLink {
                if (primaryDeviceCount === 0) {
                   platform.log("[0] primary devices were loaded from your eWeLink account.");
                   platform.log("Any existing eWeLink devices in the Homebridge cache will be removed.");
+                  platform.log("This plugin will not be loaded as there is no reason to.");
                   try {
                      platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", Array.from(platform.devicesInHB.values()));
                      platform.devicesInHB.clear();
                   } catch (e) {
-                     platform.log.error("Devices could not be removed from the cache - [%s].");
+                     platform.log.warn("Devices could not be removed from the cache - [%s].");
                   }
                   return;
                }
@@ -357,7 +359,7 @@ class eWeLink {
                };
                platform.ws.onerror = function (e) {
                   platform.log.error("Web socket error - [%s].", e);
-                  platform.log.error("Please try restarting Homebridge.");
+                  platform.log.error("Please try restarting Homebridge so that this plugin can work again.");
                };
                platform.ws.onclose = function (e) {
                   platform.log.warn("Web socket was closed - [%s].", e);
@@ -710,7 +712,7 @@ class eWeLink {
          platform.api.registerPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
          if (platform.debug) platform.log("[%s] has been added to Homebridge.", newDeviceName);
       } catch (e) {
-         platform.log.error("[%s] cannot be added - [%s].", accessory.displayName, e);
+         platform.log.warn("[%s] cannot be added - [%s].", accessory.displayName, e);
       }
    }
    
@@ -834,7 +836,7 @@ class eWeLink {
          platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
          if (platform.debug) platform.log("[%s] has been removed from Homebridge.", accessory.displayName);
       } catch (e) {
-         platform.log.error("[%s] has not been removed - [%s].", accessory.displayName, e);
+         platform.log.warn("[%s] has not been removed - [%s].", accessory.displayName, e);
       }
    }
    
