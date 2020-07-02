@@ -100,12 +100,12 @@ class eWeLink {
                let primaryDeviceCount = Object.keys(eWeLinkDevices).length;
                if (primaryDeviceCount === 0) {
                   platform.log("[0] primary devices were loaded from your eWeLink account.");
-                  platform.log("Any existing eWeLink devices in the Homebridge cache will be removed.")
+                  platform.log("Any existing eWeLink devices in the Homebridge cache will be removed.");
                   try {
                      platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", Array.from(platform.devicesInHB.values()));
                      platform.devicesInHB.clear();
                   } catch (e) {
-                     platform.log.error("Devices could not me removed from the cache - [%s].");
+                     platform.log.error("Devices could not be removed from the cache - [%s].");
                   }
                   return;
                }
