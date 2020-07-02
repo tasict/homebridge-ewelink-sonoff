@@ -680,11 +680,8 @@ class eWeLink {
             });
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation)
             .on("set", function (value, callback) {
-               if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value !== value) {
-                  platform.internalHSBUpdate(accessory, "sat", value, callback);
-               } else {
-                  callback();
-               }
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, value);
+               callback();
             });
          }
          break;
@@ -810,11 +807,8 @@ class eWeLink {
             });
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation)
             .on("set", function (value, callback) {
-               if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value !== value) {
-                  platform.internalHSBUpdate(accessory, "sat", value, callback);
-               } else {
-                  callback();
-               }
+               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, value);
+               callback();
             });
          }
       }
@@ -1011,7 +1005,6 @@ class eWeLink {
       let newRGB;
       let curHue;
       let curSat;
-      let wsDelay = 0;
       let payload = {};
       payload.action = "update";
       payload.userAgent = "app";
@@ -1021,7 +1014,6 @@ class eWeLink {
       payload.params = {};
       switch (type) {
          case "hue":
-         wsDelay = 500;
          curSat = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
          newRGB = convert.hsv.rgb(value, curSat, 100);
          if (accessory.context.eweUIID === 59) { // L1
@@ -1038,26 +1030,7 @@ class eWeLink {
          if (platform.debug) platform.log("[%s] requesting to change hue to [%s].", accessory.displayName, value);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, value);
          break;
-         case "sat":
-         wsDelay = 250;
-         curHue = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value;
-         newRGB = convert.hsv.rgb(curHue, value, 100);
-         if (accessory.context.eweUIID === 59) { // L1
-            payload.params.mode = 1;
-            payload.params.colorR = newRGB[0];
-            payload.params.colorG = newRGB[1];
-            payload.params.colorB = newRGB[2];
-         } else { // B1
-            payload.params.zyx_mode = 2;
-            payload.params.channel2 = newRGB[0];
-            payload.params.channel3 = newRGB[1];
-            payload.params.channel4 = newRGB[2];
-         }
-         if (platform.debug) platform.log("[%s] requesting to change saturation to [%s].", accessory.displayName, value);
-         accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, value);
-         break;
          case "bri":
-         wsDelay = 250;
          curHue = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value;
          curSat = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
          if (accessory.context.eweUIID === 22) { // B1
@@ -1078,7 +1051,7 @@ class eWeLink {
       }
       setTimeout(function() {
          platform.wsSendMessage(JSON.stringify(payload), callback);
-      }, wsDelay);
+      }, 250);
    }
    
    internalFanUpdate(accessory, type, targetState, callback) {
