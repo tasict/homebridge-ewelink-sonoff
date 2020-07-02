@@ -79,9 +79,9 @@ class eWeLink {
                "ts": Math.floor(new Date().getTime() / 1000),
                "nonce": nonce(),
                "appid": platform.appid
-            }
+            };
             platform.wc = request.createClient("https://" + platform.apiHost);
-            platform.wc.headers["Authorization"] = "Bearer " + platform.authenticationToken;
+            platform.wc.headers.Authorization = "Bearer " + platform.authenticationToken;
             platform.wc.get("/api/user/device?" + querystring.stringify(args), function (err, res, body) {
                let error = false;
                if (err) error = err;
@@ -119,7 +119,7 @@ class eWeLink {
                   }
                });
                // Blind groupings found in the configuration are set in the "platform.customGroup" map.
-               if (platform.config["groups"] && Object.keys(platform.config.groups).length > 0) {
+               if (platform.config.groups && Object.keys(platform.config.groups).length > 0) {
                   platform.config.groups.forEach((group) => {
                      if (typeof group.deviceId !== "undefined" && platform.devicesInEwe.has(group.deviceId + "SWX")) {
                         platform.customGroup.set(group.deviceId + "SWX", group);
@@ -142,7 +142,6 @@ class eWeLink {
                if (platform.debug) platform.log("Checking if devices need to be added/refreshed in the Homebridge cache.");
                if (platform.devicesInEwe.size > 0) {
                   platform.devicesInEwe.forEach((device) => {
-                     let channelCount;
                      let i;
                      // Add non-existing devices
                      if (!platform.devicesInHB.has(device.deviceid + "SWX") && !platform.devicesInHB.has(device.deviceid + "SW0")) {
@@ -384,7 +383,6 @@ class eWeLink {
                   if (device.hasOwnProperty("action")) {
                      let idToCheck = device.deviceid;
                      let accessory;
-                     let i;
                      if (device.action === "update" && device.hasOwnProperty("params")) {
                         if (platform.debug) platform.log("External update received via web socket.");
                         if (platform.devicesInHB.has(idToCheck + "SWX") || platform.devicesInHB.has(idToCheck + "SW0")) {
@@ -573,13 +571,13 @@ class eWeLink {
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.CurrentPosition, 0);
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, 0);
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, 2);
-         accessory.context.switchUp = (group.switchUp || platform.customGroupDefs["switchUp"]) - 1;
-         accessory.context.switchDown = (group.switchDown || platform.customGroupDefs["switchDown"]) - 1;
-         accessory.context.durationUp = group.timeUp || platform.customGroupDefs["timeUp"];
-         accessory.context.durationDown = group.timeDown || platform.customGroupDefs["timeDown"];
-         accessory.context.durationBMU = group.timeBottomMarginUp || platform.customGroupDefs["timeBottomMarginUp"];
-         accessory.context.durationBMD = group.timeBottomMarginDown || platform.customGroupDefs["timeBottomMarginDown"];
-         accessory.context.fullOverdrive = platform.customGroupDefs["fullOverdrive"];
+         accessory.context.switchUp = (group.switchUp || platform.customGroupDefs.switchUp) - 1;
+         accessory.context.switchDown = (group.switchDown || platform.customGroupDefs.switchDown) - 1;
+         accessory.context.durationUp = group.timeUp || platform.customGroupDefs.timeUp;
+         accessory.context.durationDown = group.timeDown || platform.customGroupDefs.timeDown;
+         accessory.context.durationBMU = group.timeBottomMarginUp || platform.customGroupDefs.timeBottomMarginUp;
+         accessory.context.durationBMD = group.timeBottomMarginDown || platform.customGroupDefs.timeBottomMarginDown;
+         accessory.context.fullOverdrive = platform.customGroupDefs.fullOverdrive;
          accessory.context.percentDurationDown = accessory.context.durationDown * 10;
          accessory.context.percentDurationUp = accessory.context.durationUp * 10;
          break;
@@ -587,7 +585,7 @@ class eWeLink {
          accessory.addService(Service.Fanv2).getCharacteristic(Characteristic.On)
          .on("set", function (value, callback) {
             platform.internalFanUpdate(accessory, "power", value, callback);
-         })
+         });
          accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed)
          .setProps({
             minStep: 3
@@ -697,7 +695,6 @@ class eWeLink {
          default:
          platform.log.warn("[%s] cannot be added as it is not supported by this plugin.", accessory.deviceName);
          return;
-         break;
       }
       try {
          accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.SerialNumber, hbDeviceId);
@@ -891,7 +888,7 @@ class eWeLink {
          return true;
       }
       accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, value);
-      moveUp = (value > cPos);
+      let moveUp = (value > cPos);
       let duration;
       if (moveUp) {
          duration = (value - cPos) / 100 * (accessory.context.durationUp - accessory.context.durationBMU);
@@ -1373,7 +1370,6 @@ class eWeLink {
             break;
             default:
             return;
-            break;
          }
       } else {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
@@ -1580,7 +1576,7 @@ class eWeLink {
          return kv.key + "=" + kv.value;
       }).join("&");
       let wc = request.createClient("https://api.coolkit.cc:8080");
-      wc.headers["Authorization"] = "Sign " + platform.helperGetSignature(dataToSign);
+      wc.headers.Authorization = "Sign " + platform.helperGetSignature(dataToSign);
       wc.headers["Content-Type"] = "application/json;charset=UTF-8";
       wc.get("/api/user/region?" + querystring.stringify(data), function (err, res, body) {
          if (err) {
@@ -1596,7 +1592,7 @@ class eWeLink {
             return;
          }
          if (!body.region) {
-            platform.log.error("Server did not response with a region [%s]", response);
+            platform.log.error("Server did not response with a region.");
             platform.log.warn("\n" + JSON.stringify(body, null, 2));
             callback();
             return;
@@ -1631,7 +1627,7 @@ class eWeLink {
       if (platform.debugReqRes) platform.log.warn("Sending HTTPS login request.\n" + JSON.stringify(data, null, 2));
       else if (platform.debug) platform.log("Sending HTTPS login request.");
       let wc = request.createClient("https://" + platform.apiHost);
-      wc.headers["Authorization"] = "Sign " + platform.helperGetSignature(JSON.stringify(data));
+      wc.headers.Authorization = "Sign " + platform.helperGetSignature(JSON.stringify(data));
       wc.headers["Content-Type"] = "application/json;charset=UTF-8";
       wc.post("/api/user/login", data, function (err, res, body) {
          if (err) {
@@ -1676,7 +1672,7 @@ class eWeLink {
          platform.authenticationToken = body.at;
          platform.apiKey = body.user.apikey;
          platform.wc = request.createClient("https://" + platform.apiHost);
-         platform.wc.headers["Authorization"] = "Bearer " + body.at;
+         platform.wc.headers.Authorization = "Bearer " + body.at;
          platform.wsGetHost(function () {
             callback(body.at);
          }.bind(platform));
@@ -1691,7 +1687,7 @@ class eWeLink {
       data.nonce = nonce();
       data.appid = platform.appid;
       let wc = request.createClient("https://" + platform.apiHost.replace("-api", "-disp"));
-      wc.headers["Authorization"] = "Bearer " + platform.authenticationToken;
+      wc.headers.Authorization = "Bearer " + platform.authenticationToken;
       wc.headers["Content-Type"] = "application/json;charset=UTF-8";
       wc.post("/dispatch/app", data, function (err, res, body) {
          if (err) {
@@ -1700,7 +1696,7 @@ class eWeLink {
             return;
          }
          if (!body.domain) {
-            platform.log.error("Server did not response with a web socket host [%s].", response)
+            platform.log.error("Server did not response with a web socket host.");
             platform.log.warn("\n" + JSON.stringify(body, null, 2));
             callback();
             return;
@@ -1778,18 +1774,18 @@ WSC.prototype.open = function (url) {
          this.onerror(e);
       }
    });
-}
+};
 WSC.prototype.send = function (data, option) {
    try {
       this.instance.send(data, option);
    } catch (e) {
       this.instance.emit("error", e);
    }
-}
+};
 WSC.prototype.reconnect = function (e) {
    this.instance.removeAllListeners();
    let that = this;
    setTimeout(function () {
       that.open(that.url);
    }, 2500);
-}
+};
