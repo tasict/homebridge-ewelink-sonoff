@@ -25,7 +25,7 @@ The plugin **should** work with Sonoff Thermostat devices, exposing a temperatur
 - **Supported:** TH10, TH16
 #### 🟠 Fans
 The plugin **might** work with Sonoff Fan devices. I need a kind person with the a device to assist!
-- **Unsupported:** iFan02, iFan03
+- **Needs Testing:** iFan02, iFan03
 #### 🔴 Custom Devices (Blinds, Garage Doors)
 > By custom devices I mean using a generic Sonoff multi-switch device to simulate a specific type of accessory that is HomeKit supported, for example blinds and garage doors.
 
