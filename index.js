@@ -2,7 +2,7 @@ const ws = require("ws");
 const nonce = require("nonce")();
 const crypto = require("crypto");
 const convert = require("color-convert");
-const axios = require('axios');
+const axios = require("axios");
 let platform;
 let Accessory;
 let Service;
