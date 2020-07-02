@@ -15,7 +15,7 @@ The plugin **should** work with Sonoff bulbs and LED strips, giving you control 
 The plugin **should** work with Sonoff light and dimmer switches, and will be exposed as lights in Homebridge.
 - **Supported:** T1-1C, T1-2C, T1-3C, TX-1C, TX-2C, TX-3C, KING-M4, SLAMPHER, D1
 #### 🟢 Outlets
-The plugin **should** work with Sonoff outlets.
+The plugin **should** work with Sonoff outlets. Unfortunately there is no native method in HomeKit to show power readings.
 - **Supported:** POW
 #### 🟢 RF Bridges
 The plugin **should** work with the Sonoff Bridge, at the moment exposing motion sensors that will detect motion and notify Homebridge/HomeKit. Other devices connected to the RF bridge might cause issues.
@@ -56,14 +56,10 @@ There are extra optional configuration options that can be configured via Homebr
 And voila your eWeLink devices *should* be added to your Homebridge instance.
 ## About
 #### My future plans/ideas
-- Add/remove devices upon web socket message if possible.
 - Support for more devices is always a good thing.
 - TypeScript? I wouldn't know where to begin. So a 2000 line Javascript file is what it is!
-#### My limitations
-- I am not an expert in Javascript, but can certainly work around the template I have.
-- The only devices I own are T1-1C and T1-2C light switches so I can only test with those.
 #### Issues/Pull Requests
-Please feel free to submit - the more the merrier! As the name suggests, this is still in beta so it's most likely you'll run into issues.
+Please feel free to submit - the more the merrier!
 #### Credits
 - @gbro115 → @MrTomAsh → @howanghk - the line of succession of this plugin that I forked from. Otherwise this package wouldn't exist!
 - @ozzyobr - for his continued support throughout, e.g. his work with colour conversion, his help with supporting the L1 LED strip.
