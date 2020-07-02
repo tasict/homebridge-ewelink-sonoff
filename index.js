@@ -838,67 +838,47 @@ class eWeLink {
       }
    }
    
-   internalBlindUpdate(accessory, pos, callback) {
-      platform.log("Setting [%s] new target position from [%s] to [%s].", accessory.displayName, accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).value, pos, );
+   internalBlindUpdate(accessory, value, callback) {
+      platform.log("[%s] setting new target position to [%s].", accessory.displayName, value);
+      let cPos = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value;
+      let tPos = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).value;
+      let cSte = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value;
       let timestamp = Date.now();
-      if (accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value !== 2) {
-         var diffPosition = Math.abs(pos - accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).value);
-         var actualPosition;
-         var diffTime;
-         var diff;
-         if (diffPosition === 0) {
-            actualPosition = pos;
-            diffTime = 0;
-            diff = 0;
-         } else {
-            if (accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value === 1) {
-               diffPosition = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).value - pos;
+      if (cSte !== 2) {
+         let diffPosition = Math.abs(value - tPos);
+         let actualPosition = value;
+         let diffTime = 0;
+         let diff = 0;
+         if (diffPosition > 0) {
+            if (cSte === 1) {
+               diffPosition = tPos - value;
                diffTime = Math.round(accessory.context.percentDurationDown * diffPosition);
+               actualPosition = Math.round(cPos - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
             } else {
-               diffPosition = pos - accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).value;
+               diffPosition = value - tPos;
                diffTime = Math.round(accessory.context.percentDurationUp * diffPosition);
+               actualPosition = Math.round(cPos + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
             }
             diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
-            
-            let timestamp = Date.now();
-            if (accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value === 1) {
-               actualPosition = Math.round(accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value - ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationDown));
-            } else if (accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value === 0) {
-               actualPosition = Math.round(accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value + ((timestamp - accessory.context.startTimestamp) / accessory.context.percentDurationUp));
-            } else {
-               actualPosition = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value;
-            }
             if (diff > 0) {
                accessory.context.targetTimestamp += diffTime;
-               // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-               accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).value = pos;
-               platform.log("[%s] Blinds are moving. Current position: %s, new targuet: %s, adjusting target milliseconds: %s", accessory.displayName, actualPosition, pos, diffTime);
+               // if (value === 0 || value === 100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+               accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, value);
                callback();
                return false;
             }
             if (diff < 0) {
-               platform.log("[%s] ==> Revert Blinds moving. Current pos: %s, new target: %s, new duration: %s", accessory.displayName, actualPosition, pos, Math.abs(diff));
                accessory.context.startTimestamp = timestamp;
                accessory.context.targetTimestamp = timestamp + Math.abs(diff);
-               // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-               accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value = actualPosition;
-               accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).value = pos;
-               accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value === 0 ? 1 : 0;
+               // if (value === 0 || pos === 100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+               accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.CurrentPosition, actualPosition);
+               accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, value);
+               accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, cSte === 0 ? 1 : 0);
                
                let payload = platform.prepareBlindPayload(accessory);
-               let string = JSON.stringify(payload);
-               if (platform.debugReqRes) platform.log.warn(payload);
-               platform.wsSendMessage(string, function () {
+               platform.wsSendMessage(JSON.stringify(payload), function () {
                   return;
                });
-               platform.log("[%s] Request sent for %s", accessory.displayName, accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value === 1 ? "moving up" : "moving down");
-               let service = accessory.getService(Service.WindowCovering);
-               service.getCharacteristic(Characteristic.CurrentPosition)
-               .updateValue(accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value);
-               service.getCharacteristic(Characteristic.TargetPosition)
-               .updateValue(accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).value);
-               service.getCharacteristic(Characteristic.PositionState)
-               .updateValue(accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value);
             }
             callback();
             return false;
@@ -906,88 +886,51 @@ class eWeLink {
          callback();
          return false;
       }
-      if (accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value === pos) {
-         platform.log("[%s] Current position already matches target position. There is nothing to do.", accessory.displayName);
+      if (cPos === value) {
          callback();
          return true;
       }
-      accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).value = pos;
-      moveUp = (pos > accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value);
-      let withoutmarginetimeUP;
-      let withoutmarginetimeDOWN;
+      accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, value);
+      moveUp = (value > cPos);
       let duration;
-      withoutmarginetimeUP = accessory.context.durationUp - accessory.context.durationBMU;
-      withoutmarginetimeDOWN = accessory.context.durationDown - accessory.context.durationBMD;
       if (moveUp) {
-         if (accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value === 0) {
-            duration = ((pos - accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value) / 100 * withoutmarginetimeUP) + accessory.context.durationBMU;
-         } else {
-            duration = (pos - accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value) / 100 * withoutmarginetimeUP;
+         duration = (value - cPos) / 100 * (accessory.context.durationUp - accessory.context.durationBMU);
+         if (cPos === 0) {
+            duration += accessory.context.durationBMU;
          }
       } else {
-         if (pos === 0) {
-            duration = ((accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value - pos) / 100 * withoutmarginetimeDOWN) + accessory.context.durationBMD;
-         } else {
-            duration = (accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value - pos) / 100 * withoutmarginetimeDOWN;
+         duration = (cPos - value) / 100 * (accessory.context.durationDown - accessory.context.durationBMD);
+         if (value === 0) {
+            duration += accessory.context.durationBMD;
          }
       }
-      if (pos === 0 || pos === 100) duration += accessory.context.fullOverdrive;
-      if (pos === 0 || pos === 100) platform.log("[%s] add overdive: %s", accessory.displayName, accessory.context.fullOverdrive);
+      if (value === 0 || value === 100) duration += accessory.context.fullOverdrive;
       duration = Math.round(duration * 100) / 100;
-      platform.log("[%s] %s, Duration: %s", accessory.displayName, moveUp ? "Moving up" : "Moving down", duration);
       accessory.context.startTimestamp = timestamp;
       accessory.context.targetTimestamp = timestamp + (duration * 1000);
-      // if (pos==0 || pos==100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
-      accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value = (moveUp ? 0 : 1);
-      accessory.getService(Service.WindowCovering)
-      .setCharacteristic(Characteristic.PositionState, (moveUp ? 0 : 1));
+      accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, moveUp ? 0 : 1);
       let payload = platform.prepareBlindPayload(accessory);
-      let string = JSON.stringify(payload);
-      if (platform.debugReqRes) platform.log.warn(payload);
-      setTimeout(function () {
-         platform.wsSendMessage(string, function () {
-            return;
-         });
-         platform.log("[%s] Request sent for %s", accessory.displayName, moveUp ? "moving up" : "moving down");
-         var interval = setInterval(function () {
-            if (Date.now() >= accessory.context.targetTimestamp) {
-               platform.prepareBlindFinalState(accessory);
-               clearInterval(interval);
+      platform.wsSendMessage(JSON.stringify(payload), function () {
+         return;
+      });
+      let interval = setInterval(function () {
+         if (Date.now() >= accessory.context.targetTimestamp) {
+            accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, 2);
+            let payload = platform.prepareBlindPayload(accessory);
+            setTimeout(function () {
+               platform.wsSendMessage(JSON.stringify(payload), function () {
+                  return;
+               });
+               accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.CurrentPosition, value);
                return true;
-            }
-         }, 100);
-         callback();
-      }, 1);
+            }, 1);
+            clearInterval(interval);
+            return true;
+         }
+      }, 100);
+      callback();
    }
-   
-   prepareBlindFinalState(accessory) {
-      accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value = 2;
-      let payload = platform.prepareBlindPayload(accessory);
-      let string = JSON.stringify(payload);
-      if (platform.debugReqRes) platform.log.warn(payload);
-      setTimeout(function () {
-         platform.wsSendMessage(string, function () {
-            return;
-         });
-         platform.log("[%s] Request sent to stop moving", accessory.displayName);
-         accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value = 2;
-         let targetPos = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).value;
-         accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value = targetPos;
-         let service = accessory.getService(Service.WindowCovering);
-         // Using updateValue to avoid loop
-         service.getCharacteristic(Characteristic.CurrentPosition)
-         .updateValue(targetPos);
-         service.getCharacteristic(Characteristic.TargetPosition)
-         .updateValue(targetPos);
-         service.setCharacteristic(Characteristic.PositionState, Characteristic.PositionState.STOPPED);
-         
-         platform.log("[%s] Successfully moved to target position: %s", accessory.displayName, targetPos);
-         return true;
-         // TODO Here we need to wait for the response to the socket
-      }, 1);
-      
-   }
-   
+
    prepareBlindPayload(accessory) {
       let payload = {};
       payload.action = "update";
