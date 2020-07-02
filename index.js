@@ -362,6 +362,7 @@ class eWeLink {
                platform.ws.onclose = function (e) {
                   platform.log.warn("Web socket was closed - [%s].", e);
                   platform.log.warn("Web socket will try to reconnect in a few seconds.");
+                  platform.log.warn("Then please try the command again.");
                   platform.isSocketOpen = false;
                   if (platform.hbInterval) {
                      clearInterval(platform.hbInterval);
