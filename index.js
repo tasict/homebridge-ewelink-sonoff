@@ -898,23 +898,13 @@ class eWeLink {
       let payload = {
          apikey: accessory.context.eweApiKey,
          deviceid: accessory.context.eweDeviceId,
-         params: {
-            switches: [
-               {
-                  switch: newLight ? "on" : "off"
-               },
-               {
-                  switch: newSpeed >= 33 ? "on" : "off"
-               },
-               {
-                  switch: newSpeed >= 66 && newSpeed < 99 ? "on" : "off"
-               },
-               {
-                  switch: newSpeed >= 99 ? "on" : "off"
-               }
-            ]
-         }
+         params: {}
       };
+      payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
+      payload.params.switches[0].switch = newLight ? "on" : "off";
+      payload.params.switches[1].switch = newSpeed >= 33 ? "on" : "off";
+      payload.params.switches[2].switch = newSpeed >= 66 && newSpeed < 99 ? "on" : "off";
+      payload.params.switches[3].switch = newSpeed >= 99 ? "on" : "off";
       if (platform.debug) platform.log("[%s] requesting to change fan %s.", accessory.displayName, type);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newLight);
       accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, newPower);
@@ -968,20 +958,11 @@ class eWeLink {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, value);
          break;
          case "0":
-         payload.params.switches = [
-            {
-               switch: value ? "on" : "off"
-            },
-            {
-               switch: value ? "on" : "off"
-            },
-            {
-               switch: value ? "on" : "off"
-            },
-            {
-               switch: value ? "on" : "off"
-            }
-         ];
+         payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
+         payload.params.switches[0].switch = value ? "on" : "off";
+         payload.params.switches[1].switch = value ? "on" : "off";
+         payload.params.switches[2].switch = value ? "on" : "off";
+         payload.params.switches[3].switch = value ? "on" : "off";
          if (platform.debug) platform.log("[%s] requesting to turn group [%s].", accessory.displayName, value ? "on" : "off");
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, value);
          for (i = 1; i <= 4; i++) {
@@ -1120,20 +1101,11 @@ class eWeLink {
          accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, value);
          break;
          case "0":
-         payload.params.switches = [
-            {
-               switch: value ? "on" : "off"
-            },
-            {
-               switch: value ? "on" : "off"
-            },
-            {
-               switch: value ? "on" : "off"
-            },
-            {
-               switch: value ? "on" : "off"
-            }
-         ];
+         payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
+         payload.params.switches[0].switch = value ? "on" : "off";
+         payload.params.switches[1].switch = value ? "on" : "off";
+         payload.params.switches[2].switch = value ? "on" : "off";
+         payload.params.switches[3].switch = value ? "on" : "off";
          if (platform.debug) platform.log("[%s] requesting to turn group [%s].", accessory.displayName, value ? "on" : "off");
          accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, value);
          for (i = 1; i <= 4; i++) {
