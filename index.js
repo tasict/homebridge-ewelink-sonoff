@@ -552,6 +552,7 @@ class eWeLink {
          accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.ObstructionDetected, false);
          accessory.context.switchUp = (group.switchUp || platform.customGroupDefs.garageDoor.switchUp) - 1;
          accessory.context.switchDown = (group.switchDown || platform.customGroupDefs.garageDoor.switchDown) - 1;
+         accessory.context.cacheIsOpen = false;
          break;
          case "fan":
          accessory.addService(Service.Fanv2).getCharacteristic(Characteristic.On)
@@ -1303,6 +1304,32 @@ externalBlindUpdate(hbDeviceId, params) {
 }
 
 externalGarageDoorUpdate(hbDeviceId, params) {
+   let accessory = platform.devicesInHB.get(hbDeviceId);
+   let switchUp = params.switches[accessory.context.switchUp].switch === "on" ? 1 : 0;
+   let switchDown = params.switches[accessory.context.switchDown].switch === "on" ? 2 : 0;
+   
+   switch (switchUp + switchDown) {
+      case 0: // stopped
+      case 3: // error as both switches should be on
+      default: // catch aob
+      platform.log("[%s] has been reported as stopped. Updating Homebridge...", accessory.displayName);
+      let curPosition = accessory.context.cacheIsOpen ? 1 : 0;
+      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.TargetDoorState, curPosition);
+      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, curPosition);
+      break;
+      case 1: // opening
+      platform.log("[%s] has been reported as opening. Updating Homebridge...", accessory.displayName);
+      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.TargetDoorState, 0);
+      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, 0);
+      accessory.context.cacheIsOpen = true;
+      break;
+      case 2: // closing
+      platform.log("[%s] has been reported as closing. Updating Homebridge...", accessory.displayName);
+      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.TargetDoorState, 1);
+      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, 1);
+      accessory.context.cacheIsOpen = false;
+      break;
+   }
    return;
 }
 
