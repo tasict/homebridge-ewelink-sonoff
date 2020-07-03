@@ -57,13 +57,19 @@ class eWeLink {
       platform.devicesBridge = [28];
       platform.customGroup = new Map();
       platform.customGroupDefs = {
-         switchUp: 1,
-         switchDown: 2,
-         timeUp: 40,
-         timeDown: 20,
-         timeBottomMarginUp: 0,
-         timeBottomMarginDown: 0,
-         fullOverdrive: 0
+         blind: {
+            switchUp: 1,
+            switchDown: 2,
+            timeUp: 40,
+            timeDown: 20,
+            timeBottomMarginUp: 0,
+            timeBottomMarginDown: 0,
+            fullOverdrive: 0
+         },
+         garageDoor: {
+            switchUp: 1,
+            switchDown: 2
+         }
       };
       platform.api.on("didFinishLaunching", function () {
          let afterLogin = function () {
@@ -150,6 +156,8 @@ class eWeLink {
                         if (platform.customGroup.has(device.deviceid)) {
                            if (platform.customGroup.get(device.deviceid).type === "blind" && Array.isArray(device.params.switches)) {
                               platform.addAccessory(device, device.deviceid + "SWX", "blind");
+                           } else if (platform.customGroup.get(device.deviceid).type === "garageDoor" && Array.isArray(device.params.switches)) {
+                              platform.addAccessory(device, device.deviceid + "SWX", "garageDoor");
                            }
                         }
                         //*** FANS ***//                              
@@ -234,6 +242,9 @@ class eWeLink {
                         if (platform.customGroup.has(device.deviceid + "SWX")) {
                            if (platform.customGroup.get(device.deviceid + "SWX").type === "blind" && Array.isArray(device.params.switches)) {
                               platform.externalBlindUpdate(device.deviceid + "SWX", device.params);
+                              return;
+                           } else if (platform.customGroup.get(device.deviceid + "SWX").type === "garageDoor" && Array.isArray(device.params.switches)) {
+                              platform.externalGarageDoorUpdate(device.deviceid + "SWX", device.params);
                               return;
                            }
                         }
@@ -367,6 +378,9 @@ class eWeLink {
                               if (platform.customGroup.get(idToCheck + "SWX").type === "blind" && Array.isArray(device.params.switches)) {
                                  platform.externalBlindUpdate(idToCheck + "SWX", device.params);
                                  return;
+                              } else if (platform.customGroup.get(idToCheck + "SWX").type === "garageDoor" && Array.isArray(device.params.switches)) {
+                                 platform.externalgarageDoorUpdate(idToCheck + "SWX", device.params);
+                                 return;
                               }
                            }
                            //*** FANS ***//                                         
@@ -487,6 +501,7 @@ class eWeLink {
          return;
       }
       let newDeviceName;
+      let group;
       if (switchNumber === "X" || switchNumber === "0") {
          newDeviceName = device.name;
       } else {
@@ -509,7 +524,7 @@ class eWeLink {
       });
       switch (service) {
          case "blind":
-         let group = platform.customGroup.get(accessory.context.hbDeviceId);
+         group = platform.customGroup.get(accessory.context.hbDeviceId);
          accessory.addService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
          .on("set", function (value, callback) {
             platform.internalBlindUpdate(accessory, value, callback);
@@ -517,15 +532,26 @@ class eWeLink {
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.CurrentPosition, 0);
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, 0);
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, 2);
-         accessory.context.switchUp = (group.switchUp || platform.customGroupDefs.switchUp) - 1;
-         accessory.context.switchDown = (group.switchDown || platform.customGroupDefs.switchDown) - 1;
-         accessory.context.durationUp = group.timeUp || platform.customGroupDefs.timeUp;
-         accessory.context.durationDown = group.timeDown || platform.customGroupDefs.timeDown;
-         accessory.context.durationBMU = group.timeBottomMarginUp || platform.customGroupDefs.timeBottomMarginUp;
-         accessory.context.durationBMD = group.timeBottomMarginDown || platform.customGroupDefs.timeBottomMarginDown;
-         accessory.context.fullOverdrive = platform.customGroupDefs.fullOverdrive;
+         accessory.context.switchUp = (group.switchUp || platform.customGroupDefs.blind.switchUp) - 1;
+         accessory.context.switchDown = (group.switchDown || platform.customGroupDefs.blind.switchDown) - 1;
+         accessory.context.durationUp = group.timeUp || platform.customGroupDefs.blind.timeUp;
+         accessory.context.durationDown = group.timeDown || platform.customGroupDefs.blind.timeDown;
+         accessory.context.durationBMU = group.timeBottomMarginUp || platform.customGroupDefs.blind.timeBottomMarginUp;
+         accessory.context.durationBMD = group.timeBottomMarginDown || platform.customGroupDefs.blind.timeBottomMarginDown;
+         accessory.context.fullOverdrive = platform.customGroupDefs.blind.fullOverdrive;
          accessory.context.percentDurationDown = accessory.context.durationDown * 10;
          accessory.context.percentDurationUp = accessory.context.durationUp * 10;
+         break;
+         case "garageDoor":
+         group = platform.customGroup.get(accessory.context.hbDeviceId);
+         accessory.addService(Service.GarageDoorOpener).getCharacteristic(Characteristic.TargetDoorState)
+         .on("set", function (value, callback) {
+            platform.internalGarageDoorUpdate(accessory, value, callback);
+         });
+         accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, 0);
+         accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.ObstructionDetected, false);
+         accessory.context.switchUp = (group.switchUp || platform.customGroupDefs.garageDoor.switchUp) - 1;
+         accessory.context.switchDown = (group.switchDown || platform.customGroupDefs.garageDoor.switchDown) - 1;
          break;
          case "fan":
          accessory.addService(Service.Fanv2).getCharacteristic(Characteristic.On)
@@ -665,6 +691,13 @@ class eWeLink {
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.CurrentPosition, 0);
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, 0);
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, 2);
+      } else if (accessory.getService(Service.GarageDoorOpener)) {
+         accessory.getService(Service.GarageDoorOpener).getCharacteristic(Characteristic.TargetDoorState)
+         .on("set", function (value, callback) {
+            platform.internalGarageDoorUpdate(accessory, value, callback);
+         });
+         accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, 0);
+         accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.ObstructionDetected, false);
       } else if (accessory.getService(Service.Fanv2)) {
          accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.Active, 1);
          accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
@@ -933,6 +966,10 @@ let interval = setInterval(function () {
    }
 }, 100);
 callback();
+}
+
+internalGarageDoorUpdate(accessory, value, callback) {
+   callback();
 }
 
 internalFanUpdate(accessory, type, value, callback) {
@@ -1262,6 +1299,10 @@ externalBlindUpdate(hbDeviceId, params) {
       accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, tPos);
       accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, 2);
    }
+   return;
+}
+
+externalGarageDoorUpdate(hbDeviceId, params) {
    return;
 }
 
