@@ -1,13 +1,13 @@
-const ws = require("ws");
-const nonce = require("nonce")();
-const crypto = require("crypto");
-const convert = require("color-convert");
 const axios = require("axios");
-let platform;
+const convert = require("color-convert");
+const crypto = require("crypto");
+const nonce = require("nonce")();
+const ws = require("ws");
 let Accessory;
-let Service;
 let Characteristic;
+let Service;
 let UUIDGen;
+let platform;
 module.exports = function (homebridge) {
    Accessory = homebridge.platformAccessory;
    Service = homebridge.hap.Service;
