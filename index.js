@@ -40,7 +40,6 @@ class eWeLink {
       platform.wsToReconnect = false;
       platform.debug = platform.config.debug || false;
       platform.debugReqRes = platform.config.debugReqRes || false;
-      platform.debugInitial = platform.config.debugInitial || false;
       platform.sensorTimeLength = platform.config.sensorTimeLength || 2;
       platform.sensorTimeDifference = platform.config.sensorTimeDifference || 120;
       platform.devicesInHB = new Map();
@@ -114,7 +113,7 @@ class eWeLink {
                   return;
                }
                // The eWeLink devices are stored in the "platform.devicesInEwe" map with the device ID as the key (without the SW*) part.
-               if (platform.debugInitial) platform.log.warn(JSON.stringify(eWeLinkDevices, null, 2));
+               // platform.log.warn(JSON.stringify(eWeLinkDevices, null, 2));
                eWeLinkDevices.forEach((device) => {
                   if (!platform.devicesUnsupported.includes(device.uiid)) {
                      platform.devicesInEwe.set(device.deviceid, device);
