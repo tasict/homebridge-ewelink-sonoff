@@ -1320,13 +1320,13 @@ externalGarageDoorUpdate(hbDeviceId, params) {
       case 1: // opening
       platform.log("[%s] has been reported as opening. Updating Homebridge...", accessory.displayName);
       accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.TargetDoorState, 0);
-      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, 0);
+      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, 2);
       accessory.context.cacheIsOpen = true;
       break;
       case 2: // closing
       platform.log("[%s] has been reported as closing. Updating Homebridge...", accessory.displayName);
       accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.TargetDoorState, 1);
-      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, 1);
+      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, 3);
       accessory.context.cacheIsOpen = false;
       break;
    }
