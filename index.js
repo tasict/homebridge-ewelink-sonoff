@@ -508,12 +508,12 @@ class eWeLink {
          } catch (e) {}
       });
       switch (service) {
-         case "blind":
+      case "blind":
          let group = platform.customGroup.get(accessory.context.hbDeviceId);
          accessory.addService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
-         .on("set", function (value, callback) {
-            platform.internalBlindUpdate(accessory, value, callback);
-         });
+            .on("set", function (value, callback) {
+               platform.internalBlindUpdate(accessory, value, callback);
+            });
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.CurrentPosition, 0);
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, 0);
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, 2);
@@ -527,118 +527,118 @@ class eWeLink {
          accessory.context.percentDurationDown = accessory.context.durationDown * 10;
          accessory.context.percentDurationUp = accessory.context.durationUp * 10;
          break;
-         case "fan":
+      case "fan":
          accessory.addService(Service.Fanv2).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "power", value, callback);
-         });
+            .on("set", function (value, callback) {
+               platform.internalFanUpdate(accessory, "power", value, callback);
+            });
          accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed)
-         .setProps({
-            minStep: 3
-         })
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "speed", value, callback);
-         });
+            .setProps({
+               minStep: 3
+            })
+            .on("set", function (value, callback) {
+               platform.internalFanUpdate(accessory, "speed", value, callback);
+            });
          accessory.addService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "light", value, callback);
-         });
+            .on("set", function (value, callback) {
+               platform.internalFanUpdate(accessory, "light", value, callback);
+            });
          accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.Active, 1);
          break;
-         case "thermostat":
+      case "thermostat":
          accessory.addService(Service.Switch).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalThermostatUpdate(accessory, value, callback);
-         });
+            .on("set", function (value, callback) {
+               platform.internalThermostatUpdate(accessory, value, callback);
+            });
          accessory.addService(Service.TemperatureSensor);
          if (device.params.sensorType !== "DS18B20") {
             accessory.addService(Service.HumiditySensor);
          }
          break;
-         case "outlet":
+      case "outlet":
          accessory.addService(Service.Outlet).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalOutletUpdate(accessory, value, callback);
-         });
+            .on("set", function (value, callback) {
+               platform.internalOutletUpdate(accessory, value, callback);
+            });
          accessory.getService(Service.Outlet).setCharacteristic(Characteristic.OutletInUse, true);
          break;
-         case "light":
-         case "lightb":
-         case "lightc":
+      case "light":
+      case "lightb":
+      case "lightc":
          accessory.addService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value !== value) {
-               platform.internalLightbulbUpdate(accessory, value, callback);
-            } else {
-               callback();
-            }
-         });
-         if (service === "lightb") {
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
             .on("set", function (value, callback) {
-               if (value > 0) {
-                  if (!accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
-                     platform.internalLightbulbUpdate(accessory, true, callback);
-                  }
-                  if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value !== value) {
-                     platform.internalBrightnessUpdate(accessory, value, callback);
-                  } else {
-                     callback();
-                  }
-               } else {
-                  if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
-                     platform.internalLightbulbUpdate(accessory, false, callback);
-                  } else {
-                     callback();
-                  }
-               }
-            });
-         }
-         if (service === "lightc") {
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
-            .on("set", function (value, callback) {
-               if (value > 0) {
-                  if (!accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
-                     platform.internalLightbulbUpdate(accessory, true, callback);
-                  }
-                  if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value !== value) {
-                     platform.internalHSBUpdate(accessory, "bri", value, callback);
-                  } else {
-                     callback();
-                  }
-               } else {
-                  if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
-                     platform.internalLightbulbUpdate(accessory, false, callback);
-                  } else {
-                     callback();
-                  }
-               }
-            });
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
-            .on("set", function (value, callback) {
-               if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value !== value) {
-                  platform.internalHSBUpdate(accessory, "hue", value, callback);
+               if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value !== value) {
+                  platform.internalLightbulbUpdate(accessory, value, callback);
                } else {
                   callback();
                }
             });
+         if (service === "lightb") {
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
+               .on("set", function (value, callback) {
+                  if (value > 0) {
+                     if (!accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
+                        platform.internalLightbulbUpdate(accessory, true, callback);
+                     }
+                     if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value !== value) {
+                        platform.internalBrightnessUpdate(accessory, value, callback);
+                     } else {
+                        callback();
+                     }
+                  } else {
+                     if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
+                        platform.internalLightbulbUpdate(accessory, false, callback);
+                     } else {
+                        callback();
+                     }
+                  }
+               });
+         }
+         if (service === "lightc") {
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
+               .on("set", function (value, callback) {
+                  if (value > 0) {
+                     if (!accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
+                        platform.internalLightbulbUpdate(accessory, true, callback);
+                     }
+                     if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value !== value) {
+                        platform.internalHSBUpdate(accessory, "bri", value, callback);
+                     } else {
+                        callback();
+                     }
+                  } else {
+                     if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
+                        platform.internalLightbulbUpdate(accessory, false, callback);
+                     } else {
+                        callback();
+                     }
+                  }
+               });
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
+               .on("set", function (value, callback) {
+                  if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value !== value) {
+                     platform.internalHSBUpdate(accessory, "hue", value, callback);
+                  } else {
+                     callback();
+                  }
+               });
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation)
-            .on("set", function (value, callback) {
-               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, value);
-               callback();
-            });
+               .on("set", function (value, callback) {
+                  accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, value);
+                  callback();
+               });
          }
          break;
-         case "switch":
+      case "switch":
          accessory.addService(Service.Switch).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalSwitchUpdate(accessory, value, callback);
-         });
+            .on("set", function (value, callback) {
+               platform.internalSwitchUpdate(accessory, value, callback);
+            });
          break;
-         case "bridge":
+      case "bridge":
          accessory.addService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);
          break;
-         default:
+      default:
          platform.log.warn("[%s] cannot be added as it is not supported by this plugin.", accessory.deviceName);
          return;
       }
@@ -659,108 +659,108 @@ class eWeLink {
    configureAccessory(accessory) {
       if (accessory.getService(Service.WindowCovering)) {
          accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
-         .on("set", function (value, callback) {
-            platform.internalBlindUpdate(accessory, value, callback);
-         });
+            .on("set", function (value, callback) {
+               platform.internalBlindUpdate(accessory, value, callback);
+            });
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.CurrentPosition, 0);
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, 0);
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, 2);
       } else if (accessory.getService(Service.Fanv2)) {
          accessory.getService(Service.Fanv2).setCharacteristic(Characteristic.Active, 1);
          accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "power", value, callback);
-         });
+            .on("set", function (value, callback) {
+               platform.internalFanUpdate(accessory, "power", value, callback);
+            });
          accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed)
-         .setProps({
-            minStep: 3
-         })
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "speed", value, callback);
-         });
+            .setProps({
+               minStep: 3
+            })
+            .on("set", function (value, callback) {
+               platform.internalFanUpdate(accessory, "speed", value, callback);
+            });
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalFanUpdate(accessory, "light", value, callback);
-         });
+            .on("set", function (value, callback) {
+               platform.internalFanUpdate(accessory, "light", value, callback);
+            });
       } else if (platform.devicesThermostat.includes(accessory.context.eweUIID)) {
          accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalThermostatUpdate(accessory, value, callback);
-         });
+            .on("set", function (value, callback) {
+               platform.internalThermostatUpdate(accessory, value, callback);
+            });
       } else if (accessory.getService(Service.Outlet)) {
          accessory.getService(Service.Outlet).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalOutletUpdate(accessory, value, callback);
-         });
+            .on("set", function (value, callback) {
+               platform.internalOutletUpdate(accessory, value, callback);
+            });
          accessory.getService(Service.Outlet).setCharacteristic(Characteristic.OutletInUse, true);
       } else if (accessory.getService(Service.Lightbulb)) {
          accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value !== value) {
-               platform.internalLightbulbUpdate(accessory, value, callback);
-            } else {
-               callback();
-            }
-         });
-         if (platform.devicesBrightable.includes(accessory.context.eweUIID)) {
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
             .on("set", function (value, callback) {
-               if (value > 0) {
-                  if (!accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
-                     platform.internalLightbulbUpdate(accessory, true, callback);
-                  }
-                  if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value !== value) {
-                     platform.internalBrightnessUpdate(accessory, value, callback);
-                  } else {
-                     callback();
-                  }
-               } else {
-                  if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
-                     platform.internalLightbulbUpdate(accessory, false, callback);
-                  } else {
-                     callback();
-                  }
-               }
-            });
-         } else if (platform.devicesColourable.includes(accessory.context.eweUIID)) {
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
-            .on("set", function (value, callback) {
-               if (value > 0) {
-                  if (!accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
-                     platform.internalLightbulbUpdate(accessory, true, callback);
-                  }
-                  if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value !== value) {
-                     platform.internalHSBUpdate(accessory, "bri", value, callback);
-                  } else {
-                     callback();
-                  }
-               } else {
-                  if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
-                     platform.internalLightbulbUpdate(accessory, false, callback);
-                  } else {
-                     callback();
-                  }
-               }
-            });
-            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
-            .on("set", function (value, callback) {
-               if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value !== value) {
-                  platform.internalHSBUpdate(accessory, "hue", value, callback);
+               if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value !== value) {
+                  platform.internalLightbulbUpdate(accessory, value, callback);
                } else {
                   callback();
                }
             });
+         if (platform.devicesBrightable.includes(accessory.context.eweUIID)) {
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
+               .on("set", function (value, callback) {
+                  if (value > 0) {
+                     if (!accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
+                        platform.internalLightbulbUpdate(accessory, true, callback);
+                     }
+                     if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value !== value) {
+                        platform.internalBrightnessUpdate(accessory, value, callback);
+                     } else {
+                        callback();
+                     }
+                  } else {
+                     if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
+                        platform.internalLightbulbUpdate(accessory, false, callback);
+                     } else {
+                        callback();
+                     }
+                  }
+               });
+         } else if (platform.devicesColourable.includes(accessory.context.eweUIID)) {
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness)
+               .on("set", function (value, callback) {
+                  if (value > 0) {
+                     if (!accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
+                        platform.internalLightbulbUpdate(accessory, true, callback);
+                     }
+                     if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).value !== value) {
+                        platform.internalHSBUpdate(accessory, "bri", value, callback);
+                     } else {
+                        callback();
+                     }
+                  } else {
+                     if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value) {
+                        platform.internalLightbulbUpdate(accessory, false, callback);
+                     } else {
+                        callback();
+                     }
+                  }
+               });
+            accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue)
+               .on("set", function (value, callback) {
+                  if (accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value !== value) {
+                     platform.internalHSBUpdate(accessory, "hue", value, callback);
+                  } else {
+                     callback();
+                  }
+               });
             accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation)
-            .on("set", function (value, callback) {
-               accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, value);
-               callback();
-            });
+               .on("set", function (value, callback) {
+                  accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, value);
+                  callback();
+               });
          }
       } else if (accessory.getService(Service.Switch)) {
          accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
-         .on("set", function (value, callback) {
-            platform.internalSwitchUpdate(accessory, value, callback);
-         });
+            .on("set", function (value, callback) {
+               platform.internalSwitchUpdate(accessory, value, callback);
+            });
       } else if (accessory.getService(Service.MotionSensor)) {
          accessory.getService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);
       } else {
@@ -787,7 +787,70 @@ class eWeLink {
       let tPos = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).value;
       let cSte = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value;
       let timestamp = Date.now();
-      if (cSte !== 2) {
+      let payload = {
+         apikey: accessory.context.eweApiKey,
+         deviceid: accessory.context.hbDeviceId,
+         params: {
+            lock: 0,
+            zyx_clear_timers: false,
+            configure: [{
+                  "startup": "off",
+                  "outlet": 0
+               },
+               {
+                  "startup": "off",
+                  "outlet": 1
+               },
+               {
+                  "startup": "off",
+                  "outlet": 2
+               },
+               {
+                  "startup": "off",
+                  "outlet": 3
+               }
+            ],
+            "pulses": [{
+                  "pulse": "off",
+                  "width": 1000,
+                  "outlet": 0
+               },
+               {
+                  "pulse": "off",
+                  "width": 1000,
+                  "outlet": 1
+               },
+               {
+                  "pulse": "off",
+                  "width": 1000,
+                  "outlet": 2
+               },
+               {
+                  "pulse": "off",
+                  "width": 1000,
+                  "outlet": 3
+               }
+            ],
+            "switches": [{
+                  "switch": "off",
+                  "outlet": 0
+               },
+               {
+                  "switch": "off",
+                  "outlet": 1
+               },
+               {
+                  "switch": "off",
+                  "outlet": 2
+               },
+               {
+                  "switch": "off",
+                  "outlet": 3
+               }
+            ]
+         }
+      };
+      if (cSte < 2) { // ie it's currently moving [either up or down]
          let diffPosition = Math.abs(value - tPos);
          let actualPosition = value;
          let diffTime = 0;
@@ -805,70 +868,68 @@ class eWeLink {
             diff = (accessory.context.targetTimestamp - timestamp) + diffTime;
             if (diff > 0) {
                accessory.context.targetTimestamp += diffTime;
-               // if (value === 0 || value === 100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+               if (value === 0 || value === 100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
                accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, value);
                callback();
-               return false;
+               return;
             }
             if (diff < 0) {
                accessory.context.startTimestamp = timestamp;
                accessory.context.targetTimestamp = timestamp + Math.abs(diff);
-               // if (value === 0 || pos === 100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
+               if (value === 0 || value === 100) accessory.context.targetTimestamp += accessory.context.fullOverdrive;
                accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.CurrentPosition, actualPosition);
                accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, value);
                accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, cSte === 0 ? 1 : 0);
-               
-               let payload = platform.helperBlindPayload(accessory);
+               payload.params.switches[accessory.context.switchUp].switch = cSte === 1 ? "on" : "off";
+               payload.params.switches[accessory.context.switchDown].switch = cSte === 0 ? "on" : "off";
                platform.wsSendMessage(payload, function () {
                   return;
                });
             }
             callback();
-            return false;
+            return;
          }
          callback();
-         return false;
+         return;
       }
       if (cPos === value) {
          callback();
-         return true;
+         return;
       }
       accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, value);
       let moveUp = (value > cPos);
       let duration;
       if (moveUp) {
          duration = (value - cPos) / 100 * (accessory.context.durationUp - accessory.context.durationBMU);
-         if (cPos === 0) {
-            duration += accessory.context.durationBMU;
-         }
+         if (cPos === 0) duration += accessory.context.durationBMU;
       } else {
          duration = (cPos - value) / 100 * (accessory.context.durationDown - accessory.context.durationBMD);
-         if (value === 0) {
-            duration += accessory.context.durationBMD;
-         }
+         if (value === 0) duration += accessory.context.durationBMD;
       }
       if (value === 0 || value === 100) duration += accessory.context.fullOverdrive;
       duration = Math.round(duration * 100) / 100;
       accessory.context.startTimestamp = timestamp;
       accessory.context.targetTimestamp = timestamp + (duration * 1000);
       accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, moveUp ? 0 : 1);
-      let payload = platform.helperBlindPayload(accessory);
+      payload.params.switches[accessory.context.switchUp].switch = moveUp ? "on" : "off";
+      payload.params.switches[accessory.context.switchDown].switch = moveUp ? "off" : "on";
       platform.wsSendMessage(payload, function () {
          return;
       });
       let interval = setInterval(function () {
          if (Date.now() >= accessory.context.targetTimestamp) {
             accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, 2);
-            let payload = platform.helperBlindPayload(accessory);
+            payload.params.switches[accessory.context.switchUp].switch = "off";
+            payload.params.switches[accessory.context.switchDown].switch = "off";
             setTimeout(function () {
                platform.wsSendMessage(payload, function () {
                   return;
                });
                accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.CurrentPosition, value);
-               return true;
-            }, 1);
+               return;
+            }, 500);
             clearInterval(interval);
-            return true;
+            return;
          }
       }, 100);
       callback();
@@ -879,17 +940,17 @@ class eWeLink {
       let newSpeed;
       let newLight;
       switch (type) {
-         case "power":
+      case "power":
          newPower = value;
          newSpeed = value ? 33 : 0;
          newLight = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
          break;
-         case "speed":
+      case "speed":
          newPower = value >= 33;
          newSpeed = value;
          newLight = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).value;
          break;
-         case "light":
+      case "light":
          newPower = accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.On).value;
          newSpeed = accessory.getService(Service.Fanv2).getCharacteristic(Characteristic.RotationSpeed).value;
          newLight = value;
@@ -948,7 +1009,7 @@ class eWeLink {
          params: {}
       };
       switch (accessory.context.switchNumber) {
-         case "X":
+      case "X":
          if (accessory.context.eweUIID === 22) { // The B1 uses state instead of switch for some strange reason.
             payload.params.state = value ? "on" : "off";
          } else {
@@ -957,7 +1018,7 @@ class eWeLink {
          if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, value ? "on" : "off");
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, value);
          break;
-         case "0":
+      case "0":
          payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
          payload.params.switches[0].switch = value ? "on" : "off";
          payload.params.switches[1].switch = value ? "on" : "off";
@@ -972,10 +1033,10 @@ class eWeLink {
             }
          }
          break;
-         case "1":
-         case "2":
-         case "3":
-         case "4":
+      case "1":
+      case "2":
+      case "3":
+      case "4":
          payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
          payload.params.switches[parseInt(accessory.context.switchNumber) - 1].switch = value ? "on" : "off";
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, value);
@@ -993,7 +1054,7 @@ class eWeLink {
          otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW0");
          otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, masterState === "on");
          break;
-         default:
+      default:
          callback();
          return;
       }
@@ -1041,7 +1102,7 @@ class eWeLink {
          params: {}
       };
       switch (type) {
-         case "hue":
+      case "hue":
          curSat = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
          newRGB = convert.hsv.rgb(value, curSat, 100);
          if ((accessory.context.eweUIID === 22)) { // B1
@@ -1061,7 +1122,7 @@ class eWeLink {
          if (platform.debug) platform.log("[%s] requesting to change hue to [%s].", accessory.displayName, value);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, value);
          break;
-         case "bri":
+      case "bri":
          curHue = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value;
          curSat = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
          if (accessory.context.eweUIID === 22) { // B1
@@ -1095,12 +1156,12 @@ class eWeLink {
          params: {}
       };
       switch (accessory.context.switchNumber) {
-         case "X":
+      case "X":
          payload.params.switch = value ? "on" : "off";
          if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, value ? "on" : "off");
          accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, value);
          break;
-         case "0":
+      case "0":
          payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
          payload.params.switches[0].switch = value ? "on" : "off";
          payload.params.switches[1].switch = value ? "on" : "off";
@@ -1115,10 +1176,10 @@ class eWeLink {
             }
          }
          break;
-         case "1":
-         case "2":
-         case "3":
-         case "4":
+      case "1":
+      case "2":
+      case "3":
+      case "4":
          payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
          payload.params.switches[parseInt(accessory.context.switchNumber) - 1].switch = value ? "on" : "off";
          if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, value ? "on" : "off");
@@ -1136,7 +1197,7 @@ class eWeLink {
          otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW0");
          otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, masterState === "on");
          break;
-         default:
+      default:
          callback();
          return;
       }
@@ -1152,22 +1213,22 @@ class eWeLink {
       let switchDown = params.switches[accessory.context.switchDown].switch === "on" ? 1 : 0;
       let state;
       switch (switchUp + switchDown) {
-         case 0:
-         default:
+      case 0:
+      default:
          state = 2; // stopped or error
          break;
-         case 1:
+      case 1:
          state = 1; // moving down
          break;
-         case 2:
+      case 2:
          state = 0; // moving up
          break;
       }
       accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, state);
       switch (state) {
-         case 3:
-         case 2:
-         default:
+      case 3:
+      case 2:
+      default:
          let timestamp = Date.now();
          if (cSte === 2) {
             return;
@@ -1179,7 +1240,7 @@ class eWeLink {
          accessory.context.targetTimestamp = Date.now() + 10;
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, cPos);
          break;
-         case 1:
+      case 1:
          if (cSte === 1) {
             return;
          }
@@ -1187,7 +1248,7 @@ class eWeLink {
             accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, 0);
          }
          break;
-         case 0:
+      case 0:
          if (cSte === 0) {
             return;
          }
@@ -1268,19 +1329,19 @@ class eWeLink {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, true);
          
          switch (accessory.context.eweUIID) {
-            case 36: // KING-M4
+         case 36: // KING-M4
             if (params.hasOwnProperty("bright")) {
                // Device brightness has a eWeLink scale of 10-100 and HomeKit scale is 0-100.
                let nb = Math.round((params.bright - 10) * 10 / 9);
                accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, nb);
             }
             break;
-            case 44: // D1
+         case 44: // D1
             if (params.hasOwnProperty("brightness")) {
                accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.brightness);
             }
             break;
-            case 22: // B1
+         case 22: // B1
             if (params.hasOwnProperty("zyx_mode")) { // B1
                mode = parseInt(params.zyx_mode);
             } else if (params.hasOwnProperty("channel0")) {
@@ -1301,7 +1362,7 @@ class eWeLink {
                platform.log.warn("[%s] has been set to 'white mode' which is not supported by this plugin.", accessory.displayName);
             }
             break;
-            case 59: // L1
+         case 59: // L1
             if (params.hasOwnProperty("bright")) {
                accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, params.bright);
             }
@@ -1311,7 +1372,7 @@ class eWeLink {
                accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Saturation, newColour[1]);
             }
             break;
-            default:
+         default:
             return;
          }
       } else {
@@ -1398,34 +1459,6 @@ class eWeLink {
          }
       }, platform.sensorTimeLength * 1000);
       return;
-   }
-   
-   helperBlindPayload(accessory) {
-      let payload = {};
-      payload.params = {};
-      payload.params.switches = platform.devicesInEwe.get(accessory.context.hbDeviceId).params.switches;
-      let switch0 = "off";
-      let switch1 = "off";
-      switch (accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value) {
-         case 2:
-         default:
-         switch0 = "off";
-         switch1 = "off";
-         break;
-         case 1:
-         switch0 = "off";
-         switch1 = "on";
-         break;
-         case 0:
-         switch0 = "on";
-         switch1 = "off";
-         break;
-      }
-      payload.params.switches[accessory.context.switchUp].switch = switch0;
-      payload.params.switches[accessory.context.switchDown].switch = switch1;
-      payload.apikey = accessory.context.eweApiKey;
-      payload.deviceid = accessory.context.hbDeviceId;
-      return payload;
    }
    
    helperChannelsByUIID(uiid) {
