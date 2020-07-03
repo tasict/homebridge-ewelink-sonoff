@@ -68,3 +68,5 @@ Please feel free to submit - the more the merrier!
 - @minws13 - for giving me remote access to his aquarium thermostat to add support for these devices.
 
 Thank you to all 😃.
+
+[![donate](https://img.shields.io/badge/donate-patreon-blue)](https://www.patreon.com/bePatron?u=38200025)
