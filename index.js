@@ -1573,11 +1573,11 @@ class eWeLink {
    
    httpGetRegion(callback) {
       let data = {
-         "country_code": platform.config.countryCode,
-         "version": 8,
-         "ts": Math.floor(new Date().getTime() / 1000),
-         "nonce": nonce(),
-         "appid": platform.appId
+         country_code: platform.config.countryCode,
+         version: 8,
+         ts: Math.floor(new Date().getTime() / 1000),
+         nonce: nonce(),
+         appid: platform.appId
       };
       let dataToSign = [];
       Object.keys(data).forEach(function (key) {
