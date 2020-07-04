@@ -21,9 +21,9 @@ class eWeLink {
          return;
       }
       if (!config || (!config.username || !config.password || !config.countryCode)) {
-         log.error("******************************************************************************************");
-         log.warn("Cannot load plugin - check your eWeLink username, password and country code in the config.");
-         log.error("******************************************************************************************");
+         log.error("** Cannot load homebridge-ewelink-sonoff **");
+         log.warn("Make sure your eWeLink credentials are in the Homebridge config.");
+         log.error("*******************************************");
          return;
       }
       platform = this;
@@ -31,8 +31,8 @@ class eWeLink {
       platform.config = config;
       platform.api = api;
       platform.apiKey = "UNCONFIGURED";
-      platform.authenticationToken = "UNCONFIGURED";
-      platform.appid = "oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq";
+      platform.aToken = "UNCONFIGURED";
+      platform.appId = "oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq";
       platform.emailLogin = platform.config.username.includes("@");
       platform.apiHost = (platform.config.apiHost || "eu-api.coolkit.cc") + ":8080";
       platform.wsHost = platform.config.wsHost || "eu-pconnect3.coolkit.cc";
@@ -42,8 +42,6 @@ class eWeLink {
       platform.debugReqRes = platform.config.debugReqRes || false;
       platform.sensorTimeLength = platform.config.sensorTimeLength || 2;
       platform.sensorTimeDifference = platform.config.sensorTimeDifference || 120;
-      platform.devicesInHB = new Map();
-      platform.devicesInEwe = new Map();
       platform.devicesUnsupported = [];
       platform.devicesSingleSwitch = [1, 5, 6, 14, 15, 22, 24, 27, 32, 36, 44, 59];
       platform.devicesSingleSwitchLight = ["T1 1C", "L1", "B1", "B1_R2", "TX1C", "D1", "D1R1", "KING-M4", "Slampher"];
@@ -55,6 +53,8 @@ class eWeLink {
       platform.devicesFan = [34];
       platform.devicesOutlet = [32];
       platform.devicesBridge = [28];
+      platform.devicesInHB = new Map();
+      platform.devicesInEwe = new Map();
       platform.customGroup = new Map();
       platform.customGroupDefs = {
          blind: {
@@ -77,27 +77,26 @@ class eWeLink {
                   version: 8,
                   ts: Math.floor(new Date().getTime() / 1000),
                   nonce: nonce(),
-                  appid: platform.appid
+                  appid: platform.appId
                },
                headers: {
-                  "Authorization": "Bearer " + platform.authenticationToken
+                  "Authorization": "Bearer " + platform.aToken
                }
             }).then((res) => {
                let body = res.data;
-               if (platform.debug) platform.log("Authorisation token received [%s].", platform.authenticationToken);
+               if (platform.debug) platform.log("Authorisation token received [%s].", platform.aToken);
                if (platform.debug) platform.log("User API key received [%s].", platform.apiKey);
                if (platform.debug) platform.log("Requesting a list of devices through the eWeLink HTTPS API.");
                if (body.hasOwnProperty("error") && body.error !== 0) {
-                  if (body.error === 401) throw "Authorisation token error";
+                  if (body.error === 401) throw "Authorisation token error.";
                   else if (body.error === 406) throw "Incorrect eWeLink username, password and country code in the config.";
                   else throw JSON.stringify(body, null, 2);
                   return;
                }
                eWeLinkDevices = body.devicelist;
             }).catch(function (error) {
-               platform.log.error("****** An error occurred connecting to the HTTPS API ******");
-               platform.log.warn("%s.", error);
-               platform.log.error("****** This plugin will stop loading due to this error. ******");
+               platform.log.error("** Cannot load homebridge-ewelink-sonoff **");
+               platform.log.warn(error);
                return;
             }).then(function () {
                if (eWeLinkDevices === undefined) return;
@@ -114,14 +113,11 @@ class eWeLink {
                   }
                   return;
                }
-               // The eWeLink devices are stored in the "platform.devicesInEwe" map with the device ID as the key (without the SW*) part.
-               // platform.log.warn(JSON.stringify(eWeLinkDevices, null, 2));
                eWeLinkDevices.forEach((device) => {
                   if (!platform.devicesUnsupported.includes(device.uiid)) {
                      platform.devicesInEwe.set(device.deviceid, device);
                   }
                });
-               // Custom groupings found in the configuration are set in the "platform.customGroup" map.
                if (platform.config.groups && Object.keys(platform.config.groups).length > 0) {
                   platform.config.groups.forEach((group) => {
                      if (typeof group.deviceId !== "undefined" && platform.devicesInEwe.has(group.deviceId)) {
@@ -307,7 +303,6 @@ class eWeLink {
                      }
                   });
                }
-               // Let's open a web socket to the eWeLink server to receive real-time updates about external changes to devices.
                if (platform.debug) platform.log("Opening web socket for real time updates.");
                platform.ws = new WSC();
                platform.ws.open("wss://" + platform.wsHost + ":8080/api/ws");
@@ -315,9 +310,9 @@ class eWeLink {
                   platform.wsIsOpen = true;
                   let payload = {
                      action: "userOnline",
-                     at: platform.authenticationToken,
+                     at: platform.aToken,
                      apikey: platform.apiKey,
-                     appid: platform.appid,
+                     appid: platform.appId,
                      nonce: nonce(),
                      ts: Math.floor(new Date() / 1000),
                      userAgent: "app",
@@ -483,9 +478,7 @@ class eWeLink {
    }
    
    addAccessory(device, hbDeviceId, service) {
-      if (platform.devicesInHB.get(hbDeviceId)) {
-         return; // device is already in Homebridge.
-      }
+      if (platform.devicesInHB.get(hbDeviceId)) return; // device is already in Homebridge.
       if (device.type !== "10") {
          platform.log.warn("[%s] cannot be added as it is not supported by this plugin.", device.name);
          return;
@@ -677,6 +670,7 @@ class eWeLink {
    }
    
    configureAccessory(accessory) {
+      if (!this.log) return;
       if (accessory.getService(Service.WindowCovering)) {
          accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
          .on("set", function (value, callback) {
@@ -1598,7 +1592,7 @@ httpGetRegion(callback) {
       "version": 8,
       "ts": Math.floor(new Date().getTime() / 1000),
       "nonce": nonce(),
-      "appid": platform.appid
+      "appid": platform.appId
    };
    let dataToSign = [];
    Object.keys(data).forEach(function (key) {
@@ -1623,18 +1617,9 @@ httpGetRegion(callback) {
    }).then((res) => {
       let body = res.data;
       
-      if (!body.region) {
-         platform.log.error("Server did not response with a region.");
-         platform.log.warn("\n" + JSON.stringify(body, null, 2));
-         callback();
-         return;
-      }
+      if (!body.region) throw "Server did not response with a region.\n" + JSON.stringify(body, null, 2);
       let idx = platform.apiHost.indexOf("-");
-      if (idx === -1) {
-         platform.log.error("Received region [%s]. However we cannot construct the new API host url.", body.region);
-         callback();
-         return;
-      }
+      if (idx === -1) throw "Received region [" + body.region + "] but cannot construct the new API host.";
       let newApiHost = body.region + platform.apiHost.substring(idx);
       if (platform.apiHost !== newApiHost) {
          if (platform.debug) platform.log("Received region [%s], updating API host to [%s].", body.region, newApiHost);
@@ -1643,10 +1628,8 @@ httpGetRegion(callback) {
       callback(body.region);
       return;
    }).catch(function (error) {
-      platform.log.error("****************************************************************************");
-      platform.log.warn("Unable to connect to eWeLink, so homebridge-ewelink-sonoff cannot be loaded.");
-      platform.log.warn("Please verify that your Homebridge instance is connected to the internet....");
-      platform.log.error("****************************************************************************");
+      platform.log.error("** Cannot load homebridge-ewelink-sonoff **");
+      platform.log.warn(error);
       callback();
       return;
    }.bind(platform));
@@ -1663,7 +1646,7 @@ httpLogin(callback) {
    data.version = 8;
    data.ts = Math.floor(new Date().getTime() / 1000);
    data.nonce = nonce();
-   data.appid = platform.appid;
+   data.appid = platform.appId;
    if (platform.debugReqRes) platform.log.warn("Sending HTTPS login request.\n" + JSON.stringify(data, null, 2));
    else if (platform.debug) platform.log("Sending HTTPS login request.");
    axios({
@@ -1676,10 +1659,10 @@ httpLogin(callback) {
       }
    }).then((res) => {
       let body = res.data;
-      if (!body.at) throw JSON.stringify(body, null, 2);
+      if (!body.at) throw "Server did not response with an authentication token.\n" + JSON.stringify(body, null, 2);
       if (body.hasOwnProperty("error") && body.error === 301 && body.hasOwnProperty("region")) {
          let idx = platform.apiHost.indexOf("-");
-         if (idx === -1) throw "Cannot construct the new API host url.";
+         if (idx === -1) throw "Received region [" + body.region + "] but cannot construct the new API host.";
          let newApiHost = body.region + platform.apiHost.substring(idx);
          if (platform.apiHost !== newApiHost) {
             if (platform.debug) platform.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
@@ -1688,14 +1671,14 @@ httpLogin(callback) {
             return;
          }
       }
-      platform.authenticationToken = body.at;
+      platform.aToken = body.at;
       platform.apiKey = body.user.apikey;
       platform.wsGetHost(function () {
          callback(body.at);
       }.bind(platform));
    }).catch(function (error) {
-      platform.log.error("****** An error occurred while logging in. ******");
-      platform.log.warn("[%s].", error);
+      platform.log.error("** Cannot load homebridge-ewelink-sonoff **");
+      platform.log.warn(error);
       callback();
       return;
    }.bind(platform));
@@ -1710,10 +1693,10 @@ wsGetHost(callback) {
          version: 8,
          ts: Math.floor(new Date().getTime() / 1000),
          nonce: nonce(),
-         appid: platform.appid
+         appid: platform.appId
       },
       headers: {
-         "Authorization": "Bearer " + platform.authenticationToken,
+         "Authorization": "Bearer " + platform.aToken,
          "Content-Type": "application/json;charset=UTF-8"
       }
    }).then((res) => {
@@ -1727,8 +1710,8 @@ wsGetHost(callback) {
       callback(body.domain);
       return;
    }).catch(function (error) {
-      platform.log.error("****** An error occurred while getting web socket host. ******");
-      platform.log.warn("[%s].", error);
+      platform.log.error("** Cannot load homebridge-ewelink-sonoff **");
+      platform.log.warn("No web socket host - %s.", error);
       callback();
       return;
    }.bind(platform));
