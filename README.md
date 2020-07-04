@@ -57,7 +57,7 @@ And voila your eWeLink devices *should* be added to your Homebridge instance.
 ## About
 #### My future plans/ideas
 - Support for more devices is always a good thing.
-- TypeScript? I wouldn't know where to begin. So a 2000 line Javascript file is what it is!
+- TypeScript? I wouldn't know where to begin. So a ~~2000~~ 1800 line Javascript file is what it is!
 #### Issues/Pull Requests
 Please feel free to submit - the more the merrier!
 #### Credits
@@ -69,5 +69,3 @@ Please feel free to submit - the more the merrier!
 - @minws13 - for giving me remote access to his aquarium thermostat to add support for these devices.
 
 Thank you to all 😃.
-
-[![donate](https://img.shields.io/badge/donate-patreon-blue)](https://www.patreon.com/bePatron?u=38200025)
