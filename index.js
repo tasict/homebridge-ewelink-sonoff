@@ -17,13 +17,10 @@ module.exports = function (homebridge) {
 };
 class eWeLink {
    constructor(log, config, api) {
-      if (!log || !api) {
-         return;
-      }
+      if (!log || !api)  return;
       if (!config || (!config.username || !config.password || !config.countryCode)) {
          log.error("** Cannot load homebridge-ewelink-sonoff **");
          log.warn("Make sure your eWeLink credentials are in the Homebridge config.");
-         log.error("*******************************************");
          return;
       }
       platform = this;
