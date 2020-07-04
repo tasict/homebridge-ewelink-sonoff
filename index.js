@@ -77,7 +77,7 @@ class eWeLink {
                   appid: platform.appId
                },
                headers: {
-                  "Authorization": "Bearer " + platform.aToken
+                  Authorization: "Bearer " + platform.aToken
                }
             }).then((res) => {
                let body = res.data;
@@ -1595,7 +1595,7 @@ class eWeLink {
       axios.get("https://api.coolkit.cc:8080/api/user/region", {
          params: data,
          headers: {
-            "Authorization": "Sign " + platform.helperGetSignature(dataToSign),
+            Authorization: "Sign " + platform.helperGetSignature(dataToSign),
             "Content-Type": "application/json;charset=UTF-8"
          }
       }).then((res) => {
@@ -1637,7 +1637,7 @@ class eWeLink {
          url: "https://" + platform.apiHost + "/api/user/login",
          data: data,
          headers: {
-            "Authorization": "Sign " + platform.helperGetSignature(JSON.stringify(data)),
+            Authorization: "Sign " + platform.helperGetSignature(JSON.stringify(data)),
             "Content-Type": "application/json;charset=UTF-8"
          }
       }).then((res) => {
@@ -1679,7 +1679,7 @@ class eWeLink {
             appid: platform.appId
          },
          headers: {
-            "Authorization": "Bearer " + platform.aToken,
+            Authorization: "Bearer " + platform.aToken,
             "Content-Type": "application/json;charset=UTF-8"
          }
       }).then((res) => {
