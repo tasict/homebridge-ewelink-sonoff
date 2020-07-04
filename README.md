@@ -27,8 +27,9 @@ The plugin **should** work with Sonoff Thermostat devices, exposing a temperatur
 The plugin **might** work with Sonoff Fan devices. I need a kind person with the a device to assist!
 - **Needs Testing:** iFan02, iFan03
 #### 🟠 Custom Devices
-> By custom devices I mean using a generic Sonoff multi-switch device to simulate a specific type of accessory that is HomeKit supported (e.g. blinds and garage doors).
-- **Needs Testing:** Blinds
+> By custom devices I mean using a generic Sonoff device to simulate a specific type of accessory that is HomeKit supported (e.g. blinds and garage doors).
+- **Needs Testing:** Blinds (with a two-channel device)
+- **Needs Testing:** Garage Doors (with a one-channel device)
 ## Installation
 > Please note if you are currently using a different Sonoff plugin, then you will need to reset your Homebridge accessory cache and take note of the changed configuration options.
 ### Through Homebridge Config UI X
