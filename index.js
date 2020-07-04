@@ -665,7 +665,7 @@ class eWeLink {
    }
    
    configureAccessory(accessory) {
-      if (!this.log) return;
+      if (!platform.log) return;
       if (accessory.getService(Service.WindowCovering)) {
          accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition)
             .on("set", function (value, callback) {
@@ -1642,7 +1642,7 @@ class eWeLink {
          }
       }).then((res) => {
          let body = res.data;
-         if (!body.at) throw "Server did not response with an authentication token.\n" + JSON.stringify(body, null, 2);
+         if (!body.at) throw "Server did not response with an authentication token. Please double check your eWeLink username and password in the Homebridge configuration.\n" + JSON.stringify(body, null, 2);
          if (body.hasOwnProperty("error") && body.error === 301 && body.hasOwnProperty("region")) {
             let idx = platform.apiHost.indexOf("-");
             if (idx === -1) throw "Received region [" + body.region + "] but cannot construct the new API host.";
