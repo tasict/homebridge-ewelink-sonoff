@@ -652,9 +652,12 @@ class eWeLink {
          platform.log.warn("[%s] could not be refreshed due to unknown accessory type.", accessory.displayName);
          return;
       }
-      accessory.reachable = true;
-      platform.api.updatePlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
-      platform.devicesInHB.set(accessory.context.hbDeviceId, accessory);
+      try {
+         platform.devicesInHB.set(accessory.context.hbDeviceId, accessory);
+         platform.api.updatePlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
+      } catch (e) {
+         platform.log.warn("[%s] cannot be refreshed - [%s].", accessory.displayName, e);
+      }
    }
    
    internalBlindUpdate(accessory, value, callback) {
