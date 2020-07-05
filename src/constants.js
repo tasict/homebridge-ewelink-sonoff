@@ -58,5 +58,16 @@ const UIID_TO_CHAN = {
 };
 
 module.exports = {
-   chansFromUiid: UIID_TO_CHAN
+   chansFromUiid: UIID_TO_CHAN,
+   devicesUnsupported: [],
+   devicesSingleSwitch: [1, 5, 6, 14, 15, 22, 24, 27, 32, 36, 44, 59],
+   devicesSingleSwitchLight: ["T1 1C", "L1", "B1", "B1_R2", "TX1C", "D1", "D1R1", "KING-M4", "Slampher"],
+   devicesMultiSwitch: [2, 3, 4, 7, 8, 9, 29, 30, 31, 34, 41, 77],
+   devicesMultiSwitchLight: ["T1 2C", "T1 3C", "TX2C", "TX3C"],
+   devicesBrightable: [36, 44],
+   devicesColourable: [22, 59],
+   devicesThermostat: [15],
+   devicesFan: [34],
+   devicesOutlet: [32],
+   devicesBridge: [28]
 };
