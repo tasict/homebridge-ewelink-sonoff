@@ -204,13 +204,14 @@ class eWeLink {
                         } else {
                            accessory = platform.devicesInHB.get(device.deviceid + "SW0");
                         }
+                        accessory.reachable = device.online;
+                        // @todo here we need to cycle through the secondary devices too with reachability.
                         if (!device.online) {
                            platform.log.warn("[%s] has been reported offline so cannot refresh.", accessory.displayName);
                            return;
                         }
                         if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
                         accessory.getService(Service.AccessoryInformation).updateCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
-                        accessory.reachable = device.online;
                         //*** CUSTOM GROUPS ***//  
                         if (platform.customGroup.has(device.deviceid + "SWX")) {
                            if (platform.customGroup.get(device.deviceid + "SWX").type === "blind" && Array.isArray(device.params.switches)) {
@@ -427,10 +428,9 @@ class eWeLink {
                         }
                         if (accessory) {
                            accessory.reachable = device.params.online;
+                           // @todo here we need to cycle through any secondary devices with reachability
                            if (accessory.reachable) platform.log("[%s] has been reported online.", accessory.displayName);
                            else platform.log.warn("[%s] has been reported offline.", accessory.displayName);
-                        } else {
-                           platform.log.warn("A device that you don't have in Homebridge has been reported [%s].", device.online ? "online" : "offline");
                         }
                      } else {
                         if (platform.debug) platform.log.warn("Unknown action property or no parameters received via web socket.");
@@ -473,7 +473,7 @@ class eWeLink {
       accessory.context.eweApiKey = device.apikey;
       accessory.context.switchNumber = switchNumber;
       accessory.context.channelCount = channelCount;
-      accessory.reachable = device.online;
+      accessory.reachable = true;
       accessory.on("identify", function (paired, callback) {
          platform.log("[%s] identified. Identification on device not supported.", accessory.displayName);
          try {
@@ -1311,7 +1311,6 @@ class eWeLink {
             otherAccessory = platform.devicesInHB.get(idToCheck + i);
             if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
             otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, params.fwVersion);
-            otherAccessory.reachable = true;
             otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switches[i - 1].switch === "on");
             if (params.switches[i - 1].switch === "on") primaryState = true;
          }
