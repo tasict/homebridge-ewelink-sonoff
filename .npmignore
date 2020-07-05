@@ -1,5 +1,4 @@
 # Ignore source code
-src
 .DS_Store
 .nova
 # ------------- Defaults ------------- #
