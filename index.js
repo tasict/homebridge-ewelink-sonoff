@@ -60,7 +60,7 @@ class eWeLink {
                if (platform.debug) {
                   platform.log("Authorisation token received [%s].", platform.aToken);
                   platform.log("User API key received [%s].", platform.apiKey);
-                  platform.log("Requesting a list of devices through the eWeLink HTTPS API.");
+                  platform.log("Requesting a list of devices through the eWeLink HTTP API.");
                }
                if (!body.hasOwnProperty("error") || (body.hasOwnProperty("error") && body.error !== 0)) {
                   throw JSON.stringify(body, null, 2);
@@ -73,9 +73,8 @@ class eWeLink {
             }).then(function () {
                if (eWeLinkDevices === undefined) return;
                if (Object.keys(eWeLinkDevices).length === 0) {
-                  platform.log("[0] primary devices were loaded from your eWeLink account.");
-                  platform.log("Any existing eWeLink devices in the Homebridge cache will be removed.");
-                  platform.log.warn("This plugin will not be loaded as there is no reason to.");
+                  platform.log("[0] primary devices were loaded from your eWeLink account so any eWeLink devices in the Homebridge cache will be removed.");
+                  platform.log("This plugin will no longer load as there is no reason to continue.");
                   try {
                      platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", Array.from(platform.devicesInHB.values()));
                      platform.devicesInHB.clear();
@@ -98,15 +97,14 @@ class eWeLink {
                }
                platform.log("[%s] eWeLink devices were loaded from the Homebridge cache..", platform.devicesInHB.size);
                platform.log("[%s] primary devices were loaded from your eWeLink account.", Object.keys(eWeLinkDevices).length);
-               platform.log("[%s] custom groups were loaded from the Homebridge configuration.", platform.customGroup.size);
-               if (platform.debug) platform.log("Checking if devices need to be removed from the Homebridge cache.");
+               platform.log("[%s] custom groups were loaded from the configuration.", platform.customGroup.size);
                if (platform.devicesInHB.size > 0) {
                   platform.devicesInHB.forEach((accessory) => {
                      if (!platform.devicesInEwe.has(accessory.context.eweDeviceId)) {
                         try {
                            platform.devicesInHB.delete(accessory.context.hbDeviceId);
                            platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
-                           platform.log.warn("[%s] was not present in the HTTP API response so removing from Homebridge.", accessory.displayName);
+                           platform.log("[%s] was not present in the HTTP API response will be removed from Homebridge.", accessory.displayName);
                         } catch (e) {
                            platform.log.warn("[%s] was not present in the HTTP API response but has not been removed - [%s].", accessory.displayName, e);
                         }
@@ -403,11 +401,11 @@ class eWeLink {
                               }
                            }
                            if (device.params.hasOwnProperty("power") || device.params.hasOwnProperty("rssi") || device.params.hasOwnProperty("uiActive") || device.params.hasOwnProperty("sledOnline")) {
-                              if (platform.debug) platform.log("[%s] nothing relevant to refresh.", accessory.displayName);
+                              if (platform.debug) platform.log("[%s] has sent an update which is useless to Homebridge.", accessory.displayName);
                               return;
                            }
                         } else {
-                           platform.log.warn("[%s] Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.", device.deviceid);
+                           platform.log.warn("[%s] Accessory received via web socket does not exist in Homebridge. If it's a new accessory please restart Homebridge so it is added.", device.name);
                         }
                      } else if (device.action === "sysmsg") {
                         if (platform.devicesInHB.has(device.deviceid + "SWX")) {
@@ -419,12 +417,12 @@ class eWeLink {
                         }
                         if (accessory) {
                            accessory.reachable = device.params.online;
-                           // @todo here we need to cycle through any secondary devices with reachability
+                           // @todo - need to cycle through any secondary devices with reachability.
                            if (accessory.reachable) platform.log("[%s] has been reported online.", accessory.displayName);
                            else platform.log.warn("[%s] has been reported offline.", accessory.displayName);
                         }
                      } else {
-                        if (platform.debug) platform.log.warn("Unknown action property or no parameters received via web socket.");
+                        if (platform.debug) platform.log.warn("[%s] unknown action or parameters received via web socket.", device.name);
                      }
                   } else if (device.hasOwnProperty("config") && device.config.hb && device.config.hbInterval) {
                      if (!platform.hbInterval) {
@@ -448,12 +446,8 @@ class eWeLink {
    addAccessory(device, hbDeviceId, service) {
       if (platform.devicesInHB.get(hbDeviceId)) return; // device is already in Homebridge.
       let channelCount = service === "bridge" ? Object.keys(device.params.rfList).length : platform.helperChannelsByUIID(device.uiid);
-      let switchNumber = hbDeviceId.substr(-1);
-      if (switchNumber > channelCount) {
-         platform.log.warn("[%s] cannot be added as the [%s] only has [%s] switches.", device.name, device.productModel, channelCount);
-         return;
-      }
       let group;
+      let switchNumber = hbDeviceId.substr(-1);
       let newDeviceName = device.name;
       if (!["0", "X"].includes(switchNumber)) newDeviceName += " SW" + switchNumber;
       const accessory = new Accessory(newDeviceName, UUIDGen.generate(hbDeviceId).toString());
@@ -618,7 +612,7 @@ class eWeLink {
          accessory.addService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);;
          break;
       default:
-         platform.log.warn("[%s] cannot be added as it is not supported by this plugin.", accessory.deviceName);
+         platform.log.warn("[%s] cannot be added as it isn't supported by this plugin.", accessory.deviceName);
          return;
       }
       try {
@@ -751,7 +745,7 @@ class eWeLink {
    }
    
    internalBlindUpdate(accessory, value, callback) {
-      platform.log("[%s] setting new target position to [%s].", accessory.displayName, value);
+      if (platform.debug) platform.log("[%s] updating target position to [%s].", accessory.displayName, value);
       let cPos = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).value;
       let tPos = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.TargetPosition).value;
       let cSte = accessory.getService(Service.WindowCovering).getCharacteristic(Characteristic.PositionState).value;
@@ -912,7 +906,7 @@ class eWeLink {
             switch: "on"
          }
       };
-      if (platform.debug) platform.log("[%s] requesting to [%s] garage door.", accessory.displayName, value === 0 ? "open" : "close");
+      if (platform.debug) platform.log("[%s] updating garage door to [%s].", accessory.displayName, value === 0 ? "open" : "close");
       platform.wsSendMessage(payload, function () {
          return;
       });
@@ -962,7 +956,7 @@ class eWeLink {
       payload.params.switches[1].switch = newSpeed >= 33 ? "on" : "off";
       payload.params.switches[2].switch = newSpeed >= 66 && newSpeed < 99 ? "on" : "off";
       payload.params.switches[3].switch = newSpeed >= 99 ? "on" : "off";
-      if (platform.debug) platform.log("[%s] requesting to change fan %s.", accessory.displayName, type);
+      if (platform.debug) platform.log("[%s] updating [%s] to [%s].", accessory.displayName, type, value);
       accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, newLight);
       accessory.getService(Service.Fan).updateCharacteristic(Characteristic.On, newPower);
       accessory.getService(Service.Fan).updateCharacteristic(Characteristic.RotationSpeed, newSpeed);
@@ -978,7 +972,7 @@ class eWeLink {
             mainSwitch: value ? "on" : "off"
          }
       };
-      if (platform.debug) platform.log("[%s] requesting to turn switch [%s].", accessory.displayName, value ? "on" : "off");
+      if (platform.debug) platform.log("[%s] updating to turn [%s].", accessory.displayName, value ? "on" : "off");
       accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, value);
       platform.wsSendMessage(payload, callback);
    }
@@ -1011,7 +1005,7 @@ class eWeLink {
          } else {
             payload.params.switch = value ? "on" : "off";
          }
-         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, value ? "on" : "off");
+         if (platform.debug) platform.log("[%s] updating to turn [%s].", accessory.displayName, value ? "on" : "off");
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, value);
          break;
       case "0":
@@ -1020,7 +1014,7 @@ class eWeLink {
          payload.params.switches[1].switch = value ? "on" : "off";
          payload.params.switches[2].switch = value ? "on" : "off";
          payload.params.switches[3].switch = value ? "on" : "off";
-         if (platform.debug) platform.log("[%s] requesting to turn group [%s].", accessory.displayName, value ? "on" : "off");
+         if (platform.debug) platform.log("[%s] updating to turn group [%s].", accessory.displayName, value ? "on" : "off");
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, value);
          for (i = 1; i <= 4; i++) {
             if (platform.devicesInHB.has(accessory.context.eweDeviceId + "SW" + i)) {
@@ -1046,7 +1040,7 @@ class eWeLink {
                }
             }
          }
-         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, value ? "on" : "off");
+         if (platform.debug) platform.log("[%s] updating to turn [%s].", accessory.displayName, value ? "on" : "off");
          otherAccessory = platform.devicesInHB.get(accessory.context.eweDeviceId + "SW0");
          otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, masterState === "on");
          break;
@@ -1082,7 +1076,7 @@ class eWeLink {
          }
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, value);
       }
-      if (platform.debug) platform.log("[%s] requesting to turn brightness to [%s%].", accessory.displayName, value);
+      if (platform.debug) platform.log("[%s] updating brightness to [%s%].", accessory.displayName, value);
       setTimeout(function () {
          platform.wsSendMessage(payload, callback);
       }, 250);
@@ -1115,7 +1109,7 @@ class eWeLink {
             callback();
             return;
          }
-         if (platform.debug) platform.log("[%s] requesting to change hue to [%s].", accessory.displayName, value);
+         if (platform.debug) platform.log("[%s] updating hue to [%s].", accessory.displayName, value);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Hue, value);
          break;
       case "bri":
@@ -1134,7 +1128,7 @@ class eWeLink {
             callback();
             return;
          }
-         if (platform.debug) platform.log("[%s] requesting to change brightness to [%s%].", accessory.displayName, value);
+         if (platform.debug) platform.log("[%s] updating brightness to [%s%].", accessory.displayName, value);
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.Brightness, value);
          break;
       }
@@ -1154,7 +1148,7 @@ class eWeLink {
       switch (accessory.context.switchNumber) {
       case "X":
          payload.params.switch = value ? "on" : "off";
-         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, value ? "on" : "off");
+         if (platform.debug) platform.log("[%s] updating to turn [%s].", accessory.displayName, value ? "on" : "off");
          accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, value);
          break;
       case "0":
@@ -1163,7 +1157,7 @@ class eWeLink {
          payload.params.switches[1].switch = value ? "on" : "off";
          payload.params.switches[2].switch = value ? "on" : "off";
          payload.params.switches[3].switch = value ? "on" : "off";
-         if (platform.debug) platform.log("[%s] requesting to turn group [%s].", accessory.displayName, value ? "on" : "off");
+         if (platform.debug) platform.log("[%s] updating to turn group [%s].", accessory.displayName, value ? "on" : "off");
          accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, value);
          for (i = 1; i <= 4; i++) {
             if (platform.devicesInHB.has(accessory.context.eweDeviceId + "SW" + i)) {
@@ -1178,7 +1172,7 @@ class eWeLink {
       case "4":
          payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
          payload.params.switches[parseInt(accessory.context.switchNumber) - 1].switch = value ? "on" : "off";
-         if (platform.debug) platform.log("[%s] requesting to turn [%s].", accessory.displayName, value ? "on" : "off");
+         if (platform.debug) platform.log("[%s] updating to turn [%s].", accessory.displayName, value ? "on" : "off");
          accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, value);
          let ch = false;
          let masterState = "off";
@@ -1271,15 +1265,9 @@ class eWeLink {
          return;
       }
       if (params.switch !== "on") return;
-      if (accessory.getService(Service.GarageDoorOpener).getCharacteristic(Characteristic.CurrentDoorState).value === 0) {
-         platform.log("[%s] has been reported as closing. Updating Homebridge...", accessory.displayName);
-         accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.TargetDoorState, 1);
-         accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, 1);
-      } else {
-         platform.log("[%s] has been reported as opening. Updating Homebridge...", accessory.displayName);
-         accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.TargetDoorState, 0);
-         accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, 0);
-      }
+      let cVal = accessory.getService(Service.GarageDoorOpener).getCharacteristic(Characteristic.CurrentDoorState).value;
+      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.TargetDoorState, cVal === 0 ? 1 : 0);
+      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, cVal === 0 ? 1 : 0);
    }
    
    externalFanUpdate(hbDeviceId, params) {
@@ -1403,7 +1391,6 @@ class eWeLink {
       for (i = 1; i <= accessory.context.channelCount; i++) {
          if (platform.devicesInHB.has(idToCheck + i)) {
             otherAccessory = platform.devicesInHB.get(idToCheck + i);
-            if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
             otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, params.fwVersion);
             otherAccessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, params.switches[i - 1].switch === "on");
             if (params.switches[i - 1].switch === "on") primaryState = true;
@@ -1426,7 +1413,6 @@ class eWeLink {
       for (i = 1; i <= accessory.context.channelCount; i++) {
          if (platform.devicesInHB.has(idToCheck + i)) {
             otherAccessory = platform.devicesInHB.get(idToCheck + i);
-            if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", otherAccessory.displayName);
             otherAccessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, params.fwVersion);
             otherAccessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, params.switches[i - 1].switch === "on");
             if (params.switches[i - 1].switch === "on") primaryState = true;
@@ -1534,7 +1520,7 @@ class eWeLink {
       };
       if (platform.config.username.includes("@")) data.email = platform.config.username;
       else data.phoneNumber = platform.config.username;
-      if (platform.debug) platform.log.warn("Sending HTTPS login request. This message is yellow for clarity. It is not an error.\n" + JSON.stringify(data, null, 2));
+      if (platform.debug) platform.log.warn("Sending HTTP login request. This message is yellow for clarity. It is not an error.\n" + JSON.stringify(data, null, 2));
       axios({
          method: "post",
          url: "https://" + platform.apiHost + "/api/user/login",
