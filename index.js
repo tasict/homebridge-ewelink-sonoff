@@ -329,14 +329,13 @@ class eWeLink {
                      return;
                   }
                   if (device.hasOwnProperty("action")) {
-                     let idToCheck = device.deviceid;
                      let accessory;
                      if (device.action === "update" && device.hasOwnProperty("params")) {
-                        if (platform.devicesInHB.has(idToCheck + "SWX") || platform.devicesInHB.has(idToCheck + "SW0")) {
-                           if (platform.devicesInHB.has(idToCheck + "SWX")) {
-                              accessory = platform.devicesInHB.get(idToCheck + "SWX");
+                        if (platform.devicesInHB.has(device.deviceid + "SWX") || platform.devicesInHB.has(device.deviceid + "SW0")) {
+                           if (platform.devicesInHB.has(device.deviceid + "SWX")) {
+                              accessory = platform.devicesInHB.get(device.deviceid + "SWX");
                            } else {
-                              accessory = platform.devicesInHB.get(idToCheck + "SW0");
+                              accessory = platform.devicesInHB.get(device.deviceid + "SW0");
                            }
                            if (!accessory.reachable) {
                               platform.log.warn("[%s] has been reported offline so cannot refresh.", accessory.displayName);
@@ -345,68 +344,68 @@ class eWeLink {
                            if (platform.debug) platform.log("[%s] has been found in Homebridge so refresh status.", accessory.displayName);
                            accessory.getService(Service.AccessoryInformation).updateCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
                            //*** CUSTOM GROUPS ***//       
-                           if (platform.customGroup.has(idToCheck + "SWX")) {
-                              if (platform.customGroup.get(idToCheck + "SWX").type === "blind" && Array.isArray(device.params.switches)) {
-                                 platform.externalBlindUpdate(idToCheck + "SWX", device.params);
+                           if (platform.customGroup.has(device.deviceid + "SWX")) {
+                              if (platform.customGroup.get(device.deviceid + "SWX").type === "blind" && Array.isArray(device.params.switches)) {
+                                 platform.externalBlindUpdate(device.deviceid + "SWX", device.params);
                                  return;
                               } else if (platform.customGroup.get(device.deviceid + "SWX").type === "garageDoor" && (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("pulse"))) {
-                                 platform.externalGarageDoorUpdate(idToCheck + "SWX", device.params);
+                                 platform.externalGarageDoorUpdate(device.deviceid + "SWX", device.params);
                                  return;
                               }
                            }
                            //*** FANS ***//                                         
                            else if (constants.devicesFan.includes(accessory.context.eweUIID)) {
                               if (Array.isArray(device.params.switches)) {
-                                 platform.externalFanUpdate(idToCheck + "SWX", device.params);
+                                 platform.externalFanUpdate(device.deviceid + "SWX", device.params);
                                  return;
                               }
                            }
                            //*** THERMOSTATS ***//                                   
                            else if (constants.devicesThermostat.includes(accessory.context.eweUIID)) {
                               if (device.params.hasOwnProperty("currentTemperature") || device.params.hasOwnProperty("currentHumidity") || device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("masterSwitch")) {
-                                 platform.externalThermostatUpdate(idToCheck + "SWX", device.params);
+                                 platform.externalThermostatUpdate(device.deviceid + "SWX", device.params);
                                  return;
                               }
                            }
                            //*** OUTLETS ***//  
                            else if (constants.devicesOutlet.includes(accessory.context.eweUIID)) {
                               if (device.params.hasOwnProperty("switch")) {
-                                 platform.externalOutletUpdate(idToCheck + "SWX", device.params);
+                                 platform.externalOutletUpdate(device.deviceid + "SWX", device.params);
                                  return;
                               }
                            }
                            //*** LIGHTS [SINGLE SWITCH] ***//      
                            else if (constants.devicesSingleSwitch.includes(accessory.context.eweUIID) && constants.devicesSingleSwitchLight.includes(accessory.context.eweModel)) {
                               if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("state") || device.params.hasOwnProperty("bright") || device.params.hasOwnProperty("colorR") || device.params.hasOwnProperty("brightness") || device.params.hasOwnProperty("channel0") || device.params.hasOwnProperty("channel2") || device.params.hasOwnProperty("zyx_mode")) {
-                                 platform.externalSingleLightUpdate(idToCheck + "SWX", device.params);
+                                 platform.externalSingleLightUpdate(device.deviceid + "SWX", device.params);
                                  return;
                               }
                            }
                            //*** LIGHTS [MULTI SWITCH] ***//
                            else if (constants.devicesMultiSwitch.includes(accessory.context.eweUIID) && constants.devicesMultiSwitchLight.includes(accessory.context.eweModel)) {
                               if (Array.isArray(device.params.switches)) {
-                                 platform.externalMultiLightUpdate(idToCheck + "SW0", device.params);
+                                 platform.externalMultiLightUpdate(device.deviceid + "SW0", device.params);
                                  return;
                               }
                            }
                            //*** SINGLE SWITCHES ***//
                            else if (constants.devicesSingleSwitch.includes(accessory.context.eweUIID)) {
                               if (device.params.hasOwnProperty("switch")) {
-                                 platform.externalSingleSwitchUpdate(idToCheck + "SWX", device.params);
+                                 platform.externalSingleSwitchUpdate(device.deviceid + "SWX", device.params);
                                  return;
                               }
                            }
                            //*** MULTI SWITCHES ***//
                            else if (constants.devicesMultiSwitch.includes(accessory.context.eweUIID)) {
                               if (Array.isArray(device.params.switches)) {
-                                 platform.externalMultiSwitchUpdate(idToCheck + "SW0", device.params);
+                                 platform.externalMultiSwitchUpdate(device.deviceid + "SW0", device.params);
                                  return;
                               }
                            }
                            //*** BRIDGES ***//
                            else if (constants.devicesBridge.includes(accessory.context.eweUIID)) {
                               if (device.params.hasOwnProperty("cmd") && device.params.cmd === "trigger") {
-                                 platform.externalBridgeUpdate(idToCheck + "SW0", device.params);
+                                 platform.externalBridgeUpdate(device.deviceid + "SW0", device.params);
                                  return;
                               }
                            }
