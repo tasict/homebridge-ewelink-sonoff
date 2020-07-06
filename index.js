@@ -34,9 +34,7 @@ class eWeLink {
       platform.apiHost = (platform.config.apiHost || "eu-api.coolkit.cc") + ":8080";
       platform.wsHost = platform.config.wsHost || "eu-pconnect3.coolkit.cc";
       platform.wsIsOpen = false;
-      platform.wsToReconnect = false;
       platform.debug = platform.config.debug || false;
-      platform.debugReqRes = platform.config.debugReqRes || false;
       platform.sensorTimeLength = platform.config.sensorTimeLength || 2;
       platform.sensorTimeDifference = platform.config.sensorTimeDifference || 120;
       platform.devicesInHB = new Map();
@@ -298,7 +296,7 @@ class eWeLink {
                      version: 8
                   };
                   platform.ws.send(JSON.stringify(payload));
-                  if (platform.debugReqRes) platform.log.warn("Sending web socket login request.\n" + JSON.stringify(payload, null, 2));
+                  if (platform.debug) platform.log.warn("Sending web socket login request.\n" + JSON.stringify(payload, null, 2));
                };
                platform.ws.onerror = function (e) {
                   platform.log.error("Web socket error - [%s].", e);
@@ -307,7 +305,7 @@ class eWeLink {
                platform.ws.onclose = function (e) {
                   platform.log.warn("Web socket was closed - [%s].", e);
                   platform.log.warn("Web socket will reconnect in a few seconds and then please try the command again.");
-                  platform.isSocketOpen = false;
+                  platform.wsIsOpen = false;
                   if (platform.hbInterval) {
                      clearInterval(platform.hbInterval);
                      platform.hbInterval = null;
@@ -315,8 +313,7 @@ class eWeLink {
                };
                platform.ws.onmessage = function (m) {
                   if (m === "pong") return;
-                  if (platform.debugReqRes) platform.log.warn("Web socket message received.\n" + JSON.stringify(JSON.parse(m), null, 2));
-                  else if (platform.debug) platform.log("Web socket message received.");
+                  if (platform.debug) platform.log.warn("Web socket message received.\n" + JSON.stringify(JSON.parse(m), null, 2));
                   let device;
                   try {
                      device = JSON.parse(m);
@@ -1537,8 +1534,7 @@ class eWeLink {
       };
       if (platform.config.username.includes("@")) data.email = platform.config.username;
       else data.phoneNumber = platform.config.username;
-      if (platform.debugReqRes) platform.log.warn("Sending HTTPS login request.\n" + JSON.stringify(data, null, 2));
-      else if (platform.debug) platform.log("Sending HTTPS login request.");
+      if (platform.debug) platform.log.warn("Sending HTTPS login request.\n" + JSON.stringify(data, null, 2));
       axios({
          method: "post",
          url: "https://" + platform.apiHost + "/api/user/login",
@@ -1627,8 +1623,7 @@ class eWeLink {
             } catch (e) {
                platform.ws.emit("error", e);
             }
-            if (platform.debugReqRes) platform.log.warn("Web socket message sent.\n" + JSON.stringify(json, null, 2));
-            else if (platform.debug) platform.log("Web socket message sent.");
+            if (platform.debug) platform.log.warn("Web socket message sent.\n" + JSON.stringify(json, null, 2));
             callback();
          }
          platform.delaySend = platform.delaySend <= 0 ? 0 : platform.delaySend -= delayOffset;
