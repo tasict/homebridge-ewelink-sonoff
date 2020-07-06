@@ -9,7 +9,8 @@ Please see the [installation](https://github.com/thepotterfamily/homebridge-ewel
 
 If you're feeling brave, I normally have a beta version with changes that needs testing.
 #### Beta Version (v1.6.0-1)
-> Both versions are currently equal
+> Both versions are currently equal.
+
 To install the beta version simply run this command in terminal (no need to uninstall any previous version):
 ```bash
 sudo npm i homebridge-ewelink-sonoff@next -g
