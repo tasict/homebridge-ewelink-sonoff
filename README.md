@@ -4,6 +4,21 @@ There seems to be a variety of Homebridge plugins for eWeLink/Sonoff devices. My
 This project was forked and based on the work of [homebridge-ewelink-max](https://github.com/howanghk/homebridge-ewelink).
 
 Thanks :)
+## Installation
+Please see the [installation](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Installation) wiki page for guidance.
+
+If you're feeling brave, I normally have a beta version with changes that needs testing.
+#### Beta Version (v1.6.0-1)
+To install the beta version simply run this command in terminal (no need to uninstall any previous version):
+```bash
+sudo npm i homebridge-ewelink-sonoff@next -g
+```
+#### Current Version (v1.5.6)
+To revert back to the current version simply run this command in terminal (no need to uninstall the beta version):
+```bash
+sudo npm i homebridge-ewelink-sonoff@latest -g
+```
+
 ## Supported Devices
 #### 🟢 Switches
 The plugin **should** work with Sonoff switches (single and multi-channel).
@@ -30,8 +45,6 @@ The plugin **might** work with Sonoff Fan devices. I need a kind person with the
 > By custom devices I mean using a generic Sonoff device to simulate a specific type of accessory that is HomeKit supported (e.g. blinds and garage doors).
 - **Needs Testing:** Blinds (with a two-channel device)
 - **Needs Testing:** Garage Doors (with a one-channel device)
-## Installation
-Please see the [installation](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Installation) wiki page for guidance.
 ## About
 #### My future plans/ideas
 - Support for more devices is always a good thing.
