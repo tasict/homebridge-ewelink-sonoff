@@ -3,7 +3,7 @@ const constants = require('./src/constants');
 const convert = require("color-convert");
 const crypto = require("crypto");
 const nonce = require("nonce")();
-const ws = require("ws");
+const wsc = require("./src/wsc");
 let Accessory;
 let Characteristic;
 let Service;
@@ -280,7 +280,7 @@ class eWeLink {
                   });
                }
                if (platform.debug) platform.log("Opening web socket for real time updates.");
-               platform.ws = new WSC();
+               platform.ws = new wsc();
                platform.ws.open("wss://" + platform.wsHost + ":8080/api/ws");
                platform.ws.onopen = function (e) {
                   platform.wsIsOpen = true;
@@ -296,7 +296,7 @@ class eWeLink {
                      version: 8
                   };
                   platform.ws.send(JSON.stringify(payload));
-                  if (platform.debug) platform.log.warn("Sending web socket login request. For clarity this message is yellow - it is not an error.\n" + JSON.stringify(payload, null, 2));
+                  if (platform.debug) platform.log.warn("Sending web socket login request. This message is yellow for clarity. It is not an error.\n" + JSON.stringify(payload, null, 2));
                };
                platform.ws.onerror = function (e) {
                   platform.log.error("Web socket error - [%s].", e);
@@ -313,7 +313,7 @@ class eWeLink {
                };
                platform.ws.onmessage = function (m) {
                   if (m === "pong") return;
-                  if (platform.debug) platform.log.warn("Web socket message received. For clarity this message is yellow - it is not an error.\n" + JSON.stringify(JSON.parse(m), null, 2));
+                  if (platform.debug) platform.log.warn("Web socket message received. This message is yellow for clarity. It is not an error.\n" + JSON.stringify(JSON.parse(m), null, 2));
                   let device;
                   try {
                      device = JSON.parse(m);
@@ -1534,7 +1534,7 @@ class eWeLink {
       };
       if (platform.config.username.includes("@")) data.email = platform.config.username;
       else data.phoneNumber = platform.config.username;
-      if (platform.debug) platform.log.warn("Sending HTTPS login request. For clarity this message is yellow - it is not an error.\n" + JSON.stringify(data, null, 2));
+      if (platform.debug) platform.log.warn("Sending HTTPS login request. This message is yellow for clarity. It is not an error.\n" + JSON.stringify(data, null, 2));
       axios({
          method: "post",
          url: "https://" + platform.apiHost + "/api/user/login",
@@ -1623,7 +1623,7 @@ class eWeLink {
             } catch (e) {
                platform.ws.emit("error", e);
             }
-            if (platform.debug) platform.log.warn("Web socket message sent. For clarity this message is yellow - it is not an error.\n" + JSON.stringify(json, null, 2));
+            if (platform.debug) platform.log.warn("Web socket message sent. This message is yellow for clarity. It is not an error.\n" + JSON.stringify(json, null, 2));
             callback();
          }
          platform.delaySend = platform.delaySend <= 0 ? 0 : platform.delaySend -= delayOffset;
@@ -1642,46 +1642,5 @@ class eWeLink {
          setTimeout(sendOperation, platform.delaySend, string);
          platform.delaySend += delayOffset;
       }
-   }
-}
-
-class WSC {
-   open(url) {
-      this.url = url;
-      this.instance = new ws(this.url);
-      this.instance.on("open", () => {
-         this.onopen();
-      });
-      this.instance.on("message", (data, flags) => {
-         this.number++;
-         this.onmessage(data, flags);
-      });
-      this.instance.on("close", (e) => {
-         if (e.code !== 1000) {
-            this.reconnect(e);
-         }
-         this.onclose(e);
-      });
-      this.instance.on("error", (e) => {
-         if (e.code === "ECONNREFUSED") {
-            this.reconnect(e);
-         } else {
-            this.onerror(e);
-         }
-      });
-   }
-   send(data, option) {
-      try {
-         this.instance.send(data, option);
-      } catch (e) {
-         this.instance.emit("error", e);
-      }
-   }
-   reconnect(e) {
-      this.instance.removeAllListeners();
-      let that = this;
-      setTimeout(function () {
-         that.open(that.url);
-      }, 2500);
    }
 }
