@@ -217,7 +217,7 @@ class eWeLink {
                            if (platform.customGroup.get(device.deviceid + "SWX").type === "blind" && Array.isArray(device.params.switches)) {
                               platform.externalBlindUpdate(device.deviceid + "SWX", device.params);
                               return;
-                           } else if (platform.customGroup.get(device.deviceid + "SWX").type === "garageDoor" && device.params.hasOwnProperty("switch")) {
+                           } else if (platform.customGroup.get(device.deviceid + "SWX").type === "garageDoor" && (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("pulse"))) {
                               platform.externalGarageDoorUpdate(device.deviceid + "SWX", device.params);
                               return;
                            }
@@ -349,7 +349,7 @@ class eWeLink {
                               if (platform.customGroup.get(idToCheck + "SWX").type === "blind" && Array.isArray(device.params.switches)) {
                                  platform.externalBlindUpdate(idToCheck + "SWX", device.params);
                                  return;
-                              } else if (platform.customGroup.get(idToCheck + "SWX").type === "garageDoor" && device.params.hasOwnProperty("switch")) {
+                              } else if (platform.customGroup.get(device.deviceid + "SWX").type === "garageDoor" && (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("pulse"))) {
                                  platform.externalGarageDoorUpdate(idToCheck + "SWX", device.params);
                                  return;
                               }
@@ -410,11 +410,10 @@ class eWeLink {
                                  return;
                               }
                            }
-                           if (device.params.hasOwnProperty("power") || device.params.hasOwnProperty("rssi") || device.params.hasOwnProperty("uiActive")) {
-                              // Catch other updates that don't relate to Homebridge, for example wifi signal strength.
+                           if (device.params.hasOwnProperty("power") || device.params.hasOwnProperty("rssi") || device.params.hasOwnProperty("uiActive") || device.params.hasOwnProperty("sledOnline")) {
+                              if (platform.debug) platform.log("[%s] nothing relevant to refresh.", accessory.displayName);
                               return;
                            }
-                           if (platform.debug) platform.log("[%s] wasn't refreshed as there was nothing to do.", device.deviceid);
                         } else {
                            platform.log.warn("[%s] Accessory received via web socket does not exist in Homebridge. If it's a new accessory please try restarting Homebridge so it is added.", device.deviceid);
                         }
@@ -500,6 +499,12 @@ class eWeLink {
          accessory.addService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, 1);
          accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.TargetDoorState, 1);
          accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.ObstructionDetected, false);
+         accessory.context.eweInch = 0;
+         if (device.params.hasOwnProperty("pulse") && device.params.hasOwnProperty("pulseWidth")) {
+            if (device.params.pulse === "on" && device.params.pulseWidth > 0) {
+               accessory.context.eweInch = device.params.pulseWidth;
+            }
+         }
          break;
       case "fan":
          accessory.addService(Service.Fanv2).updateCharacteristic(Characteristic.Active, 1);
@@ -826,13 +831,15 @@ class eWeLink {
       platform.wsSendMessage(payload, function () {
          return;
       });
-      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, value === 0 ? 2 : 3);
-      setTimeout(function () {
-         payload.params.switch = "off";
-         platform.wsSendMessage(payload, function () {
-            return;
-         });
-      }, 500);
+      if (accessory.context.eweInch === 0) {
+         accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, value === 0 ? 2 : 3);
+         setTimeout(function () {
+            payload.params.switch = "off";
+            platform.wsSendMessage(payload, function () {
+               return;
+            });
+         }, 500);
+      }
       setTimeout(function () {
          accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, value === 0 ? 0 : 1);
       }, 5000);
@@ -1171,6 +1178,14 @@ class eWeLink {
    
    externalGarageDoorUpdate(hbDeviceId, params) {
       let accessory = platform.devicesInHB.get(hbDeviceId);
+      if (params.hasOwnProperty("pulse") && params.hasOwnProperty("pulseWidth")) {
+         if (params.pulse === "on" && params.pulseWidth > 0) {
+            accessory.context.eweInch = params.pulseWidth;
+         } else {
+            accessory.context.eweInch = 0;
+         }
+         return;
+      }
       if (params.switch !== "on") return;
       if (accessory.getService(Service.GarageDoorOpener).getCharacteristic(Characteristic.CurrentDoorState).value === 0) {
          platform.log("[%s] has been reported as closing. Updating Homebridge...", accessory.displayName);
@@ -1181,7 +1196,6 @@ class eWeLink {
          accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.TargetDoorState, 0);
          accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, 0);
       }
-      return;
    }
    
    externalFanUpdate(hbDeviceId, params) {
