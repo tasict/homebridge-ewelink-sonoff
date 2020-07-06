@@ -31,29 +31,7 @@ The plugin **might** work with Sonoff Fan devices. I need a kind person with the
 - **Needs Testing:** Blinds (with a two-channel device)
 - **Needs Testing:** Garage Doors (with a one-channel device)
 ## Installation
-> Please note if you are currently using a different Sonoff plugin, then you will need to reset your Homebridge accessory cache and take note of the changed configuration options.
-### Through Homebridge Config UI X
-Simply go to the "Plugins" page, search `homebridge-ewelink-sonoff` and click "Install". You will be guided through the configuration.
-### Manually
-#### 1. Install
-```bash
-sudo npm i homebridge-ewelink-sonoff -g
-```
-#### 2. Configure
-Add the following to your Homebridge configuration file in the appropriate place. These are the basic required fields.
-> This plugin uses a single field for e-mail / phone number.
-```json
-{
-   "platform" : "eWeLink",
-   "name" : "eWeLink",
-   "username" : "your-ewelink-username (either phone or email)",
-   "password" : "your-ewelink-password",
-   "countryCode" : "your-ewelink-country-code (eg 44 for UK, 1 for USA, 55 for Brazil)"
-}
-```
-There are extra optional configuration options that can be configured via Homebridge-UI-X. Or you can browse the code to see them.
-#### 3. Restart Homebridge
-And voila your eWeLink devices *should* be added to your Homebridge instance.
+Please see the [installation](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Installation) wiki page for guidance.
 ## About
 #### My future plans/ideas
 - Support for more devices is always a good thing.
