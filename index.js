@@ -64,11 +64,8 @@ class eWeLink {
                   platform.log("User API key received [%s].", platform.apiKey);
                   platform.log("Requesting a list of devices through the eWeLink HTTPS API.");
                }
-               if (body.hasOwnProperty("error") && body.error !== 0) {
-                  if (body.error === 401) throw "Authorisation token error.";
-                  else if (body.error === 406) throw "Incorrect eWeLink username, password and country code in the config.";
-                  else throw JSON.stringify(body, null, 2);
-                  return;
+               if (!body.hasOwnProperty("error") || (body.hasOwnProperty("error") && body.error !== 0)) {
+                  throw JSON.stringify(body, null, 2);
                }
                eWeLinkDevices = body.devicelist;
             }).catch(function (error) {
@@ -77,16 +74,15 @@ class eWeLink {
                return;
             }).then(function () {
                if (eWeLinkDevices === undefined) return;
-               let primaryDeviceCount = Object.keys(eWeLinkDevices).length;
-               if (primaryDeviceCount === 0) {
+               if (Object.keys(eWeLinkDevices).length === 0) {
                   platform.log("[0] primary devices were loaded from your eWeLink account.");
                   platform.log("Any existing eWeLink devices in the Homebridge cache will be removed.");
-                  platform.log("This plugin will not be loaded as there is no reason to.");
+                  platform.log.warn("This plugin will not be loaded as there is no reason to.");
                   try {
                      platform.api.unregisterPlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", Array.from(platform.devicesInHB.values()));
                      platform.devicesInHB.clear();
                   } catch (e) {
-                     platform.log.warn("Devices could not be removed from the cache - [%s].");
+                     platform.log.warn("Devices could not be removed from the cache - [%s].", e);
                   }
                   return;
                }
@@ -103,7 +99,7 @@ class eWeLink {
                   });
                }
                platform.log("[%s] eWeLink devices were loaded from the Homebridge cache..", platform.devicesInHB.size);
-               platform.log("[%s] primary devices were loaded from your eWeLink account.", primaryDeviceCount);
+               platform.log("[%s] primary devices were loaded from your eWeLink account.", Object.keys(eWeLinkDevices).length);
                platform.log("[%s] custom groups were loaded from the Homebridge configuration.", platform.customGroup.size);
                if (platform.debug) platform.log("Checking if devices need to be removed from the Homebridge cache.");
                if (platform.devicesInHB.size > 0) {
@@ -1172,7 +1168,6 @@ class eWeLink {
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.TargetPosition, tPos);
          accessory.getService(Service.WindowCovering).updateCharacteristic(Characteristic.PositionState, 2);
       }
-      return;
    }
    
    externalGarageDoorUpdate(hbDeviceId, params) {
@@ -1214,7 +1209,6 @@ class eWeLink {
       }
       accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.On, status);
       accessory.getService(Service.Fanv2).updateCharacteristic(Characteristic.RotationSpeed, speed);
-      return;
    }
    
    externalThermostatUpdate(hbDeviceId, params) {
@@ -1236,13 +1230,11 @@ class eWeLink {
          let currentHumi = params.currentHumidity !== "unavailable" ? params.currentHumidity : 0;
          accessory.getService(Service.HumiditySensor).updateCharacteristic(Characteristic.CurrentRelativeHumidity, currentHumi);
       }
-      return;
    }
    
    externalOutletUpdate(hbDeviceId, params) {
       let accessory = platform.devicesInHB.get(hbDeviceId);
       accessory.getService(Service.Outlet).updateCharacteristic(Characteristic.On, params.switch === "on");
-      return;
    }
    
    externalSingleLightUpdate(hbDeviceId, params) {
@@ -1310,7 +1302,6 @@ class eWeLink {
       } else {
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, false);
       }
-      return;
    }
    
    externalMultiLightUpdate(hbDeviceId, params) {
@@ -1329,13 +1320,11 @@ class eWeLink {
          }
          accessory.getService(Service.Lightbulb).updateCharacteristic(Characteristic.On, primaryState);
       }
-      return;
    }
    
    externalSingleSwitchUpdate(hbDeviceId, params) {
       let accessory = platform.devicesInHB.get(hbDeviceId);
       accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, params.switch === "on");
-      return;
    }
    
    externalMultiSwitchUpdate(hbDeviceId, params) {
@@ -1354,7 +1343,6 @@ class eWeLink {
          }
          accessory.getService(Service.Switch).updateCharacteristic(Characteristic.On, primaryState);
       }
-      return;
    }
    
    externalBridgeUpdate(hbDeviceId, params) {
@@ -1389,7 +1377,6 @@ class eWeLink {
             }
          }
       }, platform.sensorTimeLength * 1000);
-      return;
    }
    
    helperChannelsByUIID(uiid) {
