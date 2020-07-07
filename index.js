@@ -44,6 +44,7 @@ class eWeLink {
          let afterLogin = function () {
             if (platform.apiKey === "NULL") return;
             let eWeLinkDevices;
+            if (platform.debug) platform.log("Requesting a list of devices through the eWeLink HTTP API.");
             axios.get("https://" + platform.apiHost + "/api/user/device", {
                params: {
                   apiKey: platform.apiKey,
@@ -57,14 +58,7 @@ class eWeLink {
                }
             }).then((res) => {
                let body = res.data;
-               if (platform.debug) {
-                  platform.log("Authorisation token received [%s].", platform.aToken);
-                  platform.log("User API key received [%s].", platform.apiKey);
-                  platform.log("Requesting a list of devices through the eWeLink HTTP API.");
-               }
-               if (!body.hasOwnProperty("error") || (body.hasOwnProperty("error") && body.error !== 0)) {
-                  throw JSON.stringify(body, null, 2);
-               }
+               if (!body.hasOwnProperty("error") || (body.hasOwnProperty("error") && body.error !== 0)) throw JSON.stringify(body, null, 2);
                eWeLinkDevices = body.devicelist;
             }).catch(function (error) {
                platform.log.error("** Cannot load homebridge-ewelink-sonoff **");
@@ -84,9 +78,7 @@ class eWeLink {
                   return;
                }
                eWeLinkDevices.forEach((device) => {
-                  if (!constants.devicesUnsupported.includes(device.uiid)) {
-                     platform.devicesInEwe.set(device.deviceid, device);
-                  }
+                  if (device.type === "10") platform.devicesInEwe.set(device.deviceid, device);
                });
                if (platform.config.groups && Object.keys(platform.config.groups).length > 0) {
                   platform.config.groups.forEach((group) => {
@@ -114,10 +106,6 @@ class eWeLink {
                if (platform.debug) platform.log("Checking if devices need to be added/refreshed in the Homebridge cache.");
                if (platform.devicesInEwe.size > 0) {
                   platform.devicesInEwe.forEach((device) => {
-                     if (device.type !== "10") {
-                        platform.log.warn("[%s] cannot be added as it is not supported by this plugin.", device.name);
-                        return;
-                     }
                      let i;
                      // Add non-existing devices
                      if (!platform.devicesInHB.has(device.deviceid + "SWX") && !platform.devicesInHB.has(device.deviceid + "SW0")) {
@@ -1531,6 +1519,10 @@ class eWeLink {
          if (!body.at) throw "Server did not response with an authentication token. Please double check your eWeLink username and password in the Homebridge configuration.\n" + JSON.stringify(body, null, 2);
          platform.aToken = body.at;
          platform.apiKey = body.user.apikey;
+         if (platform.debug) {
+            platform.log("Authorisation token received [%s].", platform.aToken);
+            platform.log("User API key received [%s].", platform.apiKey);
+         }
          platform.wsGetHost(function () {
             callback(platform.aToken);
          }.bind(platform));
@@ -1597,7 +1589,7 @@ class eWeLink {
          platform.delaySend = platform.delaySend <= 0 ? 0 : platform.delaySend -= delayOffset;
       };
       if (!platform.wsIsOpen) {
-         if (platform.debug) platform.log("Web socket is pending reconnection and will try in a few seconds.");
+         if (platform.debug) platform.log("Web socket is currently reconnecting.");
          let interval;
          let waitToSend = (string) => {
             if (platform.wsIsOpen) {
