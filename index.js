@@ -87,7 +87,7 @@ class eWeLink {
                      }
                   });
                }
-               platform.log("[%s] eWeLink devices were loaded from the Homebridge cache..", platform.devicesInHB.size);
+               platform.log("[%s] eWeLink devices were loaded from the Homebridge cache.", platform.devicesInHB.size);
                platform.log("[%s] primary devices were loaded from your eWeLink account.", Object.keys(eWeLinkDevices).length);
                platform.log("[%s] custom groups were loaded from the configuration.", platform.customGroup.size);
                if (platform.devicesInHB.size > 0) {
