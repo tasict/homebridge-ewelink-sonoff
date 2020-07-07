@@ -8,13 +8,13 @@ Thanks :)
 Please see the [installation](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Installation) wiki page for guidance.
 
 If you're feeling brave, I normally have a beta version with changes that needs testing.
-#### Beta Version (v1.7.1)
+#### Beta Version (v1.7.3)
 To install the beta version simply run these commands in terminal and then restart Homebridge:
 ```bash
 sudo npm uninstall homebridge-ewelink-sonoff -g
 sudo npm install homebridge-ewelink-beta -g
 ```
-#### Current Version (v1.7.1)
+#### Current Version (v1.7.3)
 To revert back to the current version simply run these commands in terminal and then restart Homebridge:
 ```bash
 sudo npm uninstall homebridge-ewelink-beta -g
