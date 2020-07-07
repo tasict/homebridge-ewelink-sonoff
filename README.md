@@ -14,7 +14,7 @@ To install the beta version simply run these commands in terminal and then resta
 sudo npm uninstall homebridge-ewelink-sonoff -g
 sudo npm install homebridge-ewelink-beta -g
 ```
-#### Current Version (v1.6.0)
+#### Current Version (v1.7.1)
 To revert back to the current version simply run these commands in terminal and then restart Homebridge:
 ```bash
 sudo npm uninstall homebridge-ewelink-beta -g
