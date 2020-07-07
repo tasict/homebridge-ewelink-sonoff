@@ -8,8 +8,7 @@ Thanks :)
 Please see the [installation](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Installation) wiki page for guidance.
 
 If you're feeling brave, I normally have a beta version with changes that needs testing.
-> Both versions are currently equal.
-#### Beta Version (v1.6.0-1)
+#### Beta Version (v1.6.1-0)
 To install the beta version simply run this command in terminal (no need to uninstall any previous version):
 ```bash
 sudo npm i homebridge-ewelink-sonoff@next -g
