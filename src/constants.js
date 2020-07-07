@@ -68,5 +68,6 @@ module.exports = {
    devicesThermostat: [15],
    devicesFan: [34],
    devicesOutlet: [32],
-   devicesBridge: [28]
+   devicesBridge: [28],
+   appId: "oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq"
 };
