@@ -1564,12 +1564,11 @@ class eWeLink {
       json.userAgent = "app";
       let string = JSON.stringify(json);
       platform.delaySend = 0;
-      const delayOffset = 280;
       let sendOperation = (string) => {
          if (!platform.wsIsOpen) {
             setTimeout(() => {
                sendOperation(string);
-            }, delayOffset);
+            }, 280);
             return;
          }
          if (platform.ws) {
@@ -1581,9 +1580,12 @@ class eWeLink {
             if (platform.debug) platform.log.warn("Web socket message sent. This message is yellow for clarity. It is not an error.\n" + JSON.stringify(json, null, 2));
             callback();
          }
-         platform.delaySend = platform.delaySend <= 0 ? 0 : platform.delaySend -= delayOffset;
+         platform.delaySend = platform.delaySend <= 0 ? 0 : platform.delaySend -= 280;
       };
-      if (!platform.wsIsOpen) {
+      if (platform.wsIsOpen) {
+         setTimeout(sendOperation, platform.delaySend, string);
+         platform.delaySend += 280;
+      } else {
          if (platform.debug) platform.log("Web socket is currently reconnecting.");
          let interval;
          let waitToSend = (string) => {
@@ -1593,9 +1595,6 @@ class eWeLink {
             }
          };
          interval = setInterval(waitToSend, 750, string);
-      } else {
-         setTimeout(sendOperation, platform.delaySend, string);
-         platform.delaySend += delayOffset;
       }
    }
 }
