@@ -910,8 +910,9 @@ class eWeLink {
       platform.wsSendMessage(payload, function () {
          return;
       });
+      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.TargetDoorState, value === 0 ? 0 : 1);
+      accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, value === 0 ? 2 : 3);
       if (accessory.context.eweInch === 0) {
-         accessory.getService(Service.GarageDoorOpener).updateCharacteristic(Characteristic.CurrentDoorState, value === 0 ? 2 : 3);
          setTimeout(function () {
             payload.params.switch = "off";
             platform.wsSendMessage(payload, function () {
