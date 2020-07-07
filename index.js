@@ -437,9 +437,7 @@ class eWeLink {
                platform.log("Plugin initialisation has been successful.");
             });
          };
-         platform.httpGetRegion(function () {
-            platform.httpLogin(afterLogin.bind(platform));
-         }.bind(platform));
+         platform.httpLogin(afterLogin.bind(platform));
       }.bind(platform));
    }
    
@@ -609,7 +607,7 @@ class eWeLink {
             });
          break;
       case "bridge":
-         accessory.addService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);;
+         accessory.addService(Service.MotionSensor).setCharacteristic(Characteristic.MotionDetected, false);
          break;
       default:
          platform.log.warn("[%s] cannot be added as it isn't supported by this plugin.", accessory.deviceName);
@@ -1464,53 +1462,6 @@ class eWeLink {
       return crypto.createHmac("sha256", "6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM").update(string).digest("base64");
    }
    
-   httpGetRegion(callback) {
-      let data = {
-         country_code: platform.config.countryCode,
-         version: 8,
-         ts: Math.floor(new Date().getTime() / 1000),
-         nonce: nonce(),
-         appid: platform.appId
-      };
-      let dataToSign = [];
-      Object.keys(data).forEach(function (key) {
-         dataToSign.push({
-            key: key,
-            value: data[key]
-         });
-      });
-      dataToSign.sort(function (a, b) {
-         return a.key < b.key ? -1 : 1;
-      });
-      dataToSign = dataToSign.map(function (kv) {
-         return kv.key + "=" + kv.value;
-      }).join("&");
-      axios.get("https://api.coolkit.cc:8080/api/user/region", {
-         params: data,
-         headers: {
-            Authorization: "Sign " + platform.helperGetSignature(dataToSign),
-            "Content-Type": "application/json;charset=UTF-8"
-         }
-      }).then((res) => {
-         let body = res.data;
-         if (!body.region) throw "Server did not response with a region.\n" + JSON.stringify(body, null, 2);
-         let idx = platform.apiHost.indexOf("-");
-         if (idx === -1) throw "Received region [" + body.region + "] but cannot construct the new API host.";
-         let newApiHost = body.region + platform.apiHost.substring(idx);
-         if (platform.apiHost !== newApiHost) {
-            if (platform.debug) platform.log("Received region [%s], updating API host to [%s].", body.region, newApiHost);
-            platform.apiHost = newApiHost;
-         }
-         callback(body.region);
-         return;
-      }).catch(function (error) {
-         platform.log.error("** Cannot load homebridge-ewelink-sonoff **");
-         platform.log.warn(error);
-         callback();
-         return;
-      }.bind(platform));
-   }
-   
    httpLogin(callback) {
       let data = {
          password: platform.config.password,
@@ -1532,7 +1483,6 @@ class eWeLink {
          }
       }).then((res) => {
          let body = res.data;
-         if (!body.at) throw "Server did not response with an authentication token. Please double check your eWeLink username and password in the Homebridge configuration.\n" + JSON.stringify(body, null, 2);
          if (body.hasOwnProperty("error") && body.error === 301 && body.hasOwnProperty("region")) {
             let idx = platform.apiHost.indexOf("-");
             if (idx === -1) throw "Received region [" + body.region + "] but cannot construct the new API host.";
@@ -1544,6 +1494,7 @@ class eWeLink {
                return;
             }
          }
+         if (!body.at) throw "Server did not response with an authentication token. Please double check your eWeLink username and password in the Homebridge configuration.\n" + JSON.stringify(body, null, 2);
          platform.aToken = body.at;
          platform.apiKey = body.user.apikey;
          platform.wsGetHost(function () {
@@ -1577,11 +1528,7 @@ class eWeLink {
          if (!body.domain) throw "Server did not response with a web socket host.";
          if (platform.debug) platform.log("Web socket host received [%s].", body.domain);
          platform.wsHost = body.domain;
-         if (platform.ws) {
-            platform.ws.url = "wss://" + body.domain + ":8080/api/ws";
-         }
-         callback(body.domain);
-         return;
+         callback(platform.wsHost);
       }).catch(function (error) {
          platform.log.error("** Cannot load homebridge-ewelink-sonoff **");
          platform.log.warn("No web socket host - %s.", error);
