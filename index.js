@@ -177,13 +177,33 @@ class eWeLink {
                         }
                      }
                      // Refresh existing devices and also those that have just been added.
-                     if (platform.devicesInHB.has(device.deviceid + "SWX") || platform.devicesInHB.has(device.deviceid + "SW0")) {
+                     if (platform.devicesInHB.has(device.deviceid + "SWX") || platform.devicesInHB.has(device.deviceid + "SW0")) { // ** //
                         let accessory;
-                        if (platform.devicesInHB.has(device.deviceid + "SWX")) accessory = platform.devicesInHB.get(device.deviceid + "SWX");
-                        else accessory = platform.devicesInHB.get(device.deviceid + "SW0");
-                        accessory.reachable = device.online;
-                        // @todo here we need to cycle through the secondary devices too with reachability.
-                        if (!device.online) {
+                        if (platform.devicesInHB.has(device.deviceid + "SWX")) {
+                           accessory = platform.devicesInHB.get(device.deviceid + "SWX");
+                           if (accessory.reachable !== device.online) {
+                              try {
+                                 accessory.reachable = device.online;
+                                 platform.devicesInHB.set(accessory.context.hbDeviceId, accessory);
+                                 platform.api.updatePlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
+                              } catch (e) {}
+                           }
+                        } else { // case of the SW0 (it must exist rather than else-if-ing due to // ** //)
+                           accessory = platform.devicesInHB.get(device.deviceid + "SW0");
+                           if (accessory.reachable !== device.online) {
+                              accessory.reachable = device.online;
+                              let otherAccessory;
+                              for (i = 0; i <= accessory.context.channelCount; i++) {
+                                 try {
+                                    otherAccessory = platform.devicesInHB.get(device.deviceid + "SW" + i);
+                                    otherAccessory.reachable = device.online;
+                                    platform.devicesInHB.set(otherAccessory.context.hbDeviceId, otherAccessory);
+                                    platform.api.updatePlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [otherAccessory]);
+                                 } catch (e) {}
+                              }
+                           }
+                        }
+                        if (!accessory.reachable) {
                            platform.log.warn("[%s] has been reported offline so cannot refresh.", accessory.displayName);
                            return;
                         }
@@ -306,6 +326,7 @@ class eWeLink {
                   }
                   if (device.hasOwnProperty("action")) {
                      let accessory;
+                     let i;
                      if (device.action === "update" && device.hasOwnProperty("params")) {
                         if (platform.devicesInHB.has(device.deviceid + "SWX") || platform.devicesInHB.has(device.deviceid + "SW0")) {
                            if (platform.devicesInHB.has(device.deviceid + "SWX")) accessory = platform.devicesInHB.get(device.deviceid + "SWX");
@@ -390,14 +411,29 @@ class eWeLink {
                            platform.log.warn("[%s] Accessory received via web socket does not exist in Homebridge. If it's a new accessory please restart Homebridge so it is added.", device.name);
                         }
                      } else if (device.action === "sysmsg") {
-                        if (platform.devicesInHB.has(device.deviceid + "SWX")) accessory = platform.devicesInHB.get(device.deviceid + "SWX");
-                        else if (platform.devicesInHB.has(device.deviceid + "SW0")) accessory = platform.devicesInHB.get(device.deviceid + "SW0");
-                        else accessory = false;
-                        if (accessory) {
-                           accessory.reachable = device.params.online;
-                           // @todo - need to cycle through any secondary devices with reachability.
-                           if (accessory.reachable) platform.log("[%s] has been reported online.", accessory.displayName);
-                           else platform.log.warn("[%s] has been reported offline.", accessory.displayName);
+                        if (platform.devicesInHB.has(device.deviceid + "SWX")) {
+                           try {
+                              accessory = platform.devicesInHB.get(device.deviceid + "SWX");
+                              accessory.reachable = device.params.online;
+                              platform.log("[%s] has been reported [%s].", accessory.displayName, accessory.reachable ? "online" : "offline");
+                              platform.devicesInHB.set(accessory.context.hbDeviceId, accessory);
+                              platform.api.updatePlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
+                           } catch (e) {
+                              platform.log.warn("[%s] new status cannot be updated - [%s].", accessory.displayName, e);
+                           }
+                        } else if (platform.devicesInHB.has(device.deviceid + "SW0")) {
+                           let otherAccessory;
+                           for (i = 0; i <= accessory.context.channelCount; i++) {
+                              try {
+                                 otherAccessory = platform.devicesInHB.get(device.deviceid + "SW" + i);
+                                 otherAccessory.reachable = device.params.online;
+                                 platform.log("[%s] has been reported [%s].", otherAccessory.displayName, otherAccessory.reachable ? "online" : "offline");
+                                 platform.devicesInHB.set(otherAccessory.context.hbDeviceId, otherAccessory);
+                                 platform.api.updatePlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [otherAccessory]);
+                              } catch (e) {
+                                 platform.log.warn("[%s] new status cannot be updated - [%s].", otherAccessory.displayName, e);
+                              }
+                           }
                         }
                      } else {
                         if (platform.debug) platform.log.warn("[%s] unknown action or parameters received via web socket.", device.name);
@@ -715,6 +751,7 @@ class eWeLink {
          return;
       }
       try {
+         accessory.reachable = true;
          platform.devicesInHB.set(accessory.context.hbDeviceId, accessory);
          platform.api.updatePlatformAccessories("homebridge-ewelink-sonoff", "eWeLink", [accessory]);
       } catch (e) {
