@@ -49,7 +49,6 @@ The plugin **might** work with Sonoff Fan devices. I need a kind person with the
 ## About
 #### My future plans/ideas
 - Support for more devices is always a good thing.
-- TypeScript? I wouldn't know where to begin. So a ~~2000~~ ~~1800~~ 1600 line Javascript file is what it is!
 #### Issues/Pull Requests
 Please feel free to submit - the more the merrier!
 #### Credits
