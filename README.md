@@ -7,46 +7,26 @@ Thanks :)
 ## Installation
 Please see the [installation](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Installation) wiki page for guidance.
 
-If you're feeling brave, I normally have a beta version with changes that needs testing.
-#### Beta Version (v1.7.3)
-To install the beta version simply run these commands in terminal and then restart Homebridge:
+If you're feeling brave, I also have a beta version, often with new features or code changes that needs testing.
+
+To switch between the different versions you can use Homebridge Config UI X to uninstall and reinstall the other. The configuration is exactly the same for both. Or, simply run these commands in the Homebridge terminal and then restart Homebridge.
+
+#### Beta Version (homebright-ewelink-beta)
+To change to the beta version:
 ```bash
 sudo npm uninstall homebridge-ewelink-sonoff -g
 sudo npm install homebridge-ewelink-beta -g
 ```
-#### Current Version (v1.7.3)
-To revert back to the current version simply run these commands in terminal and then restart Homebridge:
+#### Stable Version (homebright-ewelink-sonoff)
+To change to the stable version:
 ```bash
 sudo npm uninstall homebridge-ewelink-beta -g
 sudo npm install homebridge-ewelink-sonoff -g
 ```
 
 ## Supported Devices
-#### 🟢 Switches
-The plugin **should** work with Sonoff switches (single and multi-channel).
-- **Supported:** BASIC, MINI, 4CH
-#### 🟢 Light Bulbs
-The plugin **should** work with Sonoff bulbs and LED strips, giving you control of the brightness and colour (🇬🇧!) of your device.
-- **Supported:** B1, L1
-#### 🟢 Light Switches
-The plugin **should** work with Sonoff light and dimmer switches, and will be exposed as lights in Homebridge.
-- **Supported:** T1-1C, T1-2C, T1-3C, TX-1C, TX-2C, TX-3C, KING-M4, SLAMPHER, D1
-#### 🟢 Outlets
-The plugin **should** work with Sonoff outlets. Unfortunately there is no native method in HomeKit to show power readings.
-- **Supported:** POW
-#### 🟢 RF Bridges
-The plugin **should** work with the Sonoff Bridge, at the moment exposing motion sensors that will detect motion and notify Homebridge/HomeKit. Other devices connected to the RF bridge might cause issues.
-- **Supported:** RF_BRIDGE
-#### 🟢 Thermostats
-The plugin **should** work with Sonoff Thermostat devices, exposing a temperature sensor, a humidity sensor (if the device supports it) and a switch in Homebridge for the connected device.
-- **Supported:** TH10, TH16
-#### 🟠 Fans
-The plugin **might** work with Sonoff Fan devices. I need a kind person with the a device to assist!
-- **Needs Testing:** iFan02, iFan03
-#### 🟠 Custom Devices
-> By custom devices I mean using a generic Sonoff device to simulate a specific type of accessory that is HomeKit supported (e.g. blinds and garage doors).
-- **Needs Testing:** Blinds (with a two-channel device)
-- **Needs Testing:** Garage Doors (with a one-channel device)
+Please see the [supported devices](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Supported-Devices) wiki page for guidance.
+
 ## About
 #### My future plans/ideas
 - Support for more devices is always a good thing.
