@@ -9,15 +9,15 @@ Please see the [installation](https://github.com/thepotterfamily/homebridge-ewel
 
 If you're feeling brave, I also have a beta version, often with new features or code changes that needs testing.
 
-To switch between the different versions you can use Homebridge Config UI X to uninstall and reinstall the other. The configuration is exactly the same for both. Or, simply run these commands in the Homebridge terminal and then restart Homebridge.
+To switch between the different versions you can use Homebridge Config UI X to uninstall and reinstall the other. The configuration is exactly the same for both. Or, simply run these commands in the Homebridge terminal and then restart Homebridge. I keep the version numbers synchronised so if both packages have the same version then they are identical at that point in time.
 
-#### Beta Version (homebright-ewelink-beta)
+#### Beta Version ([homebridge-ewelink-beta](https://github.com/thepotterfamily/homebridge-ewelink-beta))
 To change to the beta version:
 ```bash
 sudo npm uninstall homebridge-ewelink-sonoff -g
 sudo npm install homebridge-ewelink-beta -g
 ```
-#### Stable Version (homebright-ewelink-sonoff)
+#### Stable Version (homebridge-ewelink-sonoff)
 To change to the stable version:
 ```bash
 sudo npm uninstall homebridge-ewelink-beta -g
