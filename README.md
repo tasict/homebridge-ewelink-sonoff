@@ -32,12 +32,14 @@ Please see the [supported devices](https://github.com/thepotterfamily/homebridge
 - Support for more devices is always a good thing.
 #### Issues/Pull Requests
 Please feel free to submit - the more the merrier!
-#### Credits
-- @gbro115 → @MrTomAsh → @howanghk - the line of succession of this plugin that I forked from. Otherwise this package wouldn't exist!
+## Credits
+#### Device Owners
 - @ozzyobr - for his continued support throughout, e.g. his work with colour conversion, his help with supporting the L1 LED strip.
 - @attarawnneh - for his hours of patience whilst we trialled and errored with the RF Bridge - we got there I hope!
 - @gmeiburg88 - for trusting my control of his baby's dimmer lamp to enable support for D1... and the heater too!
 - @victorcooper - for allowing me to turn his room into a disco with lights and colours of his B1))
 - @minws13 - for giving me remote access to his aquarium thermostat to add support for these devices.
-
-Thank you to all 😃.
+#### Code
+- @gbro115 → @MrTomAsh → @howanghk - the line of succession of this plugin that I forked from. Otherwise this package wouldn't exist!
+- Web socket client implementation for auto reconnect [→](https://github.com/websockets/ws/wiki/Websocket-client-implementation-for-auto-reconnect) 
+- Sonoff stateful blinds [→](https://github.com/manolab/homebridge-sonoff-stateful-blinds) 
