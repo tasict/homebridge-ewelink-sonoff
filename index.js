@@ -1607,6 +1607,25 @@ class eWeLink {
          }
       }).then((res) => {
          let body = res.data;
+         // *************************************//
+         // @thepotterfamily start fix for issue #5
+         // *************************************//
+         if (body.hasOwnProperty('error') && body.error == 301 && body.hasOwnProperty('region')) {
+            let idx = platform.apiHost.indexOf('-');
+            if (idx == -1) {
+               throw "Received new region [" + body.region + "]. However we cannot construct the new API host url.";
+            }
+            let newApiHost = body.region + platform.apiHost.substring(idx);
+            if (platform.apiHost != newApiHost) {
+               if (platform.debug) platform.log("Received new region [%s], updating API host to [%s].", body.region, newApiHost);
+               platform.apiHost = newApiHost;
+               platform.httpLogin(callback);
+               return;
+            }
+         }
+         // *************************************//
+         // @thepotterfamily end fix for issue #5
+         // *************************************//
          if (!body.at) {
             throw "Server did not respond with an authentication token. Please double check your eWeLink username and password in the Homebridge configuration.\n" + JSON.stringify(body, null, 2);
          }
