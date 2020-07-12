@@ -18,6 +18,7 @@ Please refer to the Wiki for documentation:
 * [Installation](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Installation)
 * Configuration
 * [Beta Version](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Beta-Version)
+* Features
 * [Supported Devices](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Supported-Devices)
   * Switches
   * Light Bulbs
