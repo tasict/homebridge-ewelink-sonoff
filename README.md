@@ -29,5 +29,5 @@ Please refer to the Wiki for documentation:
   * [Thermostats](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Thermostats)
   * [Fans](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Fans)
   * [Custom Devices](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Custom-Devices)
-* [Support & Feedback](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Support-&-Feedback)
+* [Support and Feedback](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Support-and-Feedback)
 * [Credits](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Credits)
