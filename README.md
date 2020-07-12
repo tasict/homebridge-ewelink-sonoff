@@ -3,9 +3,9 @@
 <div align="center">
     
 [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
-![npm](https://img.shields.io/npm/dt/homebridge-ewelink-sonoff)   
-![npm](https://img.shields.io/npm/v/homebridge-ewelink-sonoff?label=release)
-![npm](https://img.shields.io/npm/v/homebridge-ewelink-beta?label=beta)
+[![npm](https://img.shields.io/npm/dt/homebridge-ewelink-sonoff)](https://www.npmjs.com/package/homebridge-ewelink-sonoff)   
+[![npm](https://img.shields.io/npm/v/homebridge-ewelink-sonoff?label=release)](https://www.npmjs.com/package/homebridge-ewelink-sonoff)
+[![npm](https://img.shields.io/npm/v/homebridge-ewelink-beta?label=beta)](https://www.npmjs.com/package/homebridge-ewelink-beta)
 </div>
 
 There seems to be a variety of Homebridge plugins for eWeLink/Sonoff devices. My aim for this package is to bring together the best from all the different ones. I am constantly tinkering with the code, please feel free to post issues or pull requests.
