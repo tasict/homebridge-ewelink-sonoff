@@ -16,6 +16,17 @@ Thanks :)
 Please refer to the Wiki for documentation:
 * [Home](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki)
 * [Installation](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Installation)
+* Configuration
 * [Beta Version](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Beta-Version)
 * [Supported Devices](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Supported-Devices)
+  * Switches
+  * Light Bulbs
+  * Light Switches
+  * Switches
+  * Outlets
+  * Sensors
+  * RF Bridges
+  * Thermostats
+  * Fans
+  * Custom Devices
 * [Credits](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Credits)
