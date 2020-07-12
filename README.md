@@ -29,4 +29,5 @@ Please refer to the Wiki for documentation:
   * Thermostats
   * Fans
   * Custom Devices
+* Support & Feedback
 * [Credits](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Credits)
