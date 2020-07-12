@@ -4,11 +4,7 @@ const constants = require('./lib/constants');
 const convert = require("color-convert");
 const eWeLinkHTTP = require('./lib/eWeLinkHTTP');
 const eWeLinkWS = require('./lib/eWeLinkWS');
-let Accessory;
-let Characteristic;
-let Service;
-let UUIDGen;
-let platform;
+let Accessory, Characteristic, Service, UUIDGen, platform;
 module.exports = function (homebridge) {
    Accessory = homebridge.platformAccessory;
    Service = homebridge.hap.Service;
@@ -31,168 +27,144 @@ class eWeLink {
       platform.config = config;
       platform.api = api;
       platform.debug = platform.config.debug || false;
+      platform.customHideChanFromHB = platform.config.hideFromHB || "";
+      platform.customHideDvceFromHB = platform.config.hideDevFromHB || "";
       platform.sensorTimeLength = platform.config.sensorTimeLength || 2;
       platform.sensorTimeDifference = platform.config.sensorTimeDifference || 120;
       platform.devicesInHB = new Map();
       platform.devicesInEwe = new Map();
-      platform.customHideFromHB = platform.config.hideFromHB || "";
       platform.customGroups = new Map();
       platform.customBridgeSensors = new Map();
       platform.api.on("didFinishLaunching", function () {
-         //*************************************//
-         // FIRST WE SET UP THE HTTP API CLIENT //
+         //*** SET UP HTTP API CLIENT AND GET THE USER HTTP API HOST ***\\
          platform.httpClient = new eWeLinkHTTP(platform.config, platform.log, platform.debug);
-         //************************************************//
-         // GET THE REGION ASSIGNED TO THE EWELINK ACCOUNT //
-         platform.httpClient.getHost().then(res => {
-            platform.apiHost = res;
-            //************************************//
-            // USE THE REGION TO LOG INTO EWELINK //
-            platform.httpClient.login().then(res => {
+         platform.httpClient.getHost()
+            .then(res => {
+               //*** USE THE HTTP API HOST TO LOG INTO EWELINK ***\\
+               platform.apiHost = res;
+               return platform.httpClient.login();
+            }).then(res => {
+               //*** SET UP THE WEB SOCKET CLIENT ***\\
                platform.apiKey = res.apiKey;
                platform.aToken = res.aToken;
-               //**************************************//
-               // THEN WE SET UP THE WEB SOCKET CLIENT //
                platform.wsClient = new eWeLinkWS(platform.log, platform.apiHost, platform.aToken, platform.apiKey, platform.debug);
-               //*********************************************************//
-               // GET THE WEB SOCKET HOST BY REGION AND CREATE CONNECTION //
-               platform.wsClient.getHost().then(res => {
-                  platform.wsHost = res;
-                  platform.wsClient.login();
-                  //************************************//
-                  // REQUEST A DEVICE LIST VIA HTTP API //
-                  platform.httpClient.getDevices().then(res => {
-                     platform.httpDevices = res;
-                     //************************************//
-                     // USE THE DEVICE LIST TO REFRESH HOMEBRIDGE //
-                     (function () {
-                        //**************************************************************//
-                        // REMOVE ALL HOMEBRIDGE ACCESSORIES IF NONE IN EWELINK ACCOUNT //
-                        if (Object.keys(platform.httpDevices).length === 0) {
-                           platform.removeAllAccessories();
-                           return;
-                        }
-                        //***********************************************//
-                        // MAKE A MAP OF COMPATIBLE DEVICES FROM EWELINK //
-                        platform.httpDevices.forEach(device => {
-                           if (device.type === "10") {
-                              platform.devicesInEwe.set(device.deviceid, device);
-                           }
-                        });
-                        //********************************************************//
-                        // MAKE A MAP OF CUSTOM GROUPS FROM THE HOMEBRIDGE CONFIG //
-                        if (platform.config.groups && Object.keys(platform.config.groups).length > 0) {
-                           platform.config.groups.forEach(group => {
-                              if (typeof group.deviceId !== "undefined" && platform.devicesInEwe.has(group.deviceId.toLowerCase())) {
-                                 platform.customGroups.set(group.deviceId.toLowerCase() + "SWX", group);
-                              }
-                           });
-                        }
-                        //*******************************************************************//
-                        // MAKE A MAP OF CUSTOM RF BRIDGE SENSORS FROM THE HOMEBRIDGE CONFIG //
-                        if (platform.config.bridgeSensors && Object.keys(platform.config.bridgeSensors).length > 0) {
-                           platform.config.bridgeSensors.forEach(bridgeSensor => {
-                              if (typeof bridgeSensor.deviceId !== "undefined" && platform.devicesInEwe.has(bridgeSensor.deviceId.toLowerCase())) {
-                                 platform.customBridgeSensors.set(bridgeSensor.fullDeviceId, bridgeSensor);
-                              }
-                           });
-                        }
-                        //****************************************************************//
-                        // DO SOME LOGGING FOR AN EASY CHECK THAT EVERYTHING APPEARS OKAY //
-                        platform.log("[%s] eWeLink devices were loaded from the Homebridge cache.", platform.devicesInHB.size);
-                        platform.log("[%s] primary devices were loaded from your eWeLink account.", platform.devicesInEwe.size);
-                        platform.log("[%s] custom groups were loaded from the configuration.", platform.customGroups.size);
-                        //****************************************************************//
-                        // REMOVE ANY INDIVIDUAL ACCESSORIES THAT DON'T APPEAR IN EWELINK //
-                        if (platform.devicesInHB.size > 0) {
-                           platform.devicesInHB.forEach(accessory => {
-                              if (!platform.devicesInEwe.has(accessory.context.eweDeviceId)) {
-                                 platform.removeAccessory(accessory);
-                              }
-                           });
-                        }
-                        //******************************************************//
-                        // NO DEVICES IN EWELINK MEANS NO REASON TO LOAD PLUGIN //
-                        if (platform.devicesInEwe.size === 0) {
-                           return;
-                        }
-                        //**********************************************************************//
-                        // ADD AND REFRESH REMAINING DEVICES THAT ARE IN EWELINK AND HOMEBRIDGE //
-                        platform.devicesInEwe.forEach(device => {
-                           platform.initialiseDevice(device);
-                        });
-                        //*******************************************************************//
-                        // SET UP THE WEB SOCKET LISTENER FOR FUTURE EXTERNAL DEVICE UPDATES //
-                        platform.wsClient.receiveUpdate(device => {
-                           platform.externalDeviceUpdate(device);
-                        });
-                        //********************************************************************//
-                        // PHEW WE ARE HERE. SO MUCH THAT COULD HAVE GONE WRONG BUT ALL GOOD! //
-                        // platform.log.hooray("Plugin initialisation has been successful."); //
-                        platform.log("Plugin initialisation has been successful.");
-                     })();
-                  }).catch(err => {
-                     platform.log.error("** Could not load homebridge-ewelink-sonoff **");
-                     platform.log.warn(err);
+               return platform.wsClient.getHost();
+            }).then(res => {
+               //*** USE THE WEB SOCKET HOST TO OPEN CONNECTION ***\\
+               platform.wsHost = res;
+               platform.wsClient.login();
+               //*** REQUEST A DEVICE LIST VIA HTTP API ***\\
+               return platform.httpClient.getDevices();
+            }).then(res => {
+               platform.httpDevices = res;
+               //*** USE THE DEVICE LIST TO REFRESH HOMEBRIDGE ACCESSORIES ***\\
+               (function () {
+                  //*** REMOVE ALL HOMEBRIDGE ACCESSORIES IF NONE IN EWELINK ACCOUNT ***\\
+                  if (Object.keys(platform.httpDevices).length === 0) {
+                     platform.removeAllAccessories();
+                     return;
+                  }
+                  //*** MAKE A MAP OF COMPATIBLE DEVICES FROM EWELINK ***\\
+                  platform.httpDevices.forEach(device => {
+                     if (device.type !== "10" || platform.customHideDvceFromHB.includes(device.deviceid)) {
+                        return;
+                     }
+                     platform.devicesInEwe.set(device.deviceid, device);
                   });
-               }).catch(err => {
-                  platform.log.error("** Could not load homebridge-ewelink-sonoff **");
-                  platform.log.warn(err);
-               });
+                  //*** MAKE A MAP OF CUSTOM GROUPS FROM THE HOMEBRIDGE CONFIG ***\\
+                  if (platform.config.groups && Object.keys(platform.config.groups).length > 0) {
+                     platform.config.groups.forEach(group => {
+                        if (typeof group.deviceId !== "undefined" && platform.devicesInEwe.has(group.deviceId.toLowerCase())) {
+                           platform.customGroups.set(group.deviceId.toLowerCase() + "SWX", group);
+                        }
+                     });
+                  }
+                  //*** MAKE A MAP OF CUSTOM RF BRIDGE SENSORS FROM THE HOMEBRIDGE CONFIG ***\\
+                  if (platform.config.bridgeSensors && Object.keys(platform.config.bridgeSensors).length > 0) {
+                     platform.config.bridgeSensors.forEach(bridgeSensor => {
+                        if (typeof bridgeSensor.deviceId !== "undefined" && platform.devicesInEwe.has(bridgeSensor.deviceId.toLowerCase())) {
+                           platform.customBridgeSensors.set(bridgeSensor.fullDeviceId, bridgeSensor);
+                        }
+                     });
+                  }
+                  //*** DO SOME LOGGING FOR AN EASY CHECK THAT EVERYTHING APPEARS OKAY ***\\
+                  platform.log("[%s] eWeLink devices were loaded from the Homebridge cache.", platform.devicesInHB.size);
+                  platform.log("[%s] primary devices were loaded from your eWeLink account.", platform.devicesInEwe.size);
+                  platform.log("[%s] custom groups were loaded from the configuration.", platform.customGroups.size);
+                  //*** REMOVE ANY INDIVIDUAL ACCESSORIES THAT DON'T APPEAR IN EWELINK ***\\
+                  if (platform.devicesInHB.size > 0) {
+                     platform.devicesInHB.forEach(accessory => {
+                        if (!platform.devicesInEwe.has(accessory.context.eweDeviceId)) {
+                           platform.removeAccessory(accessory);
+                        }
+                     });
+                  }
+                  //*** NO DEVICES IN EWELINK MEANS NO REASON TO LOAD PLUGIN ***\\
+                  if (platform.devicesInEwe.size === 0) {
+                     return;
+                  }
+                  //*** ADD AND REFRESH REMAINING DEVICES THAT MATCH IN EWELINK AND HOMEBRIDGE ***\\
+                  platform.devicesInEwe.forEach(device => {
+                     platform.initialiseDevice(device);
+                  });
+                  //*** SET UP THE WEB SOCKET LISTENER FOR FUTURE EXTERNAL DEVICE UPDATES ***\\
+                  platform.wsClient.receiveUpdate(device => {
+                     platform.externalDeviceUpdate(device);
+                  });
+                  //*** PHEW WE ARE HERE. SO MUCH THAT COULD HAVE GONE WRONG BUT ALL GOOD! ***\\
+                  //*** platform.log.hooray("Plugin initialisation has been successful."); ***\\
+                  platform.log("Plugin initialisation has been successful.");
+               })();
             }).catch(err => {
                platform.log.error("** Could not load homebridge-ewelink-sonoff **");
                platform.log.warn(err);
             });
-         }).catch(err => {
-            platform.log.error("** Could not load homebridge-ewelink-sonoff **");
-            platform.log.warn(err);
-         });
-      }.bind(platform));
+      });
    }
    initialiseDevice(device) {
       let accessory;
       if (!platform.devicesInHB.has(device.deviceid + "SWX") && !platform.devicesInHB.has(device.deviceid + "SW0")) {
          if (platform.customGroups.has(device.deviceid + "SWX")) {
-            //*** [ADD] BLINDS ***//
+            //*** ADD BLINDS ***\\
             if (platform.customGroups.get(device.deviceid + "SWX").type === "cusBlind" && Array.isArray(device.params.switches)) {
                platform.addAccessory(device, device.deviceid + "SWX", "cusBlind");
             }
-            //*** [ADD] GARAGES ***//
+            //*** ADD GARAGES ***\\
             else if (platform.customGroups.get(device.deviceid + "SWX").type === "cusGarage" && device.params.hasOwnProperty("switch")) {
                platform.addAccessory(device, device.deviceid + "SWX", "cusGarage");
             }
          }
-         //*** [ADD] SENSORS ***//
+         //*** ADD SENSORS ***\\
          else if (constants.devicesSensor.includes(device.uiid)) {
             if (device.params.hasOwnProperty("switch")) {
                platform.addAccessory(device, device.deviceid + "SWX", "sensor");
             }
          }
-         //*** [ADD] FANS ***//
+         //*** ADD FANS ***\\
          else if (constants.devicesFan.includes(device.uiid)) {
             if (Array.isArray(device.params.switches)) {
                platform.addAccessory(device, device.deviceid + "SWX", "fan");
             }
          }
-         //*** [ADD] THERMOSTATS ***//
+         //*** ADD THERMOSTATS ***\\
          else if (constants.devicesThermostat.includes(device.uiid)) {
             if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("mainSwitch")) {
                platform.addAccessory(device, device.deviceid + "SWX", "thermostat");
             }
          }
-         //*** [ADD] OUTLETS ***//
+         //*** ADD OUTLETS ***\\
          else if (constants.devicesOutlet.includes(device.uiid)) {
             if (device.params.hasOwnProperty("switch")) {
                platform.addAccessory(device, device.deviceid + "SWX", "outlet");
             }
          }
-         //*** [ADD] SINGLE LIGHTS ***//
+         //*** ADD SINGLE LIGHTS ***\\
          else if (constants.devicesSingleSwitch.includes(device.uiid) && constants.devicesSingleSwitchLight.includes(device.productModel)) {
             if (device.params.hasOwnProperty("switch") || device.params.hasOwnProperty("state")) {
                platform.addAccessory(device, device.deviceid + "SWX", "light");
             }
          }
-         //*** [ADD] MULTI LIGHTS ***//
+         //*** ADD MULTI LIGHTS ***\\
          else if (constants.devicesMultiSwitch.includes(device.uiid) && constants.devicesMultiSwitchLight.includes(device.productModel)) {
             if (Array.isArray(device.params.switches)) {
                for (let i = 0; i <= constants.chansFromUiid[device.uiid]; i++) {
@@ -200,13 +172,13 @@ class eWeLink {
                }
             }
          }
-         //*** [ADD] SINGLE SWITCHES ***//
+         //*** ADD SINGLE SWITCHES ***\\
          else if (constants.devicesSingleSwitch.includes(device.uiid)) {
             if (device.params.hasOwnProperty("switch")) {
                platform.addAccessory(device, device.deviceid + "SWX", "switch");
             }
          }
-         //*** [ADD] MULTI SWITCHES ***//
+         //*** ADD MULTI SWITCHES ***\\
          else if (constants.devicesMultiSwitch.includes(device.uiid)) {
             if (Array.isArray(device.params.switches)) {
                for (let i = 0; i <= constants.chansFromUiid[device.uiid]; i++) {
@@ -214,7 +186,7 @@ class eWeLink {
                }
             }
          }
-         //*** [ADD] BRIDGES ***//
+         //*** ADD BRIDGES ***\\
          else if (constants.devicesBridge.includes(device.uiid)) {
             if (device.params.hasOwnProperty("rfList")) {
                for (let i = 0; i <= Object.keys(device.params.rfList).length; i++) {
@@ -222,12 +194,12 @@ class eWeLink {
                }
             }
          }
-         //*** [ADD] NOT SUPPORTED ***//
+         //*** ADD NOT SUPPORTED ***\\
          else {
             platform.log.warn("[%s] could not be added as it is not supported by this plugin.", device.name);
          }
       }
-      //*** REFRESH DEVICES ***//
+      //*** REFRESH DEVICES ***\\
       if (platform.devicesInHB.has(device.deviceid + "SWX")) {
          accessory = platform.devicesInHB.get(device.deviceid + "SWX");
          accessory.getService(Service.AccessoryInformation).setCharacteristic(Characteristic.FirmwareRevision, device.params.fwVersion);
@@ -247,14 +219,14 @@ class eWeLink {
             let otherAccessory;
             try {
                if (!platform.devicesInHB.has(device.deviceid + "SW" + i)) {
-                  if ([1, 2, 3, 4].includes(i) && platform.customHideFromHB.includes(device.deviceid + "SW" + i) && accessory.context.type === "switch") {
+                  if ([1, 2, 3, 4].includes(i) && platform.customHideChanFromHB.includes(device.deviceid + "SW" + i) && accessory.context.type === "switch") {
                      continue;
                   } else {
                      platform.addAccessory(device, device.deviceid + "SW" + i, "switch");
                   }
                }
                otherAccessory = platform.devicesInHB.get(device.deviceid + "SW" + i);
-               if ([1, 2, 3, 4].includes(i) && platform.customHideFromHB.includes(device.deviceid + "SW" + i) && accessory.context.type === "switch") {
+               if ([1, 2, 3, 4].includes(i) && platform.customHideChanFromHB.includes(device.deviceid + "SW" + i) && accessory.context.type === "switch") {
                   platform.removeAccessory(otherAccessory);
                   continue;
                }
@@ -282,7 +254,7 @@ class eWeLink {
       let newDeviceName = device.name;
       if (["1", "2", "3", "4"].includes(switchNumber)) {
          newDeviceName += " SW" + switchNumber;
-         if (platform.customHideFromHB.includes(hbDeviceId) && service === "switch") {
+         if (platform.customHideChanFromHB.includes(hbDeviceId) && service === "switch") {
             platform.log.warn("[%s] has not been added as per user configuration", newDeviceName);
             return;
          }
@@ -566,6 +538,8 @@ class eWeLink {
             } else {
                platform.log.error("[%s] will not be refreshed due to missing type parameter.\nPlease remove [%s] from the Homebridge cache (including any secondary devices (SW1, SW2, etc.).", accessory.displayName, accessory.displayName);
             }
+         } else if (platform.customHideDvceFromHB.includes(device.deviceid)) {
+            platform.log.warn("[%s] Accessory received via web socket has been hidden from Homebridge as per use configuration.", device.deviceid);
          } else {
             platform.log.warn("[%s] Accessory received via web socket does not exist in Homebridge. If it's a new accessory please restart Homebridge so it is added.", device.deviceid);
          }
@@ -665,8 +639,7 @@ class eWeLink {
    }
    internalBlindUpdate(accessory, value, callback) {
       if (!accessory.context.reachable) {
-         platform.log.warn("[%s] could not be updated as it is currently offline.", accessory.displayName);
-         callback("Device offline.");
+         callback(accessory.displayName + " could not be updated as it is currently offline.");
          return;
       }
       if (platform.debug) {
@@ -838,8 +811,7 @@ class eWeLink {
    }
    internalGarageUpdate(accessory, value, callback) {
       if (!accessory.context.reachable) {
-         platform.log.warn("[%s] could not be updated as it is currently offline.", accessory.displayName);
-         callback("Device offline.");
+         callback(accessory.displayName + " could not be updated as it is currently offline.");
          return;
       }
       let payload = {
@@ -873,13 +845,10 @@ class eWeLink {
    }
    internalFanUpdate(accessory, type, value, callback) {
       if (!accessory.context.reachable) {
-         platform.log.warn("[%s] could not be updated as it is currently offline.", accessory.displayName);
-         callback("Device offline.");
+         callback(accessory.displayName + " could not be updated as it is currently offline.");
          return;
       }
-      let newPower;
-      let newSpeed;
-      let newLight;
+      let newPower, newSpeed, newLight;
       switch (type) {
       case "power":
          newPower = value;
@@ -900,9 +869,10 @@ class eWeLink {
       let payload = {
          apikey: accessory.context.eweApiKey,
          deviceid: accessory.context.eweDeviceId,
-         params: {}
+         params: {
+            switches: platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches,
+         }
       };
-      payload.params.switches = platform.devicesInEwe.get(accessory.context.eweDeviceId).params.switches;
       payload.params.switches[0].switch = newLight ? "on" : "off";
       payload.params.switches[1].switch = newSpeed >= 33 ? "on" : "off";
       payload.params.switches[2].switch = newSpeed >= 66 && newSpeed < 99 ? "on" : "off";
@@ -918,8 +888,7 @@ class eWeLink {
    }
    internalThermostatUpdate(accessory, value, callback) {
       if (!accessory.context.reachable) {
-         platform.log.warn("[%s] could not be updated as it is currently offline.", accessory.displayName);
-         callback("Device offline.");
+         callback(accessory.displayName + " could not be updated as it is currently offline.");
          return;
       }
       let payload = {
@@ -957,8 +926,7 @@ class eWeLink {
    }
    internalLightbulbUpdate(accessory, value, callback) {
       if (!accessory.context.reachable) {
-         platform.log.warn("[%s] could not be updated as it is currently offline.", accessory.displayName);
-         callback("Device offline.");
+         callback(accessory.displayName + " could not be updated as it is currently offline.");
          return;
       }
       let otherAccessory;
@@ -1027,8 +995,7 @@ class eWeLink {
    }
    internalBrightnessUpdate(accessory, value, callback) {
       if (!accessory.context.reachable) {
-         platform.log.warn("[%s] could not be updated as it is currently offline.", accessory.displayName);
-         callback("Device offline.");
+         callback(accessory.displayName + " could not be updated as it is currently offline.");
          return;
       }
       let payload = {
@@ -1063,12 +1030,10 @@ class eWeLink {
    }
    internalHSBUpdate(accessory, type, value, callback) {
       if (!accessory.context.reachable) {
-         platform.log.warn("[%s] could not be updated as it is currently offline.", accessory.displayName);
-         callback("Device offline.");
+         callback(accessory.displayName + " could not be updated as it is currently offline.");
          return;
       }
-      let newRGB;
-      let params;
+      let newRGB, params;
       let curHue = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Hue).value;
       let curSat = accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Saturation).value;
       if (type === "hue") {
@@ -1129,8 +1094,7 @@ class eWeLink {
    }
    internalSwitchUpdate(accessory, value, callback) {
       if (!accessory.context.reachable) {
-         platform.log.warn("[%s] could not be updated as it is currently offline.", accessory.displayName);
-         callback("Device offline.");
+         callback(accessory.displayName + " could not be updated as it is currently offline.");
          return;
       }
       let payload = {
@@ -1326,8 +1290,7 @@ class eWeLink {
       if (platform.debug) {
          platform.log("[%s] will be refreshed.", accessory.displayName);
       }
-      let newColour;
-      let mode;
+      let newColour, mode;
       let isOn = false;
       if ((accessory.context.eweUIID === 22) && params.hasOwnProperty("state")) {
          isOn = params.state === "on";
