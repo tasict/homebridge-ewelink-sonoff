@@ -1,6 +1,5 @@
-<h1>homebridge-ewelink-sonoff</h1>
-
 <div align="center">
+<h1>homebridge-ewelink-sonoff</h1>   
     
 [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
 [![npm](https://img.shields.io/npm/dt/homebridge-ewelink-sonoff)](https://www.npmjs.com/package/homebridge-ewelink-sonoff)   
