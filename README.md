@@ -18,7 +18,7 @@ Please refer to the Wiki for documentation:
 * [Installation](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Installation)
 * [Configuration](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Configuration)
 * [Beta Version](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Beta-Version)
-* Features(https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Features)
+* [Features](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Features)
 * [Supported Devices](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Supported-Devices)
   * [Switches](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Switches)
   * [Light Bulbs](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Light-Bulbs)
