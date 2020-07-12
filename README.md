@@ -16,19 +16,18 @@ Thanks :)
 Please refer to the Wiki for documentation:
 * [Home](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki)
 * [Installation](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Installation)
-* Configuration
+* [Configuration](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Configuration)
 * [Beta Version](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Beta-Version)
-* Features
+* Features(https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Features)
 * [Supported Devices](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Supported-Devices)
-  * Switches
-  * Light Bulbs
-  * Light Switches
-  * Switches
-  * Outlets
-  * Sensors
-  * RF Bridges
-  * Thermostats
-  * Fans
-  * Custom Devices
-* Support & Feedback
+  * [Switches](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Switches)
+  * [Light Bulbs](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Light-Bulbs)
+  * [Light Switches](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Light-Switches)
+  * [Outlets](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Outlets)
+  * [Sensors](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Sensors)
+  * [RF Bridges](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/RF-Bridges)
+  * [Thermostats](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Thermostats)
+  * [Fans](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Fans)
+  * [Custom Devices](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Custom-Devices)
+* [Support & Feedback](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Support-&-Feedback)
 * [Credits](https://github.com/thepotterfamily/homebridge-ewelink-sonoff/wiki/Credits)
