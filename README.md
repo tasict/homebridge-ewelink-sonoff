@@ -21,6 +21,7 @@ Please refer to the Wiki for documentation:
 * [Configuration](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Configuration)
 * [Beta Version](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Beta-Version)
 * [Features](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Features)
+  * [Connection Methods](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Connection-Methods)
 * [Supported Devices](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Supported-Devices)
   * [Switches](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Switches)
   * [Light Bulbs](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Light-Bulbs)
