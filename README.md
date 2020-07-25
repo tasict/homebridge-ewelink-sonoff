@@ -15,23 +15,4 @@ This project was forked and based on the work of [homebridge-ewelink-max](https:
 
 Thanks :)
 ## Documentation
-Please refer to the Wiki for documentation:
-* [Home](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki)
-* [Installation](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Installation)
-* [Configuration](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Configuration)
-* [Beta Version](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Beta-Version)
-* [Features](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Features)
-  * [Connection Methods](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Connection-Methods)
-* [Supported Devices](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Supported-Devices)
-  * [Switches](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Switches)
-  * [Light Bulbs](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Light-Bulbs)
-  * [Light Switches](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Light-Switches)
-  * [Outlets](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Outlets)
-  * [Sensors](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Sensors)
-  * [RF Bridges](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/RF-Bridges)
-  * [Thermostats](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Thermostats)
-  * [Fans](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Fans)
-  * [Custom Devices](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Custom-Devices)
-* [Roadmap](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Roadmap)
-* [Support and Feedback](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Support-and-Feedback)
-* [Credits](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Credits)
+Please refer to the [wiki](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki) for documentation.
