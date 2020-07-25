@@ -29,5 +29,6 @@ Please refer to the Wiki for documentation:
   * [Thermostats](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Thermostats)
   * [Fans](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Fans)
   * [Custom Devices](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Custom-Devices)
+* [Roadmap](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Roadmap)
 * [Support and Feedback](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Support-and-Feedback)
 * [Credits](https://github.com/bwp91/homebridge-ewelink-sonoff/wiki/Credits)
