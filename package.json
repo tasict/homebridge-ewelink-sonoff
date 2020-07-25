@@ -1,5 +1,5 @@
 {
-   "name": "homebridge-ewelink-beta",
+   "name": "homebridge-ewelink-sonoff",
    "version": "2.5.9",
    "author": "bwp91",
    "contributors": [
@@ -36,7 +36,7 @@
    },
    "repository": {
       "type": "git",
-      "url": "https://github.com/bwp91/homebridge-ewelink-beta"
+      "url": "https://github.com/bwp91/homebridge-ewelink-sonoff"
    },
    "dependencies": {
       "axios": "0.19.2",
