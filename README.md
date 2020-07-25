@@ -11,7 +11,7 @@ There seems to be a variety of Homebridge plugins for eWeLink/Sonoff devices. My
 
 This project was forked and based on the work of [homebridge-ewelink-max](https://github.com/howanghk/homebridge-ewelink).
 
-> I am looking for someone with a Sonoff fan device (iFan02 and/or iFan03) to help me test. If you have free time and are willing, please create an issue letting me know :)
+> I am looking for someone with a Sonoff fan device (iFan02 and/or iFan03) or diffuser to help me test. If you have free time and are willing, please create an issue letting me know :)
 
 Thanks :)
 ## Documentation
