@@ -30,26 +30,6 @@
             "placeholder": "",
             "description": "The password for your eWeLink account."
          },
-         "mode": {
-            "title": "Default Mode",
-            "type": "string",
-            "required": true,
-            "description": "Preferred method of connection. Web socket recommended. Devices that don't support LAN mode will always use web socket.",
-            "default": "ws",
-            "oneOf": [{
-                  "title": "Web Socket",
-                  "enum": [
-                     "ws"
-                  ]
-               },
-               {
-                  "title": "LAN Mode",
-                  "enum": [
-                     "lan"
-                  ]
-               }
-            ]
-         },
          "debug": {
             "title": "Debug Logging",
             "type": "boolean",
@@ -58,7 +38,7 @@
             "default": false
          },
          "debugReqRes": {
-            "title": "Debug Requests & Responses",
+            "title": "Request & Response Logging",
             "type": "boolean",
             "required": true,
             "description": "If enabled, HTTP, web socket and LAN mode messages will be added to the log. Not recommended for long-term use.",
@@ -257,7 +237,6 @@
          "description": "Only adjust these settings if you know what you are doing.",
          "expandable": true,
          "items": [
-            "mode",
             "debug",
             "debugReqRes",
             "hideDevFromHB",
